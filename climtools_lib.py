@@ -41,6 +41,8 @@ def clus_visualize_2D():
     Makes a 2D plot using the coordinates in the first 2 EOFs of single realizations and clusters.
     """
 
+    
+
     return
 
 
