@@ -15,14 +15,14 @@ sys.path.insert(0,'/home/fabiano/Research/git/WRtool/CLUS_tool/WRtool/')
 from readsavencfield import read4Dncfield, save3Dncfield
 
 
-cart = '/home/fabiano/DATA/Medscope/seasonal_forecasts/'
+cart = '/home/fabiano/DATA/Medscope/seasonal_forecasts_1d5/'
 #cart = '/home/federico/work/MARS_data/MEDSCOPE_seasonal/'
 
 # Open nc file
 years = range(1993,2018)
 nmon = 7
 
-par = 228
+par = 167
 
 cart2 = cart + 'input_par{}_1ens/'.format(par)
 
@@ -41,6 +41,8 @@ elif par == 228:
 
 all_fields = dict()
 nc_fields = dict()
+
+dates_clim = dict()
 
 for year in years:
     for seas in ['may','nov']:
@@ -82,6 +84,9 @@ for year in years:
 
             save3Dncfield(lat,lon,var,parname,var_units,dates,time_units,time_cal,filename)
 
+        if year == 2000:
+            dates_clim[seas] = dates
+
 # Building climatology
 # faccio unica matriciona concatenando sull'asse 0, poi medio
 
@@ -108,7 +113,18 @@ for seas in ['may','nov']:
     climat_mean[seas] = np.array(climat_mean[seas])
     climat_std[seas] = np.array(climat_std[seas])
 
-pickle.dump([all_fields, climat_mean, climat_std], open(cart+'all_fields_climat_{}.p'.format(par),'wb'), protocol = 2)
+#pickle.dump([all_fields, climat_mean, climat_std], open(cart+'all_fields_climat_{}.p'.format(par),'wb'), protocol = 2)
+
+for seas in ['may','nov']:
+    filename = 'climatology_mean_{}_1993-2016.nc'.format(seas)
+    print(filename)
+    filename = cart2 + filename
+    save3Dncfield(lat,lon,climat_mean[seas],parname,var_units,dates_clim[seas],time_units,time_cal,filename)
+
+    filename = 'climatology_std_{}_1993-2016.nc'.format(seas)
+    print(filename)
+    filename = cart2 + filename
+    save3Dncfield(lat,lon,climat_std[seas],parname,var_units,dates_clim[seas],time_units,time_cal,filename)
 
 print(climat_mean['may'].shape)
 print(np.mean(climat_mean['may']))
