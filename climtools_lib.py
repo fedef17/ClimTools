@@ -13,8 +13,9 @@ import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
-from datetime import datetime
+from scipy import stats
 
+from datetime import datetime
 import pickle
 
 
@@ -653,29 +654,51 @@ def sel_season(var, dates, season, cut = True):
     return var_season, dates_season
 
 
-def filt_running_mean(var, dates, window):
+def daily_climatology(var, dates, window, refyear = 2001):
     """
-    Performs a day-of-the-year mean of the dataset using a window of n days (specified in input). Example: with window = 5, the result for day 120 is done averaging days from 118 to 122 in the full dataset.
+    Performs a daily climatological mean of the dataset using a window of n days around the day considered (specified in input). Example: with window = 5, the result for day 15/02 is done averaging days from 13/02 to 17/02 in the full dataset.
 
+    var has to be a daily dataset.
+
+    Window has to be an odd integer number. If n is even, the odd number n+1 is taken as window.
+    If window == 1, computes the simple day-by-day mean.
+
+    Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
     """
-    refyear = 2001
+
+    if not check_daily(dates):
+        raise ValueError('Not a daily dataset\n')
 
     dates_pdh = pd.to_datetime(dates)
-    days_ok = np.unique(dates_pdh.dayofyear)
+
+    months = np.unique(dates_pdh.month)
+    daysok = []
+    for mon in months:
+        mask = dates_pdh.month == mon
+        okday = np.unique(dates_pdh[mask].day)
+        if mon == 2 and okday[-1] == 29:
+            daysok.append(okday[:-1])
+        else:
+            daysok.append(okday)
 
     delta = window/2
 
     filt_mean = []
     filt_std = []
     dates_filt = []
-    date_0 = pd.to_datetime('20010101', format='%Y%m%d')
-    daydelta = pd.Timedelta('1 days')
-    for day in days_ok:
-        if day == 366: continue
-        okdates = (dates_pdh.dayofyear - day % 365 <= delta) & (day - dates_pdh.dayofyear % 365 <= delta)
-        filt_mean.append(np.mean(var[okdates,:,:], axis = 0))
-        filt_std.append(np.std(var[okdates,:,:], axis = 0))
-        dates_filt.append(date_0+(day-1)*daydelta)
+
+    for mon, daymon in zip(months, daysok):
+        for day in daymon:
+            data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,day), format='%Y%m%d')
+            if window > 2:
+                doy = data.dayofyear
+                okdates = ((dates_pdh.dayofyear - doy) % 365 <= delta) | ((doy - dates_pdh.dayofyear) % 365 <= delta)
+            else:
+                okdates = (dates_pdh.month == mon) & (dates_pdh.day == day)
+            #print(mon,day,doy,np.sum(okdates))
+            filt_mean.append(np.mean(var[okdates,:,:], axis = 0))
+            filt_std.append(np.std(var[okdates,:,:], axis = 0))
+            dates_filt.append(data)
 
     dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
 
@@ -685,17 +708,67 @@ def filt_running_mean(var, dates, window):
     return filt_mean, dates_ok, filt_std
 
 
-def anomalies(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
+def monthly_climatology(var, dates, refyear = 2001):
     """
-    Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a filt_running_mean() on var with the specified window.
+    Performs a monthly climatological mean of the dataset.
+    Works both on monthly and daily datasets.
+
+    Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
+    """
+
+    dates_pdh = pd.to_datetime(dates)
+
+    months = np.unique(dates_pdh.month)
+    dayref = np.unique(dates_pdh.day)[0]
+
+    filt_mean = []
+    filt_std = []
+    dates_filt = []
+
+    for mon in months:
+        data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,dayref), format='%Y%m%d')
+        okdates = (dates_pdh.month == mon)
+        filt_mean.append(np.mean(var[okdates,:,:], axis = 0))
+        filt_std.append(np.std(var[okdates,:,:], axis = 0))
+        dates_filt.append(data)
+
+    dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
+
+    filt_mean = np.concatenate(filt_mean)
+    filt_std = np.concatenate(filt_std)
+
+    return filt_mean, dates_ok, filt_std
+
+
+def check_daily(dates):
+    """
+    Checks if the dataset is a daily dataset.
+    """
+    daydelta = pd.Timedelta('1 days')
+    delta = dates[1]-dates[0]
+
+    if delta == daydelta:
+        return True
+    else:
+        return False
+
+
+def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
+    """
+    Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a daily or monthly climatology on var with the specified window.
+
+    Works only for daily datasets.
 
     :param climat_mean: the climatological mean to be subtracted.
     :param dates_climate_mean: the
     :param window: int. Calculate the running mean on N day window.
     """
 
-    if climat_mean is None:
-        climat_mean = filt_running_mean(var, dates, window)
+    if not check_daily(dates):
+        raise ValueError('Not a daily dataset')
+
+    if climat_mean is None or dates_climate_mean is None:
+        climat_mean, dates_climate_mean, _ = daily_climatology(var, dates, window)
 
     dates_pdh = pd.to_datetime(dates)
     dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
@@ -706,10 +779,88 @@ def anomalies(var, dates, climat_mean = None, dates_climate_mean = None, window 
         var_anom[mask,:,:] = var[mask,:,:] - el
 
     mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
-    var_anom[mask,:,:] = var[mask,:,:] - el
+    okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
+    var_anom[mask,:,:] = var[mask,:,:] - climat_mean[okel,:,:]
 
     return var_anom
 
+
+def anomalies_monthly(var, dates, climat_mean = None, dates_climate_mean = None):
+    """
+    Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a monthly climatology on var.
+
+    Works only for monthly datasets.
+
+    :param climat_mean: the climatological mean to be subtracted.
+    :param dates_climate_mean: the
+    """
+
+    if check_daily(dates):
+        raise ValueError('Not a monthly dataset')
+
+    if climat_mean is None or dates_climate_mean is None:
+        climat_mean, dates_climate_mean, _ = monthly_climatology(var, dates)
+
+    dates_pdh = pd.to_datetime(dates)
+    dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    var_anom = np.empty_like(var)
+
+    for el, dat in zip(climat_mean, dates_climate_mean_pdh):
+        mask = (dates_pdh.month == dat.month)
+        var_anom[mask,:,:] = var[mask,:,:] - el
+
+    return var_anom
+
+
+def anomalies_ensemble(var_ens, extreme = 'mean'):
+    """
+    Calculates mean and anomaly on an ensemble. Optionally calculates other statistical quantities rather than the mean, set by the key "extreme".
+
+    Possible quantities to calculate are:
+    - mean: the time mean.
+    - {}th_perc: the nth percentile of each member in time. i.e. for the 90th percentile, the key '90th_perc' has to be set
+    - maximum: the maximum of each member in time.
+    - std: the standard deviation of each member in time.
+    - trend: the trend of each member in time.
+
+    The "extreme_ensemble_mean" is calculated averaging on the full ensemble the quantities above. Anomalies are calculated with respect to this "ensemble mean".
+
+    """
+    numens = len(var_ens)
+
+    if extreme=='mean':
+        #Compute the time mean over the entire period, for each ensemble member
+        varextreme_ens=[np.mean(var_ens[i],axis=0) for i in range(numens)]
+    elif len(extreme.split("_"))==2:
+        #Compute the chosen percentile over the period, for each ensemble member
+        q=int(extreme.partition("th")[0])
+        varextreme_ens=[np.percentile(var_ens[i],q,axis=0) for i in range(numens)]
+    elif extreme=='maximum':
+        #Compute the maximum value over the period, for each ensemble member
+        varextreme_ens=[np.max(var_ens[i],axis=0) for i in range(numens)]
+    elif extreme=='std':
+        #Compute the standard deviation over the period, for each ensemble member
+        varextreme_ens=[np.std(var_ens[i],axis=0) for i in range(numens)]
+    elif extreme=='trend':
+        #Compute the linear trend over the period, for each ensemble member
+        trendmap=np.empty((var_ens[0].shape[1],var_ens[0].shape[2]))
+        trendmap_ens=[]
+        for i in range(numens):
+            for la in range(var_ens[0].shape[1]):
+                for lo in range(var_ens[0].shape[2]):
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(range(var_ens[0].shape[0]),var_ens[i][:,la,lo])
+                    trendmap[la,lo]=slope
+            trendmap_ens.append(trendmap)
+        varextreme_ens = trendmap_ens
+
+    print('\n------------------------------------------------------------')
+    print('Anomalies and ensemble mean are computed with respect to the {0}'.format(extreme))
+    print('------------------------------------------------------------\n')
+
+    extreme_ensemble_mean = np.mean(varextreme_ens_np, axis = 0)
+    extreme_ens_anomalies = varextreme_ens_np - extreme_ensemble_mean
+
+    return extreme_ens_anomalies, extreme_ensemble_mean
 
 #######################################################
 #
@@ -733,6 +884,229 @@ def cosine(x,y):
     else:
         raise ValueError('Too many dimensions')
 
+
+def eof_computation_bkp(var, varunits, lat, lon):
+    """
+    Compatibility version.
+
+    Computes the EOFs of a given variable. In the first dimension there has to be different time or ensemble realizations of variable.
+
+    The data are weighted with respect to the cosine of latitude.
+    """
+    # The data array is dimensioned (ntime, nlat, nlon) and in order for the latitude weights to be broadcastable to this shape, an extra length-1 dimension is added to the end:
+    weights_array = np.sqrt(np.cos(np.deg2rad(lat)))[:, np.newaxis]
+
+    start = datetime.datetime.now()
+    solver = Eof(var, weights=weights_array)
+    end = datetime.datetime.now()
+    print('EOF computation took me {:6.1f} seconds'.format(end-start))
+
+    #ALL VARIANCE FRACTIONS
+    varfrac = solver.varianceFraction()
+    acc = np.cumsum(varfrac*100)
+
+    #PCs unscaled  (case 0 of scaling)
+    pcs_unscal0 = solver.pcs()
+    #EOFs unscaled  (case 0 of scaling)
+    eofs_unscal0 = solver.eofs()
+
+    #PCs scaled  (case 1 of scaling)
+    pcs_scal1 = solver.pcs(pcscaling=1)
+
+    #EOFs scaled (case 2 of scaling)
+    eofs_scal2 = solver.eofs(eofscaling=2)
+
+    return solver, pcs_scal1, eofs_scal2, pcs_unscal0, eofs_unscal0, varfrac
+
+
+def eof_computation(var, latitude, weight = True):
+    """
+    Computes the EOFs of a given variable. In the first dimension there has to be different time or ensemble realizations of variable.
+
+    If weigth is True, the data are weighted with respect to the cosine of latitude.
+    """
+    # The data array is dimensioned (ntime, nlat, nlon) and in order for the latitude weights to be broadcastable to this shape, an extra length-1 dimension is added to the end:
+    if weight:
+        weights_array = np.sqrt(np.cos(np.deg2rad(lat)))[:, np.newaxis]
+    else:
+        weights_array = None
+
+    start = datetime.datetime.now()
+    solver = Eof(var, weights=weights_array)
+    end = datetime.datetime.now()
+    print('EOF computation took me {:6.1f} seconds'.format(end-start))
+
+    return solver
+
+
+def Kmeans_clustering(solver, numclus, numpcs, order_by_frequency = True, algorithm = 'sklearn', n_init_sk = 600,  max_iter_sk = 1000, npart_molt = 100):
+    """
+    Computes the Kmeans clustering on the given pcs. Two algorithms can be used:
+    - the sklearn KMeans algorithm (algorithm = 'sklearn')
+    - the fortran algorithm developed by Molteni (algorithm = 'molteni')
+    """
+    from sklearn.cluster import KMeans
+    import ctool
+
+    PCs = solver.pcs()[:,:numpcs]
+
+    start = datetime.datetime.now()
+    if algorithm == 'sklearn':
+        clus = KMeans(n_clusters=numclus, n_init = n_init_sk, max_iter = max_iter_sk)
+
+        clus.fit(PCs)
+        centroids = clus.cluster_centers_
+        labels = clus.labels_
+    elif algorithm == 'molteni':
+        pc = np.transpose(PCs)
+        nfcl, labels, centroids, varopt, iseed = ctool.cluster_toolkit.clus_opt(numclus, npart_molt, pc)
+        centroids = np.array(centroids)
+        labels = np.array(labels) - 1 # because of fortran numbering
+    else:
+        raise ValueError('algorithm {} not recognised'.format(algorithm))
+
+    end = datetime.datetime.now()
+    print('k-means algorithm took me {:6.1f} seconds'.format(end-start))
+
+
+    ## Ordering clusters for number of members
+    centroids = np.array(centroids)
+    labels = np.array(labels)
+
+    if order_by_frequency:
+        num_mem = []
+        for i in range(numclus):
+            num_mem.append(np.sum(labels == i))
+        num_mem = np.array(num_mem)
+
+        new_ord = num_mem.argsort()[::-1]
+        centroids = centroids[new_ord]
+
+        labels_new = np.array(labels)
+        for nu, i in zip(range(numclus), new_ord):
+            labels_new[labels == i] = nu
+        labels = labels_new
+
+    return centroids, labels
+
+
+def find_cluster_minmax(PCs, centroids, labels):
+    """
+    Finds closer and further points from the centroid in each cluster.
+    """
+
+    ens_mindist = []
+    ens_maxdist = []
+    for nclus in range(numclus):
+        for ens in range(numens):
+            normens = centroids[nclus,:] - PCs[ens,:]
+            norm[nclus,ens] = math.sqrt(sum(normens**2))
+
+        ens_mindist.append((np.argmin(norm[nclus,:]), norm[nclus].min()))
+        ens_maxdist.append((np.argmax(norm[nclus,:]), norm[nclus].max()))
+
+    return ens_mindist, ens_maxdist
+
+
+def clus_eval_indexes(PCs, centroids, labels):
+    """
+    Computes clustering evaluation indexes, as the Davies-Bouldin Index, the Dunn Index, the optimal variance ratio and the Silhouette value. Also computes cluster sigmas and distances.
+    """
+    ### Computing clustering evaluation Indexes
+    numclus = len(centroids)
+    inertia_i = np.empty(numclus)
+    for i in range(numclus):
+        lab_clus = labels == i
+        inertia_i[i] = np.sum([np.sum((pcok-centroids[i])**2) for pcok in PCs[lab_clus]])
+
+    clus_eval = dict()
+    clus_eval['Indexes'] = dict()
+
+    # Optimal ratio
+
+    n_clus = np.empty(numclus)
+    for i in range(numclus):
+        n_clus[i] = np.sum(labels == i)
+
+    mean_intra_clus_variance = np.sum(inertia_i)/len(labels)
+
+    dist_couples = dict()
+    coppie = list(combinations(range(numclus), 2))
+    for (i,j) in coppie:
+        dist_couples[(i,j)] = LA.norm(centroids[i]-centroids[j])
+
+    mean_inter_clus_variance = np.sum(np.array(dist_couples.values())**2)/len(coppie)
+
+    clus_eval['Indexes']['Inter-Intra Variance ratio'] = mean_inter_clus_variance/mean_intra_clus_variance
+
+    sigma_clusters = np.sqrt(inertia_i/n_clus)
+    clus_eval['Indexes']['Inter-Intra Distance ratio'] = np.mean(dist_couples.values())/np.mean(sigma_clusters)
+
+    # Davies-Bouldin Index
+    R_couples = dict()
+    for (i,j) in coppie:
+        R_couples[(i,j)] = (sigma_clusters[i]+sigma_clusters[j])/dist_couples[(i,j)]
+
+    DBI = 0.
+    for i in range(numclus):
+        coppie_i = [coup for coup in coppie if i in coup]
+        Di = np.max([R_couples[cop] for cop in coppie_i])
+        DBI += Di
+
+    DBI /= numclus
+    clus_eval['Indexes']['Davies-Bouldin'] = DBI
+
+    # Dunn Index
+
+    Delta_clus = np.empty(numclus)
+    for i in range(numclus):
+        lab_clus = labels == i
+        distances = [LA.norm(pcok-centroids[i]) for pcok in PCs[lab_clus]]
+        Delta_clus[i] = np.sum(distances)/n_clus[i]
+
+    clus_eval['Indexes']['Dunn'] = np.min(dist_couples.values())/np.max(Delta_clus)
+
+    clus_eval['Indexes']['Dunn 2'] = np.min(dist_couples.values())/np.max(sigma_clusters)
+
+    # Silhouette
+    sils = []
+    for ind, el, lab in zip(range(len(PCs)), PCs, labels):
+        lab_clus = labels == lab
+        lab_clus[ind] = False
+        ok_Pcs = PCs[lab_clus]
+        a = np.sum([LA.norm(okpc - el) for okpc in ok_Pcs])/n_clus[lab]
+
+        bs = []
+        others = range(numclus)
+        others.remove(lab)
+        for lab_b in others:
+            lab_clus = labels == lab_b
+            ok_Pcs = PCs[lab_clus]
+            b = np.sum([LA.norm(okpc - el) for okpc in ok_Pcs])/n_clus[lab_b]
+            bs.append(b)
+
+        b = np.min(bs)
+        sils.append((b-a)/max([a,b]))
+
+    sils = np.array(sils)
+    sil_clus = []
+    for i in range(numclus):
+        lab_clus = labels == i
+        popo = np.sum(sils[lab_clus])/n_clus[i]
+        sil_clus.append(popo)
+
+    siltot = np.sum(sil_clus)/numclus
+
+    clus_eval['Indexes']['Silhouette'] = siltot
+    clus_eval['clus_silhouettes'] = sil_clus
+
+    clus_eval['Indexes']['Dunn2/DB'] = clus_eval['Indexes']['Dunn 2']/clus_eval['Indexes']['Davies-Bouldin']
+
+    clus_eval['R couples'] = R_couples
+    clus_eval['Inter cluster distances'] = dist_couples
+    clus_eval['Sigma clusters'] = sigma_clusters
+
+    return clus_eval
 
 #######################################################
 #
