@@ -6,6 +6,8 @@ import sys
 import os
 
 from matplotlib import pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.patheffects as PathEffects
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
@@ -14,6 +16,10 @@ import pandas as pd
 from numpy import linalg as LA
 from eofs.standard import Eof
 from scipy import stats
+from itertools import combinations
+
+from sklearn.cluster import KMeans
+import ctool
 
 from datetime import datetime
 import pickle
@@ -225,7 +231,7 @@ def read4Dncfield(ifile, extract_level = None):
 
     return var, level, lat, lon, dates, time_units, var_units, time_cal
 
-def read3Dncfield(ifile):
+def read3Dncfield(ifile, compress_dummy_dim = True):
     '''
     GOAL
         Read netCDF file of 3Dfield
@@ -256,6 +262,9 @@ def read3Dncfield(ifile):
     var_units   = fh.variables[variabs[-1]].units
     var         = fh.variables[variabs[-1]][:,:,:]
     txt='{0} dimension [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
+
+    if compress_dummy_dim and var.ndim > 3:
+        var = var.squeeze()
     #print(fh.variables)
     dates=nc.num2date(time,time_units)
     fh.close()
@@ -581,7 +590,7 @@ def sel_area(lat,lon,var,area):
     else:
         raise ValueError('Variable has {} dimensions, should have 2 or 3.'.format(var.ndim))
 
-    return var_area,lat[latidx],lon_new[lonidx]
+    return var_area, lat[latidx], lon_new[lonidx]
 
 
 def sel_season(var, dates, season, cut = True):
@@ -702,8 +711,8 @@ def daily_climatology(var, dates, window, refyear = 2001):
 
     dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
 
-    filt_mean = np.concatenate(filt_mean)
-    filt_std = np.concatenate(filt_std)
+    filt_mean = np.stack(filt_mean)
+    filt_std = np.stack(filt_std)
 
     return filt_mean, dates_ok, filt_std
 
@@ -734,8 +743,8 @@ def monthly_climatology(var, dates, refyear = 2001):
 
     dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
 
-    filt_mean = np.concatenate(filt_mean)
-    filt_std = np.concatenate(filt_std)
+    filt_mean = np.stack(filt_mean)
+    filt_std = np.stack(filt_std)
 
     return filt_mean, dates_ok, filt_std
 
@@ -780,6 +789,7 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
 
     mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
     okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
+
     var_anom[mask,:,:] = var[mask,:,:] - climat_mean[okel,:,:]
 
     return var_anom
@@ -868,10 +878,41 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
 #
 #######################################################
 
+def Rcorr(x,y):
+    """
+    Returns correlation coefficient between two array of arbitrary shape.
+    """
+    return np.corrcoef(x.flatten(), y.flatten())[1,0]
+
+
+def E_rms(x,y):
+    """
+    Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2).
+    """
+    n = x.size
+    #E = np.sqrt(1.0/n * np.sum((x.flatten()-y.flatten())**2))
+    E = 1/np.sqrt(n) * LA.norm(x-y)
+
+    return E
+
+
+def E_rms_cp(x,y):
+    """
+    Returns centered-pattern root mean square, e.g. first subtracts the mean to the two series and then computes E_rms.
+    """
+    x1 = x - x.mean()
+    y1 = y - y.mean()
+
+    E = E_rms(x1, y1)
+
+    return E
+
+
 def cosine(x,y):
     """
     Calculates the cosine of the angle between x and y. If x and y are 2D, the scalar product is taken using the np.vdot() function.
     """
+
     if x.ndim != y.ndim:
         raise ValueError('x and y have different dimension')
     elif x.shape != y.shape:
@@ -885,6 +926,17 @@ def cosine(x,y):
         raise ValueError('Too many dimensions')
 
 
+def cosine_cp(x,y):
+    """
+    Before calculating the cosine, subtracts the mean to both x and y. This is exactly the same as calculating the correlation coefficient R.
+    """
+
+    x1 = x - x.mean()
+    y1 = y - y.mean()
+
+    return cosine(x1,y1)
+
+
 def eof_computation_bkp(var, varunits, lat, lon):
     """
     Compatibility version.
@@ -896,10 +948,10 @@ def eof_computation_bkp(var, varunits, lat, lon):
     # The data array is dimensioned (ntime, nlat, nlon) and in order for the latitude weights to be broadcastable to this shape, an extra length-1 dimension is added to the end:
     weights_array = np.sqrt(np.cos(np.deg2rad(lat)))[:, np.newaxis]
 
-    start = datetime.datetime.now()
+    start = datetime.now()
     solver = Eof(var, weights=weights_array)
-    end = datetime.datetime.now()
-    print('EOF computation took me {:6.1f} seconds'.format(end-start))
+    end = datetime.now()
+    print('EOF computation took me {:6.1f} seconds'.format((end-start).total_seconds()))
 
     #ALL VARIANCE FRACTIONS
     varfrac = solver.varianceFraction()
@@ -927,30 +979,42 @@ def eof_computation(var, latitude, weight = True):
     """
     # The data array is dimensioned (ntime, nlat, nlon) and in order for the latitude weights to be broadcastable to this shape, an extra length-1 dimension is added to the end:
     if weight:
-        weights_array = np.sqrt(np.cos(np.deg2rad(lat)))[:, np.newaxis]
+        weights_array = np.sqrt(np.cos(np.deg2rad(latitude)))[:, np.newaxis]
     else:
         weights_array = None
 
-    start = datetime.datetime.now()
+    start = datetime.now()
     solver = Eof(var, weights=weights_array)
-    end = datetime.datetime.now()
-    print('EOF computation took me {:6.1f} seconds'.format(end-start))
+    end = datetime.now()
+    print('EOF computation took me {:6.1f} seconds'.format((end-start).total_seconds()))
 
     return solver
 
 
-def Kmeans_clustering(solver, numclus, numpcs, order_by_frequency = True, algorithm = 'sklearn', n_init_sk = 600,  max_iter_sk = 1000, npart_molt = 100):
+def Kmeans_clustering_from_solver(eof_solver, numclus, numpcs, **kwargs):
+    """
+    Wrapper to Kmeans_clustering starting from eof_solver, the output of func eof_computation.
+
+    numpcs is the dimension of the Eof space to be considered.
+    """
+    PCs = eof_solver.pcs()[:,:numpcs]
+
+    centroids, labels = Kmeans_clustering(PCs, numclus, **kwargs)
+
+    return centroids, labels
+
+
+def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'sklearn', n_init_sk = 600,  max_iter_sk = 1000, npart_molt = 100):
     """
     Computes the Kmeans clustering on the given pcs. Two algorithms can be used:
     - the sklearn KMeans algorithm (algorithm = 'sklearn')
     - the fortran algorithm developed by Molteni (algorithm = 'molteni')
+
+    < param PCs > : the unscaled PCs of the EOF decomposition. The dimension should be already limited to the desired numpcs: PCs.shape = (numpoints, numpcs)
+    < param numclus > : number of clusters.
     """
-    from sklearn.cluster import KMeans
-    import ctool
 
-    PCs = solver.pcs()[:,:numpcs]
-
-    start = datetime.datetime.now()
+    start = datetime.now()
     if algorithm == 'sklearn':
         clus = KMeans(n_clusters=numclus, n_init = n_init_sk, max_iter = max_iter_sk)
 
@@ -965,8 +1029,8 @@ def Kmeans_clustering(solver, numclus, numpcs, order_by_frequency = True, algori
     else:
         raise ValueError('algorithm {} not recognised'.format(algorithm))
 
-    end = datetime.datetime.now()
-    print('k-means algorithm took me {:6.1f} seconds'.format(end-start))
+    end = datetime.now()
+    print('k-means algorithm took me {:6.1f} seconds'.format((end-start).total_seconds()))
 
 
     ## Ordering clusters for number of members
@@ -1006,6 +1070,37 @@ def find_cluster_minmax(PCs, centroids, labels):
         ens_maxdist.append((np.argmax(norm[nclus,:]), norm[nclus].max()))
 
     return ens_mindist, ens_maxdist
+
+
+def calc_composite_map(var, mask):
+    """
+    Calculates the composite, according to mask (boolean array). Var is assumed to be 3D.
+    """
+
+    pattern = np.mean(var[mask,:,:], axis = 0)
+    # pattern_std = np.std(var[mask,:,:], axis = 0)
+
+    return pattern #, pattern_std
+
+
+def compute_clusterpatterns(var, labels):
+    """
+    Calculates the cluster patterns.
+    """
+
+    labels = np.array(labels)
+    numclus = max(labels)+1
+
+    cluspatt = []
+    #freqs = []
+    for nclus in range(numclus):
+        mask = labels == nclus
+        #freqs.append(100.0*np.sum(mask)/len(labels))
+        #print('CLUSTER {} ---> {:4.1f}%\n'.format(nclus, freq_perc))
+        cluspattern = np.mean(var[mask,:,:], axis=0)
+        cluspatt.append(cluspattern)
+
+    return cluspatt
 
 
 def clus_eval_indexes(PCs, centroids, labels):
@@ -1113,6 +1208,268 @@ def clus_eval_indexes(PCs, centroids, labels):
 ###     Plots and visualization
 #
 #######################################################
+
+def color_brightness(color):
+    return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
+
+def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6):
+    """
+    Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
+    """
+    cmappa = cm.get_cmap(cmap)
+    colors = []
+    valori = np.linspace(0.05,0.95,n)
+    for cos in valori:
+        colors.append(cmappa_clus(cos))
+
+    for i, (col,val) in enumerate(zip(colors, valori)):
+        if color_brightness(col) > bright_thres:
+            # Looking for darker color
+            col2 = cmappa_clus(val+1.0/(3*n))
+            col3 = cmappa_clus(val-1.0/(3*n))
+            colori = [col, col2, col3]
+            brighti = np.array([color_brightness(co) for co in colori]).argmin()
+            colors[i] = colori[brighti]
+
+    return colors
+
+
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+    """
+    Plots field contours on the axis of a figure.
+
+    < data >: the field to plot
+    < lat, lon >: latitude and longitude
+
+    < proj >: The ccrs transform used for the plot.
+    < cmappa >: color map.
+    < cbar_range >: limits of the color bar.
+
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+
+    """
+
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+
+    ax.set_global()
+    ax.coastlines(linewidth = 2)
+    xi,yi = np.meshgrid(lon,lat)
+
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = proj, extend = 'both')
+    if draw_contour_lines:
+        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = proj, linewidth = 0.5)
+
+    if isinstance(proj, ccrs.PlateCarree):
+        latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
+        ax.set_extent(latlonlim, crs = proj)
+
+    return map_plot
+
+
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+    """
+    Plots a single map to a figure.
+
+    < data >: the field to plot
+    < lat, lon >: latitude and longitude
+    < filename >: name of the file to save the figure to. If None, the figure is just shown.
+
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < cmap >: name of the color map.
+    < cbar_range >: limits of the color bar.
+
+    < plot_anomalies >: if True, the colorbar is symmetrical, so that zero corresponds to white. If cbar_range is set, plot_anomalies is set to False.
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+
+    """
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        clat = lat.min() + (lat.max()-lat.min())/2
+        clon = lon.min() + (lon.max()-lon.min())/2
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+    mi = np.percentile(data, 5)
+    ma = np.percentile(data, 95)
+    if plot_anomalies:
+        # making a symmetrical color axis
+        oko = max(abs(mi), abs(ma))
+        spi = 2*oko/(n_color_levels-1)
+        spi_ok = np.ceil(spi*100)/100
+        oko2 = spi_ok*(n_color_levels-1)/2
+        oko1 = -oko2
+    else:
+        oko1 = mi
+        oko2 = ma
+
+    clevels = np.linspace(oko1, oko2, n_color_levels)
+    cbar_range = (oko1, oko2)
+
+    # Plotting figure
+    fig4 = plt.figure(figsize=(8,6))
+    ax = plt.subplot(projection = proj)
+
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    title_obj = plt.title(title, fontsize=20, fontweight='bold')
+    title_obj.set_position([.5, 1.05])
+
+    cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+    cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
+    cb.ax.tick_params(labelsize=14)
+    cb.set_label(cb_label, fontsize=16)
+
+    top    = 0.88  # the top of the subplots
+    bottom = 0.20    # the bottom of the subplots
+    left   = 0.02    # the left side
+    right  = 0.98  # the right side
+    hspace = 0.20   # height reserved for white space
+    wspace = 0.05    # width reserved for blank space
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+
+    # save the figure or show it
+    if filename is not None:
+        fig4.savefig(filename)
+        plt.close(fig4)
+    else:
+        plt.show(fig4)
+
+    return
+
+
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+    """
+    Plots multiple maps on a single figure (or more figures if needed).
+
+    < data >: list, the fields to plot
+    < lat, lon >: latitude and longitude
+    < filename >: name of the file to save the figure to. If more figures are needed, the others are named as filename_1.pdf, filename_2.pdf, ...
+
+    < max_ax_in_fig >: maximum number of figure panels inside a single figure. More figures are produced if dataset is longer.
+    < number_subplots > : show the absolute number of each member on top of the subplot.
+
+    If the fields to plot belong to different clusters, other functions are available:
+    < cluster_labels > : labels that assign each member of dataset to a cluster.
+    < cluster_colors > : colors for the different clusters. Cluster numbers have this color background.
+    < repr_cluster > : number of the member representative of each cluster. A colored rectangle is drawn around them.
+
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < cmap >: name of the color map.
+    < cbar_range >: limits of the color bar.
+
+    < plot_anomalies >: if True, the colorbar is symmetrical, so that zero corresponds to white. If cbar_range is set, plot_anomalies is set to False.
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+
+    """
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        clat = lat.min() + (lat.max()-lat.min())/2
+        clon = lon.min() + (lon.max()-lon.min())/2
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+    mi = np.percentile(dataset, 5)
+    ma = np.percentile(dataset, 95)
+    if plot_anomalies:
+        # making a symmetrical color axis
+        oko = max(abs(mi), abs(ma))
+        spi = 2*oko/(n_color_levels-1)
+        spi_ok = np.ceil(spi*100)/100
+        oko2 = spi_ok*(n_color_levels-1)/2
+        oko1 = -oko2
+    else:
+        oko1 = mi
+        oko2 = ma
+
+    clevels = np.linspace(oko1, oko2, n_color_levels)
+    cbar_range = (oko1, oko2)
+
+    # Begin plotting
+    numens = len(dataset)
+
+    num_figs = int(np.ceil(1.0*numens/max_ax_in_fig))
+    numens_ok = int(np.ceil(numens/num_figs))
+
+    side1 = int(np.ceil(np.sqrt(numens_ok)))
+    side2 = int(np.ceil(numens_ok/float(side1)))
+
+    namef = []
+    namef.append(filename)
+    if num_figs > 1:
+        indp = filename.rfind('.')
+        figform = filename[indp:]
+        basename = filename[:indp]
+        for i in range(num_figs)[1:]:
+            namef.append(basename+'_{}'.format(i)+figform)
+
+    if cluster_labels is not None:
+        numclus = len(np.unique(cluster_labels))
+        if cluster_colors is None:
+            cluster_colors = color_set(numclus)
+
+    for i in range(num_figs):
+        fig = plt.figure(figsize=(24,14))
+        for nens in range(numens_ok*i, numens_ok*(i+1)):
+            nens_rel = nens - numens_ok*i
+            ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
+
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range)
+
+            if number_subplots:
+                subtit = nens
+                title_obj = plt.text(-0.05, 1.05, subtit, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, fontsize=20, fontweight='bold', zorder = 20)
+            if cluster_labels is not None:
+                for nclus in range(numclus):
+                    if nens in np.where(cluster_labels == nclus)[0]:
+                        okclus = nclus
+                        bbox=dict(facecolor=cluster_colors[nclus], alpha = 0.7, edgecolor='black', boxstyle='round,pad=0.2')
+                        title_obj.set_bbox(bbox)
+
+                if repr_cluster is not None:
+                    if nens == repr_cluster[okclus]:
+                        rect = plt.Rectangle((-0.01,-0.01), 1.02, 1.02, fill = False, transform = ax.transAxes, clip_on = False, zorder = 10)
+                        rect.set_edgecolor(cluster_colors[okclus])
+                        rect.set_linewidth(6.0)
+                        ax.add_artist(rect)
+
+        cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+        cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
+        cb.ax.tick_params(labelsize=18)
+        cb.set_label(cb_label, fontsize=20)
+
+        plt.suptitle(title, fontsize=35, fontweight='bold')
+
+        plt.subplots_adjust(top=0.85)
+        top    = 0.90  # the top of the subplots
+        bottom = 0.13    # the bottom
+        left   = 0.02    # the left side
+        right  = 0.98  # the right side
+        hspace = 0.20   # the amount of height reserved for white space between subplots
+        wspace = 0.05    # the amount of width reserved for blank space between subplots
+        plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+
+        fig.savefig(namef[i])
+        plt.close(fig)
+
+    return
 
 
 def clus_visualize_2D():
