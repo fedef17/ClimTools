@@ -951,7 +951,7 @@ def eof_computation_bkp(var, varunits, lat, lon):
     start = datetime.now()
     solver = Eof(var, weights=weights_array)
     end = datetime.now()
-    print('EOF computation took me {:6.1f} seconds'.format((end-start).total_seconds()))
+    print('EOF computation took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
     #ALL VARIANCE FRACTIONS
     varfrac = solver.varianceFraction()
@@ -986,7 +986,7 @@ def eof_computation(var, latitude, weight = True):
     start = datetime.now()
     solver = Eof(var, weights=weights_array)
     end = datetime.now()
-    print('EOF computation took me {:6.1f} seconds'.format((end-start).total_seconds()))
+    print('EOF computation took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
     return solver
 
@@ -1004,7 +1004,7 @@ def Kmeans_clustering_from_solver(eof_solver, numclus, numpcs, **kwargs):
     return centroids, labels
 
 
-def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'sklearn', n_init_sk = 600,  max_iter_sk = 1000, npart_molt = 100):
+def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'sklearn', n_init_sk = 600,  max_iter_sk = 1000, npart_molt = 1000):
     """
     Computes the Kmeans clustering on the given pcs. Two algorithms can be used:
     - the sklearn KMeans algorithm (algorithm = 'sklearn')
@@ -1025,12 +1025,15 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
         pc = np.transpose(PCs)
         nfcl, labels, centroids, varopt, iseed = ctool.cluster_toolkit.clus_opt(numclus, npart_molt, pc)
         centroids = np.array(centroids)
+        centroids = centroids.T # because of fortran lines/columns ordering
         labels = np.array(labels) - 1 # because of fortran numbering
     else:
         raise ValueError('algorithm {} not recognised'.format(algorithm))
 
+    print(algorithm)
+    print(centroids)
     end = datetime.now()
-    print('k-means algorithm took me {:6.1f} seconds'.format((end-start).total_seconds()))
+    print('k-means algorithm took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
 
     ## Ordering clusters for number of members
@@ -1092,11 +1095,12 @@ def compute_clusterpatterns(var, labels):
     numclus = max(labels)+1
 
     cluspatt = []
-    #freqs = []
+    freqs = []
     for nclus in range(numclus):
         mask = labels == nclus
-        #freqs.append(100.0*np.sum(mask)/len(labels))
-        #print('CLUSTER {} ---> {:4.1f}%\n'.format(nclus, freq_perc))
+        freq_perc = 100.0*np.sum(mask)/len(labels)
+        freqs.append(freq_perc)
+        print('CLUSTER {} ---> {:4.1f}%\n'.format(nclus, freq_perc))
         cluspattern = np.mean(var[mask,:,:], axis=0)
         cluspatt.append(cluspattern)
 
