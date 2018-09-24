@@ -16,7 +16,7 @@ import pandas as pd
 from numpy import linalg as LA
 from eofs.standard import Eof
 from scipy import stats
-from itertools import combinations
+import itertools as iter
 
 from sklearn.cluster import KMeans
 import ctool
@@ -717,13 +717,19 @@ def daily_climatology(var, dates, window, refyear = 2001):
     return filt_mean, dates_ok, filt_std
 
 
-def monthly_climatology(var, dates, refyear = 2001):
+def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     """
     Performs a monthly climatological mean of the dataset.
     Works both on monthly and daily datasets.
 
     Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
     """
+
+    if dates_range is not None:
+        var, dates = sel_time_range(var, dates, dates_range)
+        refyear = dates_range[1].year
 
     dates_pdh = pd.to_datetime(dates)
 
@@ -747,6 +753,22 @@ def monthly_climatology(var, dates, refyear = 2001):
     filt_std = np.stack(filt_std)
 
     return filt_mean, dates_ok, filt_std
+
+
+def range_years(year1, year2):
+    data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
+    data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
+    return data1, data2
+
+
+def sel_time_range(var, dates, dates_range):
+    """
+    Extracts a subset in time.
+    """
+    dates_pdh = pd.to_datetime(dates)
+    okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
+
+    return var[okdates, ...], dates[okdates]
 
 
 def check_daily(dates):
@@ -872,6 +894,52 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
 
     return extreme_ens_anomalies, extreme_ensemble_mean
 
+
+def yearly_average(var, dates):
+    """
+    Averages year per year.
+    """
+
+    dates_pdh = pd.to_datetime(dates)
+
+    nuvar = []
+    nudates = []
+    for year in np.unique(dates_pdh.year):
+        data = pd.to_datetime('{}0101'.format(year), format='%Y%m%d')
+        okdates = (dates_pdh.year == year)
+        nuvar.append(np.mean(var[okdates, ...], axis = 0))
+        nudates.append(data)
+
+    nuvar = np.stack(nuvar)
+
+    return nuvar, nudates
+
+
+def global_mean(field, latitude):
+    """
+    Calculates a global mean of field, weighting with the cosine of latitude.
+
+    Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
+    """
+    weights_array = abs(np.cos(np.deg2rad(latitude)))
+
+    zonal_field = zonal_mean(field)
+    mea = np.average(zonal_field, weights = weights_array, axis = -1)
+
+    return mea
+
+
+def zonal_mean(field):
+    """
+    Calculates a zonal mean of field.
+
+    Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
+    """
+
+    mea = np.mean(field, axis = -1)
+
+    return mea
+
 #######################################################
 #
 ###     EOF computation / Clustering / algebra
@@ -883,6 +951,13 @@ def Rcorr(x,y):
     Returns correlation coefficient between two array of arbitrary shape.
     """
     return np.corrcoef(x.flatten(), y.flatten())[1,0]
+
+
+def distance(x, y):
+    """
+    L2 distance.
+    """
+    return LA.norm(x-y)
 
 
 def E_rms(x,y):
@@ -1030,8 +1105,8 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     else:
         raise ValueError('algorithm {} not recognised'.format(algorithm))
 
-    print(algorithm)
-    print(centroids)
+    # print(algorithm)
+    # print(centroids)
     end = datetime.now()
     print('k-means algorithm took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
@@ -1041,20 +1116,106 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     labels = np.array(labels)
 
     if order_by_frequency:
-        num_mem = []
-        for i in range(numclus):
-            num_mem.append(np.sum(labels == i))
-        num_mem = np.array(num_mem)
-
-        new_ord = num_mem.argsort()[::-1]
-        centroids = centroids[new_ord]
-
-        labels_new = np.array(labels)
-        for nu, i in zip(range(numclus), new_ord):
-            labels_new[labels == i] = nu
-        labels = labels_new
+        labels, centroids = clus_order_by_frequency(labels, centroids)
 
     return centroids, labels
+
+
+def calc_clus_freq(labels):
+    """
+    Calculates clusters frequency.
+    """
+    numclus = max(labels)+1
+
+    num_mem = []
+    for i in range(numclus):
+        num_mem.append(np.sum(labels == i))
+    num_mem = np.array(num_mem)
+
+    freq_mem = 100.*num_mem/len(labels)
+
+    return num_mem, freq_mem
+
+
+def change_clus_order(labels, centroids, new_ord):
+    """
+    Changes order of cluster centroids and labels according to new_order.
+    """
+    numclus = max(labels)+1
+
+    labels_new = np.array(labels)
+    for nu, i in zip(range(numclus), new_ord):
+        labels_new[labels == i] = nu
+    labels = labels_new
+
+    centroids = centroids[new_ord]
+
+    return labels, centroids
+
+
+def clus_order_by_frequency(labels, centroids):
+    """
+    Orders the clusters in decreasing frequency. Returns new labels and ordered centroids.
+    """
+    numclus = max(labels)+1
+
+    num_mem, _ = calc_clus_freq(labels)
+    new_ord = num_mem.argsort()[::-1]
+
+    labels, centroids = change_clus_order(labels, centroids, new_ord)
+
+    return labels, centroids
+
+
+def match_pc_sets(pcset1, pcset2):
+    """
+    Find the best possible match between two sets of PCs.
+
+    Given two sets of PCs, finds the combination of PCs that minimizes the mean total squared error. If the input PCs represent cluster centroids, the results then correspond to the best unique match between the two sets of cluster centroids.
+
+    The first set of PCs is left in the input order and the second set of PCs is re-arranged.
+    Output:
+    - new_ord, the permutation of the second set that best matches the first.
+    """
+    if pcset1.shape != pcset2.shape:
+        raise ValueError('the PC sets must have the same dimensionality')
+
+    numclus, numpcs = pcset1.shape
+
+    perms = list(it.permutations(range(numclus)))
+    nperms = len(perms)
+
+    mean_rms = []
+    for p in perms:
+        all_rms = [LA.norm(pcset1[i] - pcset2[p[i]]) for i in range(numclus)]
+        mean_rms.append(np.mean(all_rms))
+
+    mean_rms = np.array(mean_rms)
+    jmin = mean_rms.argmin()
+
+    return perms[jmin]
+
+
+def clus_compare(clusters_1, clusters_2):
+    """
+    Computes the distance and cosine of the angle between two sets of clusters.
+    It is assumed the clusters are in matrix/vector form.
+
+    Works both in the physical space (with cluster patterns) and with the cluster PCs.
+
+    IMPORTANT!! It assumes the clusters are already ordered. (compares 1 with 1, ecc..)
+    """
+
+    et = []
+    patcor = []
+
+    for c1, c2 in zip(clusters_1, clusters_2):
+        dist = LA.norm(c1-c2)
+        et.append(dist)
+        cosin = cosine(c1,c2)
+        patcor.append(cosin)
+
+    return et, patcor
 
 
 def find_cluster_minmax(PCs, centroids, labels):
@@ -1130,7 +1291,7 @@ def clus_eval_indexes(PCs, centroids, labels):
     mean_intra_clus_variance = np.sum(inertia_i)/len(labels)
 
     dist_couples = dict()
-    coppie = list(combinations(range(numclus), 2))
+    coppie = list(iter.combinations(range(numclus), 2))
     for (i,j) in coppie:
         dist_couples[(i,j)] = LA.norm(centroids[i]-centroids[j])
 
@@ -1224,13 +1385,13 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6):
     colors = []
     valori = np.linspace(0.05,0.95,n)
     for cos in valori:
-        colors.append(cmappa_clus(cos))
+        colors.append(cmappa(cos))
 
     for i, (col,val) in enumerate(zip(colors, valori)):
         if color_brightness(col) > bright_thres:
             # Looking for darker color
-            col2 = cmappa_clus(val+1.0/(3*n))
-            col3 = cmappa_clus(val-1.0/(3*n))
+            col2 = cmappa(val+1.0/(3*n))
+            col3 = cmappa(val-1.0/(3*n))
             colori = [col, col2, col3]
             brighti = np.array([color_brightness(co) for co in colori]).argmin()
             colors[i] = colori[brighti]
@@ -1472,6 +1633,165 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
 
         fig.savefig(namef[i])
         plt.close(fig)
+
+    return
+
+
+def Taylor_plot(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, show_numbers = True, only_numbers = False, colors_all = None, cluster_labels = None, cluster_colors = None, repr_cluster = None, verbose = True):
+    """
+    Produces two figures:
+    - a Taylor diagram
+    - a bias/E_rms plot
+
+    < models > : a set of patterns (2D matrices or pc vectors) corresponding to different simulation results/model behaviours.
+    < observation > : the corresponding observed pattern. observation.shape must be the same as each of the models' shape.
+
+    < show_numbers > : print a number given by the order of the models sequence at each point in the plot.
+    < only_numbers > : print just numbers in the plot instead of points.
+
+    If the fields to plot belong to different clusters, other functions are available:
+    < cluster_labels > : labels that assign each member of dataset to a cluster.
+    < cluster_colors > : colors for the different clusters. Cluster numbers have this color background.
+    < repr_cluster > : number of the member representative of each cluster. A colored rectangle is drawn around them.
+    """
+    fig6 = plt.figure(figsize=(8,6))
+    ax = fig6.add_subplot(111, polar = True)
+    plt.title(title)
+    #ax.set_facecolor(bgcol)
+
+    ax.set_thetamin(0)
+    ax.set_thetamax(180)
+
+    sigmas_pred = np.array([np.std(var) for var in models])
+    sigma_obs = np.std(observation)
+    corrs_pred = np.array([Rcorr(observation, var) for var in models])
+
+    if cluster_labels is not None:
+        numclus = len(np.unique(cluster_labels))
+        if cluster_colors is None:
+            cluster_colors = color_set(numclus)
+
+        colors_all = [cluster_colors[clu] for clu in cluster_labels]
+
+    angles = np.arccos(corrs_pred)
+
+    ax.scatter([0.], [sigma_obs], color = 'black', s = 40, clip_on=False)
+
+    if not show_numbers:
+        ax.scatter(angles, sigmas_pred, s = 10, color = colors_all)
+        if repr_cluster is not None:
+            ax.scatter(angles[repr_cluster], sigmas_pred[repr_cluster], color = cluster_colors, edgecolor = 'black', s = 40)
+    else:
+        if only_numbers:
+            ax.scatter(angles, sigmas_pred, s = 0, color = colors_all)
+            for i, (ang, sig, col) in enumerate(zip(angles, sigmas_pred, colors_all)):
+                zord = 5
+                siz = 3
+                if i in repr_ens:
+                    zord = 21
+                    siz = 4
+                gigi = ax.text(ang, sig, i, ha="center", va="center", color = col, fontsize = siz, zorder = zord, weight = 'bold')
+        else:
+            for i, (ang, sig, col) in enumerate(zip(angles, sigmas_pred, colors_all)):
+                zord = i + 1
+                siz = 4
+                if repr_cluster is not None:
+                    if i in repr_cluster:
+                        zord = zord + numens
+                        siz = 5
+                        ax.scatter(ang, sig, color = col, alpha = 0.7, s = 60, zorder = zord, edgecolor = col)
+                    else:
+                        ax.scatter(ang, sig, s = 30, color = col, zorder = zord, alpha = 0.7)
+                else:
+                    ax.scatter(ang, sig, s = 30, color = col, zorder = zord, alpha = 0.7)
+                gigi = ax.text(ang, sig, i, ha="center", va="center", color = 'white', fontsize = siz, zorder = zord, WEIGHT = 'bold')
+
+    ok_cos = np.array([-0.99, -0.95, -0.9, -0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99])
+    labgr = ['{:4.2f}'.format(co) for co in ok_cos]
+    anggr = np.rad2deg(np.arccos(ok_cos))
+
+    plt.thetagrids(anggr, labels=labgr, frac = 1.1, zorder = 0)
+
+    for sig in [1., 2., 3.]:
+        circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
+        ax.add_artist(circle)
+
+    top    = 0.88  # the top of the subplots
+    bottom = 0.02    # the bottom
+    left   = 0.02    # the left side
+    right  = 0.98  # the right side
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top)
+    fig6.savefig(filename)
+
+
+    indp = filename.rfind('.')
+    figform = filename[indp:]
+    basename = filename[:indp]
+    nuname = basename+'_biases'+figform
+
+    fig7 = plt.figure(figsize=(8,6))
+    ax = fig7.add_subplot(111)
+    plt.title(title)
+
+    biases = np.array([np.mean(var) for var in models])
+    ctr_patt_RMS = np.array([E_rms_cp(var, observation) for var in models])
+    RMS = np.array([E_rms(var, observation) for var in models])
+
+    if verbose and cluster_labels is not None:
+        print('----------------------------\n')
+        min_cprms = ctr_patt_RMS.argmin()
+        print('The member with smallest centered-pattern RMS is member {} of cluster {}\n'.format(min_cprms, cluster_labels[min_cprms]))
+        print('----------------------------\n')
+        min_rms = RMS.argmin()
+        print('The member with smallest absolute RMS is member {} of cluster {}\n'.format(min_rms, cluster_labels[min_rms]))
+        print('----------------------------\n')
+        min_bias = np.abs((biases - np.mean(observation))).argmin()
+        print('The member with closest mean anomaly is member {} of cluster {}\n'.format(min_bias, cluster_labels[min_bias]))
+        print('----------------------------\n')
+        max_corr = corrs_pred.argmax()
+        print('The member with largest correlation coefficient is member {} of cluster {}\n'.format(max_corr, cluster_labels[max_corr]))
+
+    if not show_numbers:
+        ax.scatter(biases, ctr_patt_RMS, color = colors_all, s =10)
+        if repr_cluster is not None:
+            ax.scatter(biases[repr_cluster], ctr_patt_RMS[repr_cluster], color = cluster_colors, edgecolor = 'black', s = 40)
+    else:
+        if only_numbers:
+            ax.scatter(biases, ctr_patt_RMS, s = 0, color = colors_all)
+            for i, (ang, sig, col) in enumerate(zip(biases, ctr_patt_RMS, colors_all)):
+                zord = 5
+                siz = 7
+                if repr_cluster is not None:
+                    if i in repr_cluster:
+                        zord = 21
+                        siz = 9
+                gigi = ax.text(ang, sig, i, ha="center", va="center", color = col, fontsize = siz, zorder = zord, weight = 'bold')
+        else:
+            for i, (ang, sig, col) in enumerate(zip(biases, ctr_patt_RMS, colors_all)):
+                zord = i + 1
+                siz = 7
+                if repr_cluster is not None:
+                    if i in repr_cluster:
+                        zord = zord + numens
+                        siz = 9
+                        ax.scatter(ang, sig, color = col, alpha = 0.7, s = 200, zorder = zord, edgecolor = col)
+                    else:
+                        ax.scatter(ang, sig, s = 120, color = col, zorder = zord, alpha = 0.7)
+                else:
+                    ax.scatter(ang, sig, s = 120, color = col, zorder = zord, alpha = 0.7)
+                gigi = ax.text(ang, sig, i, ha="center", va="center", color = 'white', fontsize = siz, zorder = zord, WEIGHT = 'bold')
+
+    plt.xlabel(label_bias_axis)
+    plt.ylabel(label_ERMS_axis)
+
+    for sig in [1., 2., 3.]:
+        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs, fill = False, edgecolor = 'black', linestyle = '--')
+        ax.add_artist(circle)
+
+    plt.scatter(np.mean(observation), 0., color = 'black', s = 120, zorder = 5)
+    plt.grid()
+
+    fig7.savefig(nuname)
 
     return
 
