@@ -1377,13 +1377,20 @@ def clus_eval_indexes(PCs, centroids, labels):
 def color_brightness(color):
     return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
 
-def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6):
+def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6, full_cb_range = False):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
+
+    < full_cb_range > : if True, takes all cb values. If false takes the portion 0.05/0.95.
     """
     cmappa = cm.get_cmap(cmap)
     colors = []
-    valori = np.linspace(0.05,0.95,n)
+
+    if full_cb_range:
+        valori = np.linspace(0.0,1.0,n)
+    else:
+        valori = np.linspace(0.05,0.95,n)
+        
     for cos in valori:
         colors.append(cmappa(cos))
 
