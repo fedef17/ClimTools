@@ -1390,7 +1390,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6, full_cb_range = Fal
         valori = np.linspace(0.0,1.0,n)
     else:
         valori = np.linspace(0.05,0.95,n)
-        
+
     for cos in valori:
         colors.append(cmappa(cos))
 
@@ -1427,9 +1427,14 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
+
+    if isinstance(proj, ccrs.Orthographic):
+        # add longitude to complete the globe
+        lon = np.append(lon, 360-1e-4)
+        data = np.c_[data,data[:,0]]
     xi,yi = np.meshgrid(lon,lat)
 
-    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = proj, extend = 'both')
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both')
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = proj, linewidth = 0.5)
 
@@ -1440,7 +1445,26 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     return map_plot
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def get_cbar_range(data, symmetrical = False, percentiles = (5,95), n_color_levels = None):
+    mi = np.percentile(data, percentiles[0])
+    ma = np.percentile(data, percentiles[1])
+    if symmetrical:
+        oko = max(abs(mi), abs(ma))
+        if n_color_levels is not None:
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+        else:
+            oko2 = oko
+        oko1 = -oko2
+    else:
+        oko1 = mi
+        oko2 = ma
+
+    return (oko1, oko2)
+
+
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
     """
     Plots a single map to a figure.
 
@@ -1449,6 +1473,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < filename >: name of the file to save the figure to. If None, the figure is just shown.
 
     < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
     < cmap >: name of the color map.
     < cbar_range >: limits of the color bar.
 
@@ -1462,8 +1487,11 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
     elif visualization == 'polar':
-        clat = lat.min() + (lat.max()-lat.min())/2
-        clon = lon.min() + (lon.max()-lon.min())/2
+        if central_lat_lon is not None:
+            (clat, clon) = central_lat_lon
+        else:
+            clat = lat.min() + (lat.max()-lat.min())/2
+            clon = lon.min() + (lon.max()-lon.min())/2
         proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
     else:
         raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
@@ -1471,21 +1499,22 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
 
-    mi = np.percentile(data, 5)
-    ma = np.percentile(data, 95)
-    if plot_anomalies:
-        # making a symmetrical color axis
-        oko = max(abs(mi), abs(ma))
-        spi = 2*oko/(n_color_levels-1)
-        spi_ok = np.ceil(spi*100)/100
-        oko2 = spi_ok*(n_color_levels-1)/2
-        oko1 = -oko2
-    else:
-        oko1 = mi
-        oko2 = ma
+    if cbar_range is None:
+        mi = np.percentile(data, 5)
+        ma = np.percentile(data, 95)
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
 
-    clevels = np.linspace(oko1, oko2, n_color_levels)
-    cbar_range = (oko1, oko2)
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     # Plotting figure
     fig4 = plt.figure(figsize=(8,6))
@@ -1519,7 +1548,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -1536,6 +1565,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     < repr_cluster > : number of the member representative of each cluster. A colored rectangle is drawn around them.
 
     < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
     < cmap >: name of the color map.
     < cbar_range >: limits of the color bar.
 
@@ -1549,8 +1579,11 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
     elif visualization == 'polar':
-        clat = lat.min() + (lat.max()-lat.min())/2
-        clon = lon.min() + (lon.max()-lon.min())/2
+        if central_lat_lon is not None:
+            (clat, clon) = central_lat_lon
+        else:
+            clat = lat.min() + (lat.max()-lat.min())/2
+            clon = lon.min() + (lon.max()-lon.min())/2
         proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
     else:
         raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
@@ -1558,21 +1591,22 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
 
-    mi = np.percentile(dataset, 5)
-    ma = np.percentile(dataset, 95)
-    if plot_anomalies:
-        # making a symmetrical color axis
-        oko = max(abs(mi), abs(ma))
-        spi = 2*oko/(n_color_levels-1)
-        spi_ok = np.ceil(spi*100)/100
-        oko2 = spi_ok*(n_color_levels-1)/2
-        oko1 = -oko2
-    else:
-        oko1 = mi
-        oko2 = ma
+    if cbar_range is None:
+        mi = np.percentile(data, 5)
+        ma = np.percentile(data, 95)
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
 
-    clevels = np.linspace(oko1, oko2, n_color_levels)
-    cbar_range = (oko1, oko2)
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     # Begin plotting
     numens = len(dataset)
