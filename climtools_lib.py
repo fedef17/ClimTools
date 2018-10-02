@@ -175,21 +175,13 @@ def read4Dncfield(ifile, extract_level = None):
     for variab in fh.variables:
         variabs.append(variab)
     #print('The variables in the nc file are: ', variabs)
-    if ('level' in variabs):
-        level       = fh.variables['level'][:]
-        level_units = fh.variables['level'].units
-    elif ('lev' in variabs):
-        level       = fh.variables['lev'][:]
-        level_units = fh.variables['lev'].units
-    elif ('pressure' in variabs):
-        level       = fh.variables['pressure'][:]
-        level_units = fh.variables['pressure'].units
-    elif ('plev' in variabs):
-        level       = fh.variables['plev'][:]
-        level_units = fh.variables['plev'].units
-    elif ('plev8' in variabs):
-        level       = fh.variables['plev8'][:]
-        level_units = fh.variables['plev8'].units
+    lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
+    for levna in lev_names:
+        if levna in variabs:
+            oklevname = levna
+            level = fh.variables[levna][:]
+            nlevs = len(level)
+            break
 
     try:
         lat         = fh.variables['lat'][:]
@@ -205,14 +197,19 @@ def read4Dncfield(ifile, extract_level = None):
     var_units   = fh.variables[variabs[-1]].units
     if extract_level is not None:
         lvel = extract_level
-        if level_units=='millibar' or level_units=='hPa':
-            l_sel=int(np.where(level==lvel)[0])
-            print('Selecting level {0} millibar'.format(lvel))
-        elif level_units=='Pa':
-            l_sel=int(np.where(level==lvel*100)[0])
-            print('Selecting level {0} Pa'.format(lvel*100))
-        del level
-        level=lvel
+        if nlevs > 1:
+            level_units = fh.variables[levna].units
+            if level_units=='millibar' or level_units=='hPa':
+                l_sel=int(np.where(level==lvel)[0])
+                print('Selecting level {0} millibar'.format(lvel))
+            elif level_units=='Pa':
+                l_sel=int(np.where(level==lvel*100)[0])
+                print('Selecting level {0} Pa'.format(lvel*100))
+            level = lvel
+        else:
+            level = level[0]
+            l_sel = 0
+
         var         = fh.variables[variabs[-1]][:,l_sel,:,:]
         txt='{0}{1} dimension for a single ensemble member [time x lat x lon]: {2}'.format(variabs[-1],lvel,var.shape)
     else:
