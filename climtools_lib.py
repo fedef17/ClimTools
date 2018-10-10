@@ -16,10 +16,11 @@ import pandas as pd
 from numpy import linalg as LA
 from eofs.standard import Eof
 from scipy import stats
-import itertools as iter
+import itertools as itt
 
 from sklearn.cluster import KMeans
 import ctool
+import ctp
 
 from datetime import datetime
 import pickle
@@ -1107,7 +1108,6 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     end = datetime.now()
     print('k-means algorithm took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
-
     ## Ordering clusters for number of members
     centroids = np.array(centroids)
     labels = np.array(labels)
@@ -1116,6 +1116,60 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
         labels, centroids = clus_order_by_frequency(labels, centroids)
 
     return centroids, labels
+
+
+def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100):
+    """
+    H_0: There are no regimes ---> multi-normal distribution PDF
+    Synthetic datasets modelled on the PCs of the original data are computed (synthetic PCs have the same lag-1, mean and standard deviation of the original PCs)
+    SIGNIFICANCE = % of times that the optimal variance ratio found by clustering the real dataset exceeds the optimal ratio found by clustering the syntetic dataset (is our distribution more clustered than a multinormal distribution?)
+
+    < pcs > : the series of principal components. pcs.shape = (n_days, numpcs)
+    < dates > : the dates.
+    < nrsamp > : the number of synthetic datasets used to calculate the significance.
+    """
+
+    #PCunscal = solver.pcs()[:,:numpcs]
+    pc_trans = np.transpose(pcs)
+
+    numclus = centroids.shape[0]
+    varopt = calc_varopt_molt(pcs, centroids, labels)
+
+    dates = pd.to_datetime(dates)
+    deltas = dates[1:]-dates[:-1]
+    deltauno = dates[1]-dates[0]
+    ndis = np.sum(deltas > 3*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
+
+    print('check: number of seasons = {}\n'.format(ndis+1))
+
+    #=======parallel=======
+    start = datetime.now()
+    significance = ctp.cluster_toolkit_parallel.clus_sig_p_ncl(nrsamp, numclus, npart, ndis, pc_trans, varopt)
+    end = datetime.now()
+    print('significance computation took me {:6.2f} seconds'.format(end-start))
+    print('significance for {} clusters = {:6.2f}'.format(numclus, significance))
+
+    return significance
+
+
+def calc_varopt_molt(pcs, centroids, labels):
+    """
+    Calculates the variance ratio of the partition, as defined in Molteni's cluster_sig.
+    In Molteni this is defined as: media pesata sulla frequenza del quadrato della norma di ogni cluster centroid Sum(centroid**2) DIVISO media della varianza interna su tutti gli elementi Sum(pc-centroid)**2.
+    < pcs > : the sequence of pcs.
+    < centroids > : the cluster centroids coordinates.
+    < labels > : the cluster labels for each element.
+    """
+
+    numpcs = centroids.shape[1]
+    freq_mem = calc_clus_freq(labels)
+
+    varopt = np.sum(freq_mem*np.sum(centroids**2, axis = 1))
+
+    varint = np.sum([np.sum((pc-centroids[lab])**2) for pc, lab in zip(pcs, labels)])/len(labels)
+    varopt = varopt/varint
+
+    return varopt
 
 
 def calc_clus_freq(labels):
@@ -1131,7 +1185,7 @@ def calc_clus_freq(labels):
 
     freq_mem = 100.*num_mem/len(labels)
 
-    return num_mem, freq_mem
+    return freq_mem
 
 
 def change_clus_order(labels, centroids, new_ord):
@@ -1156,8 +1210,8 @@ def clus_order_by_frequency(labels, centroids):
     """
     numclus = max(labels)+1
 
-    num_mem, _ = calc_clus_freq(labels)
-    new_ord = num_mem.argsort()[::-1]
+    freq_mem = calc_clus_freq(labels)
+    new_ord = freq_mem.argsort()[::-1]
 
     labels, centroids = change_clus_order(labels, centroids, new_ord)
 
@@ -1288,7 +1342,7 @@ def clus_eval_indexes(PCs, centroids, labels):
     mean_intra_clus_variance = np.sum(inertia_i)/len(labels)
 
     dist_couples = dict()
-    coppie = list(iter.combinations(range(numclus), 2))
+    coppie = list(itt.combinations(range(numclus), 2))
     for (i,j) in coppie:
         dist_couples[(i,j)] = LA.norm(centroids[i]-centroids[j])
 

@@ -24,10 +24,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter, FFMpegFileWriter, AVConvFileWriter
 
-cart_out_WRtool = '/home/fabiano/Research/lavori/WeatherRegimes/OUT_WRTOOL/'
-#cart_out_WRtool = '/home/fedefab/Scrivania/Research/Post-doc/Prima_WRTool/Visual_traj/'
-cart_git_WRtool = '/home/fabiano/Research/git/WRtool/'
-#cart_git_WRtool = '/home/fedefab/Scrivania/Research/Post-doc/git/WRtool/'
+#cart_out_WRtool = '/home/fabiano/Research/lavori/WeatherRegimes/OUT_WRTOOL/'
+cart_out_WRtool = '/home/fedefab/Scrivania/Research/Post-doc/Prima_WRTool/Visual_traj/'
+#cart_git_WRtool = '/home/fabiano/Research/git/WRtool/'
+cart_git_WRtool = '/home/fedefab/Scrivania/Research/Post-doc/git/WRtool/'
 
 sys.path.insert(0,cart_git_WRtool+'CLUS_tool/')
 sys.path.insert(0,cart_git_WRtool+'CLUS_tool/WRtool/')
@@ -141,7 +141,7 @@ elif dim == 3:
 data = pvec_anom_ERA
 nome = 'ERA'
 cart_out = cart1
-save = True
+save = False
 
 #data = pvec_anom_EC
 #nome = 'EC'

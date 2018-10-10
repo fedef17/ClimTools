@@ -15,7 +15,8 @@ import pickle
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
 
-cart = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/'
+#cart = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/'
+cart = '/home/fedefab/Scrivania/Research/Post-doc/SPHINX/'
 
 cart_data = '/home/fabiano/DATA/SPHINX/tas_mon/'
 
@@ -96,7 +97,7 @@ ref_period = ctl.range_years(1850,1900)
 # #month_climat_ens = np.stack(month_climat_ens)
 #
 
-# LEGGO DAL PICKLE 
+# LEGGO DAL PICKLE
 # pickle.dump([lat, lon, years, zonal_anom_ens, global_anom_ens, yearly_anom_ens], open(cart+'temp_proj.p','w'))
 lat, lon, years, zonal_anom_ens, global_anom_ens, yearly_anom_ens = pickle.load(open(cart+'temp_proj.p'))
 
