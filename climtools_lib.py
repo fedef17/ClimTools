@@ -1188,7 +1188,7 @@ def calc_clus_freq(labels):
     return freq_mem
 
 
-def change_clus_order(labels, centroids, new_ord):
+def change_clus_order(centroids, labels, new_ord):
     """
     Changes order of cluster centroids and labels according to new_order.
     """
@@ -1201,10 +1201,10 @@ def change_clus_order(labels, centroids, new_ord):
 
     centroids = centroids[new_ord]
 
-    return labels, centroids
+    return centroids, labels
 
 
-def clus_order_by_frequency(labels, centroids):
+def clus_order_by_frequency(centroids, labels):
     """
     Orders the clusters in decreasing frequency. Returns new labels and ordered centroids.
     """
@@ -1215,10 +1215,28 @@ def clus_order_by_frequency(labels, centroids):
 
     labels, centroids = change_clus_order(labels, centroids, new_ord)
 
-    return labels, centroids
+    return centroids, labels
 
 
-def match_pc_sets(pcset1, pcset2):
+def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_AREA, solver_ref, numpcs):
+    """
+    Compares a set of patterns with a reference set, after projecting on the reference base. This is done to calculate the differences in a reduced space.
+    Returns the patterns ordered in the best match to the reference ones and the RMS distance and the pattern correlation between the two sets.
+    """
+
+    pcs_ref = solver_ref.projectField(cluspattern_ref_AREA, neofs=numpcs, eofscaling=0, weighted=True)
+    pcs = solver_ref.projectField(cluspattern_AREA, neofs=numpcs, eofscaling=0, weighted=True)
+
+    perm = match_pc_sets(pcs_ref, pcs)
+    centroids, labels = change_clus_order(centroids, labels, perm)
+    cluspattern = cluspattern[perm, ...]
+
+    et, patcor = calc_RMS_and_patcor(pcs_ref, pcs[perm, ...])
+
+    return perm, centroids, labels, et, patcor
+
+
+def match_pc_sets(pcset_ref, pcset):
     """
     Find the best possible match between two sets of PCs.
 
@@ -1228,17 +1246,17 @@ def match_pc_sets(pcset1, pcset2):
     Output:
     - new_ord, the permutation of the second set that best matches the first.
     """
-    if pcset1.shape != pcset2.shape:
+    if pcset_ref.shape != pcset.shape:
         raise ValueError('the PC sets must have the same dimensionality')
 
-    numclus, numpcs = pcset1.shape
+    numclus, numpcs = pcset_ref.shape
 
     perms = list(it.permutations(range(numclus)))
     nperms = len(perms)
 
     mean_rms = []
     for p in perms:
-        all_rms = [LA.norm(pcset1[i] - pcset2[p[i]]) for i in range(numclus)]
+        all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
         mean_rms.append(np.mean(all_rms))
 
     mean_rms = np.array(mean_rms)
@@ -1247,7 +1265,7 @@ def match_pc_sets(pcset1, pcset2):
     return perms[jmin]
 
 
-def clus_compare(clusters_1, clusters_2):
+def calc_RMS_and_patcor(clusters_1, clusters_2):
     """
     Computes the distance and cosine of the angle between two sets of clusters.
     It is assumed the clusters are in matrix/vector form.
