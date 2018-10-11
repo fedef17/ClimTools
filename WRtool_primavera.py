@@ -81,7 +81,7 @@ def compute(ifile):
     freq_mem = ctl.calc_clus_freq(labels)
 
     print('Running clus sig\n')
-    significance = ctl.clusters_sig(PCs, centroids, labels, dates_season)
+    significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
 
     return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
 

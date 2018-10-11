@@ -216,6 +216,7 @@ def read4Dncfield(ifile, extract_level = None):
     else:
         var         = fh.variables[variabs[-1]][:,:,:,:]
         txt='{0} dimension for a single ensemble member [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
+    print(txt)
     #print(fh.variables)
     if var_units == 'm**2 s**-2':
         print('From geopotential (m**2 s**-2) to geopotential height (m)')   # g0=9.80665 m/s2
@@ -227,9 +228,25 @@ def read4Dncfield(ifile, extract_level = None):
     dates = nc.num2date(time,time_units,time_cal)
     fh.close()
 
-    print(txt)
+    if time_cal == '365_day' or time_cal == 'noleap':
+        dates = adjust_noleap_dates(dates)
 
     return var, level, lat, lon, dates, time_units, var_units, time_cal
+
+
+def adjust_noleap_dates(dates):
+    """
+    When the time_calendar is 365_day or noleap, nc.num2date() returns a cftime array which is not convertible to datetime (and to pandas DatetimeIndex). This fixes this problem, returning the usual datetime array.
+    """
+    dates_ok = []
+    #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
+    for ci in dates:
+        dates_ok.append(pd.Timestamp(ci.strftime()).to_pydatetime())
+
+    dates_ok = np.array(dates_ok)
+
+    return dates_ok
+
 
 def read3Dncfield(ifile, compress_dummy_dim = True):
     '''
@@ -269,6 +286,9 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     time = list(time)
     dates=nc.num2date(time,time_units)
     fh.close()
+
+    if time_cal == '365_day' or time_cal == 'noleap':
+        dates = adjust_noleap_dates(dates)
 
     print(txt)
 
@@ -1122,7 +1142,7 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     return centroids, labels
 
 
-def clusters_sig(pcs, centroids, labels, dates, nrsamp = 500, npart_molt = 100):
+def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100):
     """
     H_0: There are no regimes ---> multi-normal distribution PDF
     Synthetic datasets modelled on the PCs of the original data are computed (synthetic PCs have the same lag-1, mean and standard deviation of the original PCs)
