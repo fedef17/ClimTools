@@ -1218,7 +1218,7 @@ def change_clus_order(centroids, labels, new_ord):
     Changes order of cluster centroids and labels according to new_order.
     """
     numclus = int(np.max(labels)+1)
-    print('yo',labels.shape)
+    print('yo',labels.shape, new_ord)
 
     labels_new = np.array(labels)
     for nu, i in zip(range(numclus), new_ord):
@@ -1262,6 +1262,7 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     pcs = np.stack(pcs)
 
     perm = match_pc_sets(pcs_ref, pcs)
+    print(perm)
     centroids, labels = change_clus_order(centroids, labels, perm)
     cluspattern = cluspattern[perm, ...]
 
