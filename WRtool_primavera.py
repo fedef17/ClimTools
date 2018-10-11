@@ -143,6 +143,9 @@ for tag, fil in zip(filenames, tags):
     cluspatt_AREA = cluspatt_AREA[perm, ...]
     freq_mem = freq_mem[perm]
 
+    namef=cart_out+'regime_indices_{}.txt'.format(tag)
+    np.savetxt(namef, labels)
+
     print('\n ----------------------\n')
     print('Results for {}\n'.format(tag))
     results['significance'][tag] = significance
