@@ -1148,7 +1148,7 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
 
     #=======parallel=======
     start = datetime.now()
-    significance = ctp.cluster_toolkit_parallel.clus_sig_p_ncl(nrsamp, numclus, npart, ndis, pc_trans, varopt)
+    significance = ctp.cluster_toolkit_parallel.clus_sig_p_ncl(nrsamp, numclus, npart_molt, ndis, pc_trans, varopt)
     end = datetime.now()
     print('significance computation took me {:6.2f} seconds'.format(end-start))
     print('significance for {} clusters = {:6.2f}'.format(numclus, significance))
