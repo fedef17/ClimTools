@@ -1122,7 +1122,7 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     return centroids, labels
 
 
-def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100):
+def clusters_sig(pcs, centroids, labels, dates, nrsamp = 500, npart_molt = 100):
     """
     H_0: There are no regimes ---> multi-normal distribution PDF
     Synthetic datasets modelled on the PCs of the original data are computed (synthetic PCs have the same lag-1, mean and standard deviation of the original PCs)
@@ -1150,7 +1150,7 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     start = datetime.now()
     significance = ctp.cluster_toolkit_parallel.clus_sig_p_ncl(nrsamp, numclus, npart_molt, ndis, pc_trans, varopt)
     end = datetime.now()
-    print('significance computation took me {:6.2f} seconds'.format(end-start))
+    print('significance computation took me {:6.2f} seconds'.format((end-start).seconds))
     print('significance for {} clusters = {:6.2f}'.format(numclus, significance))
 
     return significance
