@@ -101,17 +101,13 @@ lat, lon, var_ERA, solver_ERA, centroids_ERA, labels_ERA, cluspattern_ERA, clusp
 tag = 'ERA'
 print('\n ----------------------\n')
 print('Results for {}\n'.format(tag))
-results['significance'][tag] = significance
-print('Significance: {:6.3f}\n'.format(significance))
-results['freq_mem'][tag] = freq_mem
-print('frequency: {}\n'.format(freq_mem))
-results['cluspattern'][tag] = cluspattern
-results['cluspattern_area'][tag] = cluspatt_area
-results['labels'][tag] = labels
-results['et'][tag] = et
-print('et: {}\n'.format(et))
-results['patcor'][tag] = patcor
-print('patcor: {}\n'.format(patcor))
+results['significance'][tag] = significance_ERA
+print('Significance: {:6.3f}\n'.format(significance_ERA))
+results['freq_mem'][tag] = freq_mem_ERA
+print('frequency: {}\n'.format(freq_mem_ERA))
+results['cluspattern'][tag] = cluspattern_ERA
+results['cluspattern_area'][tag] = cluspatt_area_ERA
+results['labels'][tag] = labels_ERA
 print('----------------------\n')
 
 ### NCEP reference
@@ -120,17 +116,13 @@ lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, 
 tag = 'NCEP'
 print('\n ----------------------\n')
 print('Results for {}\n'.format(tag))
-results['significance'][tag] = significance
-print('Significance: {:6.3f}\n'.format(significance))
-results['freq_mem'][tag] = freq_mem
-print('frequency: {}\n'.format(freq_mem))
-results['cluspattern'][tag] = cluspattern
-results['cluspattern_area'][tag] = cluspatt_area
-results['labels'][tag] = labels
-results['et'][tag] = et
-print('et: {}\n'.format(et))
-results['patcor'][tag] = patcor
-print('patcor: {}\n'.format(patcor))
+results['significance'][tag] = significance_NCEP
+print('Significance: {:6.3f}\n'.format(significance_NCEP))
+results['freq_mem'][tag] = freq_mem_NCEP
+print('frequency: {}\n'.format(freq_mem_NCEP))
+results['cluspattern'][tag] = cluspattern_NCEP
+results['cluspattern_area'][tag] = cluspatt_area_NCEP
+results['labels'][tag] = labels_NCEP
 print('----------------------\n')
 
 for tag, fil in zip(filenames, tags):
