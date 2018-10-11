@@ -1285,7 +1285,7 @@ def match_pc_sets(pcset_ref, pcset):
 
     numclus, numpcs = pcset_ref.shape
 
-    perms = list(it.permutations(range(numclus)))
+    perms = list(itt.permutations(range(numclus)))
     nperms = len(perms)
 
     mean_rms = []
