@@ -1366,6 +1366,8 @@ def compute_clusterpatterns(var, labels):
         cluspattern = np.mean(var[mask,:,:], axis=0)
         cluspatt.append(cluspattern)
 
+    cluspatt = np.stack(cluspatt)
+
     return cluspatt
 
 
