@@ -134,7 +134,7 @@ for fil, tag in zip(filenames, tags):
     perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, cluspatt_area_ERA, solver_ERA, numpcs)
 
     cluspattern = cluspattern[perm, ...]
-    cluspatt_AREA = cluspatt_AREA[perm, ...]
+    cluspatt_area = cluspatt_area[perm, ...]
     freq_mem = freq_mem[perm]
 
     namef=cart_out+'regime_indices_{}.txt'.format(tag)
