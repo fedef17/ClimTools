@@ -1117,7 +1117,7 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     labels = np.array(labels)
 
     if order_by_frequency:
-        labels, centroids = clus_order_by_frequency(labels, centroids)
+        centroids, labels = clus_order_by_frequency(centroids, labels)
 
     return centroids, labels
 
@@ -1220,7 +1220,7 @@ def clus_order_by_frequency(centroids, labels):
     freq_mem = calc_clus_freq(labels)
     new_ord = freq_mem.argsort()[::-1]
 
-    labels, centroids = change_clus_order(labels, centroids, new_ord)
+    centroids, labels = change_clus_order(centroids, labels, new_ord)
 
     return centroids, labels
 
