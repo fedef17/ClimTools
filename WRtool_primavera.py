@@ -135,6 +135,8 @@ for fil, tag in zip(filenames, tags):
 
     cluspattern = cluspattern[perm, ...]
     cluspatt_area = cluspatt_area[perm, ...]
+    print(freq_mem, perm)
+    freq_mem = np.array(freq_mem)
     freq_mem = freq_mem[perm]
 
     namef=cart_out+'regime_indices_{}.txt'.format(tag)
