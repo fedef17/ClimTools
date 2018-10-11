@@ -125,7 +125,7 @@ results['cluspattern_area'][tag] = cluspatt_area_NCEP
 results['labels'][tag] = labels_NCEP
 print('----------------------\n')
 
-for tag, fil in zip(filenames, tags):
+for fil, tag in zip(filenames, tags):
     print('\n analyzing: {} --> {} \n'.format(fil, tag))
     lat, lon, var_anom, solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance = compute(cart_in+fil)
 
