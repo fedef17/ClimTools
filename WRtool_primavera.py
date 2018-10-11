@@ -131,6 +131,8 @@ for fil, tag in zip(filenames, tags):
     print('\n analyzing: {} --> {} \n'.format(fil, tag))
     lat, lon, var_anom, solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance = compute(cart_in+fil)
 
+    print(type(centroids))
+    print(centroids.shape)
     perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, cluspatt_area_ERA, solver_ERA, numpcs)
 
     cluspattern = cluspattern[perm, ...]

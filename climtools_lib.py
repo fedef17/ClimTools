@@ -1225,7 +1225,7 @@ def change_clus_order(centroids, labels, new_ord):
         labels_new[labels == i] = nu
     labels = labels_new
 
-    centroids = centroids[new_ord]
+    centroids = centroids[new_ord, ...]
 
     return centroids, labels
 
