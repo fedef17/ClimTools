@@ -1293,7 +1293,7 @@ def match_pc_sets(pcset_ref, pcset):
     mean_rms = np.array(mean_rms)
     jmin = mean_rms.argmin()
 
-    return perms[jmin]
+    return np.array(perms[jmin])
 
 
 def calc_RMS_and_patcor(clusters_1, clusters_2):
