@@ -1197,7 +1197,8 @@ def change_clus_order(centroids, labels, new_ord):
     """
     Changes order of cluster centroids and labels according to new_order.
     """
-    numclus = max(labels)+1
+    numclus = int(np.max(labels)+1)
+    print('yo',labels.shape)
 
     labels_new = np.array(labels)
     for nu, i in zip(range(numclus), new_ord):
@@ -1213,7 +1214,8 @@ def clus_order_by_frequency(centroids, labels):
     """
     Orders the clusters in decreasing frequency. Returns new labels and ordered centroids.
     """
-    numclus = max(labels)+1
+    numclus = int(np.max(labels)+1)
+    print('yo',labels.shape)
 
     freq_mem = calc_clus_freq(labels)
     new_ord = freq_mem.argsort()[::-1]
@@ -1327,7 +1329,8 @@ def compute_clusterpatterns(var, labels):
     """
 
     labels = np.array(labels)
-    numclus = max(labels)+1
+    numclus = int(np.max(labels)+1)
+    print('yo',labels.shape)
 
     cluspatt = []
     freqs = []
