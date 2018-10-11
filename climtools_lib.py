@@ -1254,6 +1254,8 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     pcs_ref = []
     pcs = []
     for clu_ref, clu in zip(cluspattern_ref_AREA, cluspattern_AREA):
+        print(clu_ref.shape)
+        print(clu.shape)
         pcs_ref.append(solver_ref.projectField(clu_ref, neofs=numpcs, eofscaling=0, weighted=True))
         pcs.append(solver_ref.projectField(clu, neofs=numpcs, eofscaling=0, weighted=True))
     pcs_ref = np.stack(pcs_ref)

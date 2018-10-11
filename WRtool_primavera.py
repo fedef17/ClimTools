@@ -72,10 +72,12 @@ def compute(ifile):
     centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = 'molteni')
 
     cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
+    print(cluspattern[0].shape)
     cluspatt_area = []
     for clu in cluspattern:
         cluspatt_area.append(ctl.sel_area(lat, lon, clu, area))
     cluspatt_area = np.stack(cluspatt_area)
+    print(cluspatt_area[0].shape)
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     freq_mem = ctl.calc_clus_freq(labels)
