@@ -222,6 +222,8 @@ def read4Dncfield(ifile, extract_level = None):
         var=var/9.80665
         var_units='m'
     print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
+
+    time = list(time)
     dates = nc.num2date(time,time_units,time_cal)
     fh.close()
 
@@ -264,6 +266,7 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     if compress_dummy_dim and var.ndim > 3:
         var = var.squeeze()
     #print(fh.variables)
+    time = list(time)
     dates=nc.num2date(time,time_units)
     fh.close()
 

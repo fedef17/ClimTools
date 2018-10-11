@@ -50,6 +50,8 @@ ifile_NCEP = 'zg500_Aday_NCEPNCAR_2deg_1979-2014.nc'
 
 def compute(ifile):
     ## PRECOMPUTE
+    print(ifile)
+    print('Running precompute\n')
     var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(ifile)
 
     var_season, dates_season = ctl.sel_season(var, dates, season, wnd)
@@ -60,10 +62,12 @@ def compute(ifile):
 
     var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
+    print('Running compute\n')
     #### EOF COMPUTATION
     eof_solver = ctl.eof_computation(var_area, lat_area)
     PCs = eof_solver.pcs()[:, :numpcs]
 
+    print('Running clustering\n')
     #### CLUSTERING
     centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = 'molteni')
 
@@ -76,6 +80,7 @@ def compute(ifile):
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     freq_mem = ctl.calc_clus_freq(labels)
 
+    print('Running clus sig\n')
     significance = ctl.clusters_sig(PCs, centroids, labels, dates_season)
 
     return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
