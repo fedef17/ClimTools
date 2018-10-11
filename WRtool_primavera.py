@@ -111,7 +111,7 @@ results['labels'][tag] = labels_ERA
 print('----------------------\n')
 
 ### NCEP reference
-lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_ERA, freq_mem_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
+lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_NCEP, freq_mem_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
 
 tag = 'NCEP'
 print('\n ----------------------\n')
