@@ -274,6 +274,7 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
 
     return var, lat, lon, dates, time_units, var_units
 
+
 def read2Dncfield(ifile):
     '''
     GOAL

@@ -52,7 +52,7 @@ def compute(ifile):
     ## PRECOMPUTE
     print(ifile)
     print('Running precompute\n')
-    var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(ifile)
+    var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(ifile, extract_level = 50000.)
 
     var_season, dates_season = ctl.sel_season(var, dates, season, wnd)
 
