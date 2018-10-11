@@ -74,8 +74,8 @@ def compute(ifile):
     cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
     cluspatt_area = []
     for clu in cluspattern:
-        patt_area.append(ctl.sel_area(lat, lon, clu, area))
-    cluspatt_area = np.stack(patt_area)
+        cluspatt_area.append(ctl.sel_area(lat, lon, clu, area))
+    cluspatt_area = np.stack(cluspatt_area)
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     freq_mem = ctl.calc_clus_freq(labels)
