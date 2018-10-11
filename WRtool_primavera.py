@@ -61,6 +61,7 @@ def compute(ifile):
     var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
 
     var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
+    print(var_area.shape)
 
     print('Running compute\n')
     #### EOF COMPUTATION
@@ -75,7 +76,9 @@ def compute(ifile):
     print(cluspattern[0].shape)
     cluspatt_area = []
     for clu in cluspattern:
+        print(clu.shape)
         cluspatt_area.append(ctl.sel_area(lat, lon, clu, area))
+        print(cluspatt_area[-1].shape)
     cluspatt_area = np.stack(cluspatt_area)
     print(cluspatt_area[0].shape)
 
