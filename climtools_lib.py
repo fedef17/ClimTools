@@ -1251,8 +1251,13 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     Returns the patterns ordered in the best match to the reference ones and the RMS distance and the pattern correlation between the two sets.
     """
 
-    pcs_ref = solver_ref.projectField(cluspattern_ref_AREA, neofs=numpcs, eofscaling=0, weighted=True)
-    pcs = solver_ref.projectField(cluspattern_AREA, neofs=numpcs, eofscaling=0, weighted=True)
+    pcs_ref = []
+    pcs = []
+    for clu_ref, clu in zip(cluspattern_ref_AREA, cluspattern_AREA):
+        pcs_ref.append(solver_ref.projectField(clu_ref, neofs=numpcs, eofscaling=0, weighted=True))
+        pcs.append(solver_ref.projectField(clu, neofs=numpcs, eofscaling=0, weighted=True))
+    pcs_ref = np.stack(pcs_ref)
+    pcs = np.stack(pcs)
 
     perm = match_pc_sets(pcs_ref, pcs)
     centroids, labels = change_clus_order(centroids, labels, perm)
