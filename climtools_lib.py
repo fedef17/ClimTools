@@ -1180,7 +1180,8 @@ def calc_clus_freq(labels):
     """
     Calculates clusters frequency.
     """
-    numclus = max(labels)+1
+    numclus = int(np.max(labels)+1)
+    print('yo',labels.shape)
 
     num_mem = []
     for i in range(numclus):
