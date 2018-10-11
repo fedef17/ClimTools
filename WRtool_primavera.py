@@ -86,13 +86,6 @@ def compute(ifile):
     return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
 
 #############################################
-
-### ERA reference
-lat, lon, var_ERA, solver_ERA, centroids_ERA, labels_ERA, cluspattern_ERA, cluspatt_area_ERA, freq_mem_ERA, significance_ERA = compute(cart_in+ifile_ERA)
-
-### NCEP reference
-lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_ERA, freq_mem_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
-
 results = dict()
 results['significance'] = dict()
 results['freq_mem'] = dict()
@@ -101,6 +94,44 @@ results['cluspattern_area'] = dict()
 results['labels'] = dict()
 results['et'] = dict()
 results['patcor'] = dict()
+
+### ERA reference
+lat, lon, var_ERA, solver_ERA, centroids_ERA, labels_ERA, cluspattern_ERA, cluspatt_area_ERA, freq_mem_ERA, significance_ERA = compute(cart_in+ifile_ERA)
+
+tag = 'ERA'
+print('\n ----------------------\n')
+print('Results for {}\n'.format(tag))
+results['significance'][tag] = significance
+print('Significance: {:6.3f}\n'.format(significance))
+results['freq_mem'][tag] = freq_mem
+print('frequency: {}\n'.format(freq_mem))
+results['cluspattern'][tag] = cluspattern
+results['cluspattern_area'][tag] = cluspatt_area
+results['labels'][tag] = labels
+results['et'][tag] = et
+print('et: {}\n'.format(et))
+results['patcor'][tag] = patcor
+print('patcor: {}\n'.format(patcor))
+print('----------------------\n')
+
+### NCEP reference
+lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_ERA, freq_mem_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
+
+tag = 'NCEP'
+print('\n ----------------------\n')
+print('Results for {}\n'.format(tag))
+results['significance'][tag] = significance
+print('Significance: {:6.3f}\n'.format(significance))
+results['freq_mem'][tag] = freq_mem
+print('frequency: {}\n'.format(freq_mem))
+results['cluspattern'][tag] = cluspattern
+results['cluspattern_area'][tag] = cluspatt_area
+results['labels'][tag] = labels
+results['et'][tag] = et
+print('et: {}\n'.format(et))
+results['patcor'][tag] = patcor
+print('patcor: {}\n'.format(patcor))
+print('----------------------\n')
 
 for tag, fil in zip(filenames, tags):
     print('\n analyzing: {} --> {} \n'.format(fil, tag))
@@ -112,6 +143,8 @@ for tag, fil in zip(filenames, tags):
     cluspatt_AREA = cluspatt_AREA[perm, ...]
     freq_mem = freq_mem[perm]
 
+    print('\n ----------------------\n')
+    print('Results for {}\n'.format(tag))
     results['significance'][tag] = significance
     print('Significance: {:6.3f}\n'.format(significance))
     results['freq_mem'][tag] = freq_mem
