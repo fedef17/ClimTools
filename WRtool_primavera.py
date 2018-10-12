@@ -85,6 +85,8 @@ def compute(ifile):
 
     print('Running clus sig\n')
     significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
+    significance_2 = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
+    print('Significances: {:7.3f} vs {:7.3f}\n'.format(significance, significance_2))
 
     return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
 
@@ -141,7 +143,7 @@ for fil, tag in zip(filenames, tags):
     freq_mem = freq_mem[perm]
 
     namef=cart_out+'regime_indices_{}.txt'.format(tag)
-    np.savetxt(namef, labels)
+    np.savetxt(namef, labels, fmt='%d')
 
     print('\n ----------------------\n')
     print('Results for {}\n'.format(tag))

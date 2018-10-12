@@ -1352,7 +1352,7 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = True):
+def match_pc_sets(pcset_ref, pcset, verbose = False):
     """
     Find the best possible match between two sets of PCs.
 
