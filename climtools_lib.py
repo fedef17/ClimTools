@@ -1270,11 +1270,12 @@ def calc_varopt_molt(pcs, centroids, labels):
     """
 
     numpcs = centroids.shape[1]
-    freq_mem = calc_clus_freq(labels)
+    freq_mem_abs = calc_clus_freq(labels)/100.
 
     varopt = np.sum(freq_mem*np.sum(centroids**2, axis = 1))
 
     varint = np.sum([np.sum((pc-centroids[lab])**2) for pc, lab in zip(pcs, labels)])/len(labels)
+
     varopt = varopt/varint
 
     return varopt
