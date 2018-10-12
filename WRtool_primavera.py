@@ -80,6 +80,7 @@ def compute(ifile):
     cluspatt_area = np.stack(cluspatt_area)
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
+    print('varopt: {:8.4f}\n'.format(varopt))
     freq_mem = ctl.calc_clus_freq(labels)
 
     print('Running clus sig\n')

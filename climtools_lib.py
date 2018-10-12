@@ -284,6 +284,8 @@ def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True):
 
     if time_cal == '365_day' or time_cal == 'noleap':
         dates = adjust_noleap_dates(dates)
+    elif time_cal == '360_day':
+        dates = adjust_360day_dates(dates)
 
     if compress_dummy_dim:
         var = var.squeeze()
@@ -301,6 +303,26 @@ def adjust_noleap_dates(dates):
     #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
     for ci in dates:
         dates_ok.append(pd.Timestamp(ci.strftime()).to_pydatetime())
+
+    dates_ok = np.array(dates_ok)
+
+    return dates_ok
+
+
+def adjust_360day_dates(dates):
+    """
+    When the time_calendar is 360_day (please not!), nc.num2date() returns a cftime array which is not convertible to datetime (obviously)(and to pandas DatetimeIndex). This fixes this problem in a completely arbitrary way, missing one day each two months. Returns the usual datetime array.
+    """
+    dates_ok = []
+    #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
+    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+
+    for ci in dates:
+        firstday = strindata.format(ci.year, 1, 1)
+        num = ci.dayofyr-1
+        add_day = num/72
+        okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
+        dates_ok.append(okday)
 
     dates_ok = np.array(dates_ok)
 
