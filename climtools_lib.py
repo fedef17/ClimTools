@@ -320,9 +320,9 @@ def adjust_360day_dates(dates):
     for ci in dates:
         firstday = strindata.format(ci.year, 1, 1)
         num = ci.dayofyr-1
-        add_day = num/72
+        add_day = num/72 # salto un giorno ogni 72
         okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
-        dates_ok.append(okday)
+        dates_ok.append(okday.to_pydatetime())
 
     dates_ok = np.array(dates_ok)
 
