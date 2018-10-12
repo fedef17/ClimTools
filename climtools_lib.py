@@ -158,7 +158,61 @@ def read_inputs(nomefile, key_strings, n_lines = None, itype = None, defaults = 
 #
 #######################################################
 
-def read4Dncfield(ifile, extract_level = None):
+
+def check_increasing_latlon(var, lat, lon):
+    """
+    Checks that the latitude and longitude are in increasing order. Returns ordered arrays.
+
+    Assumes that lat and lon are the second-last and last dimensions of the array var.
+    """
+    lat = np.array(lat)
+    lon = np.array(lon)
+    var = np.array(var)
+
+    revlat = False
+    revlon = False
+    if lat[1] < lat[0]:
+        revlat = True
+        print('Latitude is in reverse order! Ordering..\n')
+    if lon[1] < lon[0]:
+        revlon = True
+        print('Longitude is in reverse order! Ordering..\n')
+
+    if revlat and not revlon:
+        var = var[..., ::-1, :]
+        lat = lat[::-1]
+    elif revlon and not revlat:
+        var = var[..., :, ::-1]
+        lon = lon[::-1]
+    elif revlat and revlon:
+        var = var[..., ::-1, ::-1]
+        lat = lat[::-1]
+        lon = lon[::-1]
+
+    return var, lat, lon
+
+
+def readxDncfield(ifile):
+    """
+    Read a netCDF file as it is, preserving all dimensions.
+    """
+
+    fh = nc.Dataset(ifile)
+    ndim = len(fh.variables.keys()) - 1
+    print('Field as {} dimensions. All keys: {}'.format(ndim, fh.variables.keys()))
+    del fh
+
+    if ndim == 2:
+        out = read2Dncfield(ifile)
+    elif ndim == 3:
+        out = read3Dncfield(ifile)
+    elif ndim == 4:
+        out = read4Dncfield(ifile)
+
+    return out
+
+
+def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True):
     '''
     GOAL
         Read netCDF file of 4Dfield, optionally selecting a level.
@@ -231,6 +285,11 @@ def read4Dncfield(ifile, extract_level = None):
     if time_cal == '365_day' or time_cal == 'noleap':
         dates = adjust_noleap_dates(dates)
 
+    if compress_dummy_dim:
+        var = var.squeeze()
+
+    var, lat, lon = check_increasing_latlon(var, lat, lon)
+
     return var, level, lat, lon, dates, time_units, var_units, time_cal
 
 
@@ -290,6 +349,8 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     if time_cal == '365_day' or time_cal == 'noleap':
         dates = adjust_noleap_dates(dates)
 
+    var, lat, lon = check_increasing_latlon(var, lat, lon)
+
     print(txt)
 
     return var, lat, lon, dates, time_units, var_units
@@ -328,6 +389,7 @@ def read2Dncfield(ifile):
     txt='{0} dimension [lat x lon]: {1}'.format(variabs[2],var.shape)
     #print(fh.variables)
     fh.close()
+    var, lat, lon = check_increasing_latlon(var, lat, lon)
 
     #print('\n'+txt)
 
@@ -363,7 +425,7 @@ def read_N_2Dfields(ifile):
     txt='{0} dimension [num x lat x lon]: {1}'.format(variabs[3],var.shape)
     #print(fh.variables)
     fh.close()
-
+    var, lat, lon = check_increasing_latlon(var, lat, lon)
     #print('\n'+txt)
 
     return var, var_units, lat, lon
@@ -1267,7 +1329,7 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset):
+def match_pc_sets(pcset_ref, pcset, verbose = True):
     """
     Find the best possible match between two sets of PCs.
 
@@ -1277,6 +1339,8 @@ def match_pc_sets(pcset_ref, pcset):
     Output:
     - new_ord, the permutation of the second set that best matches the first.
     """
+    pcset_ref = np.array(pcset_ref)
+    pcset = np.array(pcset)
     if pcset_ref.shape != pcset.shape:
         raise ValueError('the PC sets must have the same dimensionality')
 
@@ -1286,12 +1350,24 @@ def match_pc_sets(pcset_ref, pcset):
     nperms = len(perms)
 
     mean_rms = []
+    mean_patcor = []
     for p in perms:
         all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
+        all_patcor = [Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)]
+        if verbose:
+            print('Permutation: ', p)
+            print(all_rms)
+            print(all_patcor)
+        mean_patcor.append(np.mean(all_patcor))
         mean_rms.append(np.mean(all_rms))
 
     mean_rms = np.array(mean_rms)
     jmin = mean_rms.argmin()
+    mean_patcor = np.array(mean_patcor)
+    jmin2 = mean_patcor.argmax()
+
+    if jmin != jmin2:
+        print('WARNING: bad matching. Best permutation with RMS is {}, with patcor is {}'.format(perms[jmin], perms[jmin2]))
 
     return np.array(perms[jmin])
 
@@ -1345,6 +1421,67 @@ def calc_composite_map(var, mask):
     # pattern_std = np.std(var[mask,:,:], axis = 0)
 
     return pattern #, pattern_std
+
+
+def calc_residence_times(indices, dates = None, count_incomplete = True):
+    """
+    Calculates residence times given a set of indices indicating cluster numbers.
+
+    For each cluster, the observed set of residence times is given and a transition probability is calculated.
+
+    < dates > : list of datetime objects (or datetime array). If set, the code eliminates spourious transitions between states belonging to two different seasons.
+    < count_incomplete > : counts also residence periods that terminate with the end of the season and not with a transition to another cluster.
+    """
+    indices = np.array(indices)
+    numclus = int(indices.max() + 1)
+
+    resid_times = []
+    if dates is None:
+        for clu in range(numclus):
+            clu_resids = []
+            okclu = indices == clu
+            init = False
+            for el in okclu:
+                if el:
+                    if not init:
+                        init = True
+                        num_days = 1
+                    else:
+                        num_days += 1
+                else:
+                    if init:
+                        clu_resids.append(num_days)
+                        init = False
+
+            resid_times.append(np.array(clu_resids))
+    else:
+        dates = pd.to_datetime(dates)
+        duday = pd.Timedelta('2 days 00:00:00')
+        for clu in range(numclus):
+            clu_resids = []
+            okclu = indices == clu
+            init = False
+            old_date = dates[0]
+            for el, dat in zip(okclu, dates):
+                if dat - old_date > duday:
+                    init = False
+                    if count_incomplete:
+                        clu_resids.append(num_days)
+                if el:
+                    if not init:
+                        init = True
+                        num_days = 1
+                    else:
+                        num_days += 1
+                else:
+                    if init:
+                        clu_resids.append(num_days)
+                        init = False
+                old_date = dat
+
+            resid_times.append(np.array(clu_resids))
+
+    return np.array(resid_times)
 
 
 def compute_clusterpatterns(var, labels):
@@ -1647,6 +1784,95 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
         plt.close(fig4)
     else:
         plt.show(fig4)
+
+    return
+
+
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = None, stitle_2 = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+    """
+    Plots multiple maps on a single figure (or more figures if needed).
+
+    < data1, data2 >: the fields to plot
+    < lat, lon >: latitude and longitude
+    < filename >: name of the file to save the figure to. If more figures are needed, the others are named as filename_1.pdf, filename_2.pdf, ...
+
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
+    < cmap >: name of the color map.
+    < cbar_range >: limits of the color bar.
+
+    < plot_anomalies >: if True, the colorbar is symmetrical, so that zero corresponds to white. If cbar_range is set, plot_anomalies is set to False.
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+
+    """
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        if central_lat_lon is not None:
+            (clat, clon) = central_lat_lon
+        else:
+            clat = lat.min() + (lat.max()-lat.min())/2
+            clon = lon.min() + (lon.max()-lon.min())/2
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+    data = np.stack([data1,data2])
+
+    if cbar_range is None:
+        mi = np.percentile(data, 5)
+        ma = np.percentile(data, 95)
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
+
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+
+    fig = plt.figure(figsize=(24,14))
+
+    ax = plt.subplot(1, 2, 1, projection=proj)
+    map_plot = plot_mapc_on_ax(ax, data1, lat, lon, proj, cmappa, cbar_range)
+    ax.set_title(stitle_1)
+    ax = plt.subplot(1, 2, 2, projection=proj)
+    map_plot = plot_mapc_on_ax(ax, data2, lat, lon, proj, cmappa, cbar_range)
+    ax.set_title(stitle_2)
+
+    cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+    cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
+    cb.ax.tick_params(labelsize=18)
+    cb.set_label(cb_label, fontsize=20)
+
+    plt.suptitle(title, fontsize=35, fontweight='bold')
+
+    plt.subplots_adjust(top=0.85)
+    top    = 0.90  # the top of the subplots
+    bottom = 0.13    # the bottom
+    left   = 0.02    # the left side
+    right  = 0.98  # the right side
+    hspace = 0.20   # the amount of height reserved for white space between subplots
+    wspace = 0.05    # the amount of width reserved for blank space between subplots
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+
+    # save the figure or show it
+    if filename is not None:
+        fig.savefig(filename)
+        plt.close(fig)
+    else:
+        plt.show(fig)
 
     return
 
