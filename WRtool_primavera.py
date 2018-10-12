@@ -37,11 +37,19 @@ wnd = 5
 numpcs = 4
 numclus = 4
 
-cart_in = '/home/federico/work/Primavera/DATA_stream1/'
-cart_out = '/home/federico/work/Primavera/Results_WP2/'
+#inputs = 'all_models'
+inputs = 'ecmwf_ensemble'
 
-filenames = ['zg500_Aday_CMCC-CM2-HR4_288x192_regrid25_1979-2014.nc', 'zg500_Aday_CMCC-CM2-VHR4_1152x768_regrid25_1979-2014.nc', 'zg500_Aday_CNRM-CM6-1-HR_TL359_regrid25_1979-2014.nc', 'zg500_Aday_CNRM-CM6-1_TL127_regrid25_1979-2014.nc', 'zg500_Aday_EC-Earth3-HR_T511_regrid25_1979-2014.nc', 'zg500_Aday_EC-Earth3_T255_regrid25_1979-2014.nc', 'zg500_Aday_ECMWF-IFS-HR_1442x1021_regrid25_1979-2014.nc', 'zg500_Aday_ECMWF-IFS-LR_360x181_regrid25_1979-2014.nc', 'zg500_Aday_MPIESM-1-2-HR_384x192_regrid25_1979-2014.nc', 'zg500_Aday_MPIESM-1-2-XR_768x384_regrid25_1979-2014.nc', 'zg500_APrimday_HadGEM3-GC31-HM_N512_regrid25_1979-2014.nc', 'zg500_APrimday_HadGEM3-GC31-MM_N216_regrid25_1979-2014.nc']
-tags = ['CMCC_LR','CMCC_HR', 'CNRM_HR', 'CNRM_LR', 'ECE_HR', 'ECE_LR', 'ECMWF_HR', 'ECMWF_LR', 'MPI_LR', 'MPI_HR', 'HadGEM_HR', 'HadGEM_LR']
+if inputs == 'all_models':
+    cart_in = '/home/federico/work/Primavera/DATA_stream1/'
+    cart_out = '/home/federico/work/Primavera/Results_WP2/'
+    filenames = ['zg500_Aday_CMCC-CM2-HR4_288x192_regrid25_1979-2014.nc', 'zg500_Aday_CMCC-CM2-VHR4_1152x768_regrid25_1979-2014.nc', 'zg500_Aday_CNRM-CM6-1-HR_TL359_regrid25_1979-2014.nc', 'zg500_Aday_CNRM-CM6-1_TL127_regrid25_1979-2014.nc', 'zg500_Aday_EC-Earth3-HR_T511_regrid25_1979-2014.nc', 'zg500_Aday_EC-Earth3_T255_regrid25_1979-2014.nc', 'zg500_Aday_ECMWF-IFS-HR_1442x1021_regrid25_1979-2014.nc', 'zg500_Aday_ECMWF-IFS-LR_360x181_regrid25_1979-2014.nc', 'zg500_Aday_MPIESM-1-2-HR_384x192_regrid25_1979-2014.nc', 'zg500_Aday_MPIESM-1-2-XR_768x384_regrid25_1979-2014.nc', 'zg500_APrimday_HadGEM3-GC31-HM_N512_regrid25_1979-2014.nc', 'zg500_APrimday_HadGEM3-GC31-MM_N216_regrid25_1979-2014.nc']
+    tags = ['CMCC_LR','CMCC_HR', 'CNRM_HR', 'CNRM_LR', 'ECE_HR', 'ECE_LR', 'ECMWF_HR', 'ECMWF_LR', 'MPI_LR', 'MPI_HR', 'HadGEM_HR', 'HadGEM_LR']
+elif inputs == 'ecmwf_ensemble':
+    cart_in = '/home/federico/work/Primavera/DATA_stream1/Primavera_runs_chrisrob/'
+    cart_out = '/home/federico/work/Primavera/Results_WP2/ECMWF_ensemble/'
+    filenames = ['rid_HR_1979-2014_ens1.nc', 'rid_HR_1979-2014_ens2.nc', 'rid_HR_1979-2014_ens3.nc', 'rid_HR_1979-2014_ens4.nc', 'rid_LR_1979-2014_ens1.nc', 'rid_LR_1979-2014_ens2.nc', 'rid_LR_1979-2014_ens3.nc', 'rid_LR_1979-2014_ens4.nc', 'rid_LR_1979-2014_ens5.nc', 'rid_LR_1979-2014_ens6.nc']
+    tags = ['HR_1', 'HR_2', 'HR_3', 'HR_4', 'LR_1', 'LR_2', 'LR_3', 'LR_4', 'LR_5', 'LR_6']
 
 ifile_ERA = 'zg500_ERAInterim_1979-2014.nc'
 
@@ -85,8 +93,8 @@ def compute(ifile):
 
     print('Running clus sig\n')
     significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
-    significance_2 = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
-    print('Significances: {:7.3f} vs {:7.3f}\n'.format(significance, significance_2))
+    # significance_2 = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
+    # print('Significances: {:7.3f} vs {:7.3f}\n'.format(significance, significance_2))
 
     return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
 
