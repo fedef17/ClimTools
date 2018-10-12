@@ -1218,7 +1218,7 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
 
     ## Ordering clusters for number of members
     centroids = np.array(centroids)
-    labels = np.array(labels)
+    labels = np.array(labels).astype(int)
 
     if order_by_frequency:
         centroids, labels = clus_order_by_frequency(centroids, labels)
