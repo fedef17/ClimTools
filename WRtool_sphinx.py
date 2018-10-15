@@ -74,10 +74,10 @@ for fil,tag in zip(tot_files, tot_tags):
     for ran in yr_ranges:
         print('analyzing range {}\n'.format(ran))
         area = 'EAT'
-        resu = cd.WRtool_from_file(fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
+        resu = cd.WRtool_from_file(cart_in+fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
         results[(tag, area, ran)] = resu
         area = 'PNA'
-        resu = cd.WRtool_from_file(fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
+        resu = cd.WRtool_from_file(cart_in+fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
         results[(tag, area, ran)] = resu
 
 pickle.dump(results, open(cart_out+'results_SPHINX.p','w'))
