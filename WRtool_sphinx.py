@@ -71,7 +71,7 @@ results = dict()
 # Beginning the analysis
 for fil,tag in zip(tot_files, tot_tags):
     print('Analyzing {}\n'.format(tag))
-    var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(fil, extract_level = 50000.)
+    var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(cart_in+fil, extract_level = 50000.)
 
     var_season, dates_season = ctl.sel_season(var, dates, 'DJF')
     dates_season_pdh = pd.to_datetime(dates_season)
