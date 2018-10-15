@@ -71,13 +71,23 @@ results = dict()
 # Beginning the analysis
 for fil,tag in zip(tot_files, tot_tags):
     print('Analyzing {}\n'.format(tag))
+    var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(fil, extract_level = 50000.)
+
+    var_season, dates_season = ctl.sel_season(var, dates, 'DJF')
+    dates_season_pdh = pd.to_datetime(dates_season)
+
     for ran in yr_ranges:
         print('analyzing range {}\n'.format(ran))
+        okdat = (dates_season_pdh.year >= sel_range[0]) & (dates_season_pdh.year <= sel_range[1])
+        var_season = var_season[okdat, ...]
+        dates_season = dates_season[okdat, ...]
+
         area = 'EAT'
-        resu = cd.WRtool_from_file(cart_in+fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
+        resu = cd.WRtool_core(var_season, lat, lon, dates_season, area)
         results[(tag, area, ran)] = resu
         area = 'PNA'
-        resu = cd.WRtool_from_file(cart_in+fil, 'DJF', area, sel_range = ran, extract_level_4D = 50000.)
+        resu = cd.WRtool_core(var_season, lat, lon, dates_season, area, numclus = 3)
         results[(tag, area, ran)] = resu
+
 
 pickle.dump(results, open(cart_out+'results_SPHINX.p','w'))
