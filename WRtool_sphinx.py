@@ -78,7 +78,7 @@ for fil,tag in zip(tot_files, tot_tags):
 
     for ran in yr_ranges:
         print('analyzing range {}\n'.format(ran))
-        okdat = (dates_season_pdh.year >= sel_range[0]) & (dates_season_pdh.year <= sel_range[1])
+        okdat = (dates_season_pdh.year >= ran[0]) & (dates_season_pdh.year <= ran[1])
         var_season = var_season[okdat, ...]
         dates_season = dates_season[okdat, ...]
 
