@@ -30,11 +30,14 @@ import climtools_lib as ctl
 ##############################################
 ############ INPUTS #########
 
-cart = '/home/fedefab/Scrivania/Research/Post-doc/Primavera/Results_WP2/'
+cart = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_WP2/'
 results = pickle.load(open(cart+'res_primavera.p','r'))
 
-cart_ecmwf = '/home/fedefab/Scrivania/Research/Post-doc/Primavera/ECMWF_ens/'
-results_ecmwf = pickle.load(open(cart_ecmwf+'res_ecmwf.p','r'))
+cart_ecmwf = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_ECMWF/'
+results_ecmwf = pickle.load(open(cart_ecmwf+'res_primavera.p','r'))
+
+cart_ecmwf_full = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_ECMWF_full/'
+results_ecmwf_full = pickle.load(open(cart_ecmwf_full+'res_primavera.p','r'))
 
 res_tags = ['labels', 'freq_mem', 'patcor', 'cluspattern', 'significance', 'et', 'cluspattern_area']
 
@@ -71,9 +74,9 @@ plt.xticks(range(len(keytot)), keytot, size='small')
 plt.ylabel('Significance')
 fig.savefig(cart+'Significance_ECMWF.pdf')
 
-print('\n \n \n SOSTITUISCO LA MEDIAAA DI ECMWFFFFFFF\n \n \n')
-sig['ECMWF_LR'] = mean_LR
-sig['ECMWF_HR'] = mean_HR
+# print('\n \n \n SOSTITUISCO LA MEDIAAA DI ECMWFFFFFFF\n \n \n')
+# sig['ECMWF_LR'] = mean_LR
+# sig['ECMWF_HR'] = mean_HR
 
 syms = ['$H$']*len(models) + ['$L$']*len(models) + ['D']
 labels = ['ECE', 'HadGEM', 'CMCC', 'CNRM', 'MPI', 'ECMWF']+6*[None]+['NCEP']
@@ -170,7 +173,27 @@ for num, patt in enumerate(patnames):
     else:
         modpats += [results['cluspattern_area']['NCEP'][num, ...]]
 
-    filename = cart+'TaylorPlot_{}_ECMWF.pdf'.format(patnames_short[num])
+    filename = cart_ecmwf+'TaylorPlot_{}_ECMWF.pdf'.format(patnames_short[num])
+    label_ERMS_axis = 'Total RMS error (m)'
+    label_bias_axis = 'Pattern mean (m)'
+    ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = syms, only_first_quarter = True, legend = True, marker_edge = None, labels = labels, obs_label = 'ERA')
+
+key_HR = ['HR_{}_full'.format(ke) for ke in range(1,5)]
+key_LR = ['LR_{}_full'.format(ke) for ke in range(1,7)]
+for num, patt in enumerate(patnames):
+    obs = results['cluspattern_area']['ERA'][num, ...]
+    modpats_HR = [results_ecmwf_full['cluspattern_area'][tag][num, ...] for tag in key_HR]
+    modpats_LR = [results_ecmwf_full['cluspattern_area'][tag][num, ...] for tag in key_LR]
+    tags = key_HR+key_LR+['NCEP']
+    modpats = modpats_HR+modpats_LR
+    if num == 2:
+        modpats += [results['cluspattern_area']['NCEP'][3, ...]]
+    elif num == 3:
+        modpats += [results['cluspattern_area']['NCEP'][2, ...]]
+    else:
+        modpats += [results['cluspattern_area']['NCEP'][num, ...]]
+
+    filename = cart_ecmwf_full+'TaylorPlot_{}_ECMWF_full.pdf'.format(patnames_short[num])
     label_ERMS_axis = 'Total RMS error (m)'
     label_bias_axis = 'Pattern mean (m)'
     ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = syms, only_first_quarter = True, legend = True, marker_edge = None, labels = labels, obs_label = 'ERA')
