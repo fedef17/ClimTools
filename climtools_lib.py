@@ -1811,7 +1811,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = None, stitle_2 = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = None, stitle_2 = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98)):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -1828,6 +1828,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     < n_color_levels >: number of color levels.
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
+    < color_percentiles > : define the range of data to be represented in the color bar. e.g. (0,100) to full range, (5,95) to enhance features.
 
     """
 
@@ -1849,8 +1850,8 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     data = np.stack([data1,data2])
 
     if cbar_range is None:
-        mi = np.percentile(data, 5)
-        ma = np.percentile(data, 95)
+        mi = np.percentile(data, color_percentiles[0])
+        ma = np.percentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -1869,10 +1870,10 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 2, 1, projection=proj)
     map_plot = plot_mapc_on_ax(ax, data1, lat, lon, proj, cmappa, cbar_range)
-    ax.set_title(stitle_1)
+    ax.set_title(stitle_1, fontsize = 25)
     ax = plt.subplot(1, 2, 2, projection=proj)
     map_plot = plot_mapc_on_ax(ax, data2, lat, lon, proj, cmappa, cbar_range)
-    ax.set_title(stitle_2)
+    ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
     cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
@@ -1900,7 +1901,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -1926,6 +1927,10 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
 
+    < subtitles > : list of subtitles for all subplots.
+    < color_percentiles > : define the range of data to be represented in the color bar. e.g. (0,100) to full range, (5,95) to enhance features.
+    < fix_subplots_shape > : Fixes the number of subplots in rows and columns.
+
     """
 
     if visualization == 'standard':
@@ -1944,8 +1949,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     cmappa = cm.get_cmap(cmap)
 
     if cbar_range is None:
-        mi = np.percentile(data, 5)
-        ma = np.percentile(data, 95)
+        mi = np.percentile(dataset, color_percentiles[0])
+        ma = np.percentile(dataset, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -1963,11 +1968,15 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     # Begin plotting
     numens = len(dataset)
 
-    num_figs = int(np.ceil(1.0*numens/max_ax_in_fig))
-    numens_ok = int(np.ceil(numens/num_figs))
-
-    side1 = int(np.ceil(np.sqrt(numens_ok)))
-    side2 = int(np.ceil(numens_ok/float(side1)))
+    if fix_subplots_shape is None:
+        num_figs = int(np.ceil(1.0*numens/max_ax_in_fig))
+        numens_ok = int(np.ceil(numens/num_figs))
+        side1 = int(np.ceil(np.sqrt(numens_ok)))
+        side2 = int(np.ceil(numens_ok/float(side1)))
+    else:
+        (side1, side2) = fix_subplots_shape
+        numens_ok = side1*side2
+        num_figs = int(np.ceil(1.0*numens/numens_ok))
 
     namef = []
     namef.append(filename)
@@ -1984,7 +1993,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             cluster_colors = color_set(numclus)
 
     for i in range(num_figs):
-        fig = plt.figure(figsize=(24,14))
+        fig = plt.figure(figsize = (15,12))#(24,14)
         for nens in range(numens_ok*i, numens_ok*(i+1)):
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
@@ -1994,6 +2003,13 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             if number_subplots:
                 subtit = nens
                 title_obj = plt.text(-0.05, 1.05, subtit, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, fontsize=20, fontweight='bold', zorder = 20)
+            if subtitles is not None:
+                fonsiz = 25
+                if numens_ok > 6:
+                    fonsiz = 15
+                elif numens_ok > 12:
+                    fonsiz = 10
+                ax.set_title(subtitles[nens], fontsize = fonsiz)
             if cluster_labels is not None:
                 for nclus in range(numclus):
                     if nens in np.where(cluster_labels == nclus)[0]:
@@ -2030,7 +2046,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     return
 
 
-def Taylor_plot(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, show_numbers = True, only_numbers = False, colors_all = None, cluster_labels = None, cluster_colors = None, repr_cluster = None, verbose = True):
+def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, show_numbers = True, only_numbers = False, colors_all = None, cluster_labels = None, cluster_colors = None, repr_cluster = None, verbose = True):
     """
     Produces two figures:
     - a Taylor diagram
@@ -2182,6 +2198,106 @@ def Taylor_plot(models, observation, filename, title = None, label_bias_axis = N
         ax.add_artist(circle)
 
     plt.scatter(np.mean(observation), 0., color = 'black', s = 120, zorder = 5)
+    plt.grid()
+
+    fig7.savefig(nuname)
+
+    return
+
+
+def Taylor_plot(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = 'black', labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50):
+    """
+    Produces two figures:
+    - a Taylor diagram
+    - a bias/E_rms plot
+
+    < models > : a set of patterns (2D matrices or pc vectors) corresponding to different simulation results/model behaviours.
+    < observation > : the corresponding observed pattern. observation.shape must be the same as each of the models' shape.
+
+    < colors > : list of colors for each model point
+    < markers > : list of markers for each model point
+    """
+    fig6 = plt.figure(figsize=(8,6))
+    ax = fig6.add_subplot(111, polar = True)
+    plt.title(title)
+    #ax.set_facecolor(bgcol)
+
+    ax.set_thetamin(0)
+    if only_first_quarter:
+        ax.set_thetamax(90)
+        ok_cos = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99])
+    else:
+        ax.set_thetamax(180)
+        ok_cos = np.array([-0.99, -0.95, -0.9, -0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99])
+
+    labgr = ['{:4.2f}'.format(co) for co in ok_cos]
+    anggr = np.rad2deg(np.arccos(ok_cos))
+
+    plt.thetagrids(anggr, labels=labgr, frac = 1.1)
+
+    sigmas_pred = np.array([np.std(var) for var in models])
+    sigma_obs = np.std(observation)
+    corrs_pred = np.array([Rcorr(observation, var) for var in models])
+
+    if colors is None:
+        colors = color_set(len(models))
+
+    angles = np.arccos(corrs_pred)
+
+    if markers is None:
+        markers = ['o']*len(angles)
+    if labels is None:
+        labels = [None]*len(angles)
+    for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
+        ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab)
+
+    ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
+
+    for sig in [1., 2., 3.]:
+        circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
+        ax.add_artist(circle)
+
+    top    = 0.88  # the top of the subplots
+    bottom = 0.1    # the bottom
+    left   = 0.02    # the left side
+    right  = 0.98  # the right side
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top)
+
+    if legend:
+        plt.legend(fontsize = 'small', loc = 1)
+    fig6.savefig(filename)
+
+    indp = filename.rfind('.')
+    figform = filename[indp:]
+    basename = filename[:indp]
+    nuname = basename+'_biases'+figform
+
+    fig7 = plt.figure(figsize=(8,6))
+    ax = fig7.add_subplot(111)
+    plt.title(title)
+
+    biases = np.array([np.mean(var) for var in models])
+    ctr_patt_RMS = np.array([E_rms_cp(var, observation) for var in models])
+    RMS = np.array([E_rms(var, observation) for var in models])
+
+    if markers is None:
+        markers = ['o']*len(angles)
+    if labels is None:
+        labels = [None]*len(angles)
+    for bia, ctpr, col, sym, lab in zip(biases, ctr_patt_RMS, colors, markers, labels):
+        ax.scatter(bia, ctpr, s = mod_points_size+20, color = col, marker = sym, edgecolor = marker_edge, label = lab)
+
+    plt.xlabel(label_bias_axis)
+    plt.ylabel(label_ERMS_axis)
+
+    for sig in [1., 2., 3.]:
+        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs, fill = False, edgecolor = 'black', linestyle = '--')
+        ax.add_artist(circle)
+
+    plt.scatter(np.mean(observation), 0., color = 'black', s = obs_points_size+20, marker = 'D', zorder = 5, label = obs_label)
+
+    if legend:
+        plt.legend(fontsize = 'small', loc = 1)
     plt.grid()
 
     fig7.savefig(nuname)

@@ -38,7 +38,7 @@ numpcs = 4
 numclus = 4
 
 #inputs = 'all_models'
-inputs = 'ecmwf_ensemble'
+inputs = 'ecmwf_ensemble_full'
 
 if inputs == 'all_models':
     cart_in = '/home/federico/work/Primavera/DATA_stream1/'
@@ -50,6 +50,11 @@ elif inputs == 'ecmwf_ensemble':
     cart_out = '/home/federico/work/Primavera/Results_WP2/ECMWF_ensemble/'
     filenames = ['rid_HR_1979-2014_ens1.nc', 'rid_HR_1979-2014_ens2.nc', 'rid_HR_1979-2014_ens3.nc', 'rid_HR_1979-2014_ens4.nc', 'rid_LR_1979-2014_ens1.nc', 'rid_LR_1979-2014_ens2.nc', 'rid_LR_1979-2014_ens3.nc', 'rid_LR_1979-2014_ens4.nc', 'rid_LR_1979-2014_ens5.nc', 'rid_LR_1979-2014_ens6.nc']
     tags = ['HR_1', 'HR_2', 'HR_3', 'HR_4', 'LR_1', 'LR_2', 'LR_3', 'LR_4', 'LR_5', 'LR_6']
+elif inputs == 'ecmwf_ensemble_full':
+    cart_in = '/home/federico/work/Primavera/DATA_stream1/Primavera_runs_chrisrob/'
+    cart_out = '/home/federico/work/Primavera/Results_WP2/ECMWF_ensemble_full/'
+    filenames = ['AMIP_HR_ens1.nc','AMIP_HR_ens2.nc','AMIP_HR_ens3.nc','AMIP_HR_ens4.nc','AMIP_LR_ens1.nc','AMIP_LR_ens2.nc','AMIP_LR_ens3.nc','AMIP_LR_ens4.nc','AMIP_LR_ens5.nc','AMIP_LR_ens6.nc']
+    tags = ['HR_1_full', 'HR_2_full', 'HR_3_full', 'HR_4_full', 'LR_1_full', 'LR_2_full', 'LR_3_full', 'LR_4_full', 'LR_5_full', 'LR_6_full']
 
 ifile_ERA = 'zg500_ERAInterim_1979-2014.nc'
 
