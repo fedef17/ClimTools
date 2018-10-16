@@ -63,7 +63,7 @@ years2 = np.arange(1880,2101,10)
 
 yr_ranges = []
 yr_ranges.append((1850,2005))
-yr_ranges.append((2005,2100))
+yr_ranges.append((2006,2100))
 for y1, y2 in zip(years1, years2):
     yr_ranges.append((y1,y2))
 
@@ -79,14 +79,14 @@ for fil,tag in zip(tot_files, tot_tags):
     for ran in yr_ranges:
         print('analyzing range {}\n'.format(ran))
         okdat = (dates_season_pdh.year >= ran[0]) & (dates_season_pdh.year <= ran[1])
-        var_season = var_season[okdat, ...]
-        dates_season = dates_season[okdat, ...]
+        var_season_range = var_season[okdat, ...]
+        dates_season_range = dates_season[okdat, ...]
 
         area = 'EAT'
-        resu = cd.WRtool_core(var_season, lat, lon, dates_season, area)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area)
         results[(tag, area, ran)] = resu
         area = 'PNA'
-        resu = cd.WRtool_core(var_season, lat, lon, dates_season, area, numclus = 3)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 3)
         results[(tag, area, ran)] = resu
 
 
