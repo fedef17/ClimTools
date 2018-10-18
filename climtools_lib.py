@@ -1446,14 +1446,16 @@ def calc_composite_map(var, mask):
     return pattern #, pattern_std
 
 
-def calc_residence_times(indices, dates = None, count_incomplete = True):
+def calc_residence_times(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
     """
     Calculates residence times given a set of indices indicating cluster numbers.
 
     For each cluster, the observed set of residence times is given and a transition probability is calculated.
 
     < dates > : list of datetime objects (or datetime array). If set, the code eliminates spourious transitions between states belonging to two different seasons.
+
     < count_incomplete > : counts also residence periods that terminate with the end of the season and not with a transition to another cluster.
+    < skip_singleday_pause > : If a regime stops for a single day and then starts again, the two periods will be summed on. The single day is counted as another regime's day, to preserve the total number.
     """
     indices = np.array(indices)
     numclus = int(indices.max() + 1)
@@ -1464,6 +1466,8 @@ def calc_residence_times(indices, dates = None, count_incomplete = True):
             clu_resids = []
             okclu = indices == clu
             init = False
+            pause = False
+
             for el in okclu:
                 if el:
                     if not init:
@@ -1471,40 +1475,90 @@ def calc_residence_times(indices, dates = None, count_incomplete = True):
                         num_days = 1
                     else:
                         num_days += 1
+                        if pause:
+                            # regime started again after one day pause
+                            pause = False
                 else:
-                    if init:
-                        clu_resids.append(num_days)
-                        init = False
+                    if skip_singleday_pause:
+                        if init and not pause:
+                            # first day of pause
+                            pause = True
+                        elif init and pause:
+                            # this is the second day of pause, closing regime period
+                            clu_resids.append(num_days)
+                            init = False
+                            pause = False
+                    else:
+                        if init:
+                            clu_resids.append(num_days)
+                            init = False
+
 
             resid_times.append(np.array(clu_resids))
     else:
         dates = pd.to_datetime(dates)
         duday = pd.Timedelta('2 days 00:00:00')
+        dates_init = []
         for clu in range(numclus):
             clu_resids = []
+            clu_dates_init = []
             okclu = indices == clu
             init = False
+            pause = False
+
             old_date = dates[0]
             for el, dat in zip(okclu, dates):
                 if dat - old_date > duday:
                     init = False
                     if count_incomplete:
                         clu_resids.append(num_days)
+                    else:
+                        clu_dates_init.pop()
                 if el:
                     if not init:
                         init = True
                         num_days = 1
+                        clu_dates_init.append(dat)
                     else:
                         num_days += 1
+                        if pause:
+                            # regime started again after one day pause
+                            pause = False
                 else:
-                    if init:
-                        clu_resids.append(num_days)
-                        init = False
+                    if skip_singleday_pause:
+                        if init and not pause:
+                            # first day of pause
+                            pause = True
+                        elif init and pause:
+                            # this is the second day of pause, closing regime period
+                            clu_resids.append(num_days)
+                            init = False
+                            pause = False
+                    else:
+                        if init:
+                            clu_resids.append(num_days)
+                            init = False
+
                 old_date = dat
 
             resid_times.append(np.array(clu_resids))
+            dates_init.append(np.array(clu_dates_init))
 
-    return np.array(resid_times)
+    if dates is None:
+        return np.array(resid_times)
+    else:
+        return np.array(resid_times), np.array(dates_init)
+
+
+def compute_centroid_distance(PCs, centroids, labels):
+    """
+    Calculates distances of pcs to centroid assigned by label.
+    """
+    distances = []
+    for pc, lab in zip(PCs, labels):
+        distances.append( distance(pc, centroids[lab]) )
+
+    return np.array(distances)
 
 
 def compute_clusterpatterns(var, labels):
@@ -1901,7 +1955,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12)):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -1993,7 +2047,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             cluster_colors = color_set(numclus)
 
     for i in range(num_figs):
-        fig = plt.figure(figsize = (15,12))#(24,14)
+        fig = plt.figure(figsize = figsize)#(24,14)
         for nens in range(numens_ok*i, numens_ok*(i+1)):
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
@@ -2024,14 +2078,14 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
                         rect.set_linewidth(6.0)
                         ax.add_artist(rect)
 
-        cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+        #cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+        cax = plt.axes([0.1, 0.1, 0.8, 0.05])
         cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
         cb.ax.tick_params(labelsize=18)
         cb.set_label(cb_label, fontsize=20)
 
         plt.suptitle(title, fontsize=35, fontweight='bold')
 
-        plt.subplots_adjust(top=0.85)
         top    = 0.90  # the top of the subplots
         bottom = 0.13    # the bottom
         left   = 0.02    # the left side
@@ -2205,7 +2259,7 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     return
 
 
-def Taylor_plot(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = 'black', labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50):
+def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True):
     """
     Produces two figures:
     - a Taylor diagram
@@ -2217,9 +2271,17 @@ def Taylor_plot(models, observation, filename, title = None, label_bias_axis = N
     < colors > : list of colors for each model point
     < markers > : list of markers for each model point
     """
-    fig6 = plt.figure(figsize=(8,6))
-    ax = fig6.add_subplot(111, polar = True)
-    plt.title(title)
+    if ax is None and filename is None:
+        raise ValueError('Where do I plot this? specify ax or filename')
+    elif filename is not None and ax is not None:
+        raise ValueError('Where do I plot this? specify ax OR filename, not BOTH')
+
+    if ax is None:
+        fig6 = plt.figure(figsize=(8,6))
+        ax = fig6.add_subplot(111, polar = True)
+
+    if title is not None:
+        ax.set_title(title)
     #ax.set_facecolor(bgcol)
 
     ax.set_thetamin(0)
@@ -2233,7 +2295,7 @@ def Taylor_plot(models, observation, filename, title = None, label_bias_axis = N
     labgr = ['{:4.2f}'.format(co) for co in ok_cos]
     anggr = np.rad2deg(np.arccos(ok_cos))
 
-    plt.thetagrids(anggr, labels=labgr, frac = 1.1)
+    ax.set_thetagrids(anggr, labels=labgr, frac = 1.1)
 
     sigmas_pred = np.array([np.std(var) for var in models])
     sigma_obs = np.std(observation)
@@ -2243,6 +2305,9 @@ def Taylor_plot(models, observation, filename, title = None, label_bias_axis = N
         colors = color_set(len(models))
 
     angles = np.arccos(corrs_pred)
+
+    if enlarge_rmargin:
+        ax.set_ymargin(0.2)
 
     if markers is None:
         markers = ['o']*len(angles)
@@ -2257,14 +2322,18 @@ def Taylor_plot(models, observation, filename, title = None, label_bias_axis = N
         circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
         ax.add_artist(circle)
 
+    if legend:
+        ax.legend(fontsize = 'small', loc = 1)
+
+    if filename is None:
+        return
+
     top    = 0.88  # the top of the subplots
     bottom = 0.1    # the bottom
     left   = 0.02    # the left side
     right  = 0.98  # the right side
     plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top)
 
-    if legend:
-        plt.legend(fontsize = 'small', loc = 1)
     fig6.savefig(filename)
 
     indp = filename.rfind('.')

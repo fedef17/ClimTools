@@ -108,7 +108,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, output_results_only = True):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, output_results_only = True, run_significance_calc = True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -142,6 +142,8 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     #### CLUSTERING
     centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
 
+    dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+
     cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
     cluspatt_area = []
     for clu in cluspattern:
@@ -153,11 +155,12 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     print('varopt: {:8.4f}\n'.format(varopt))
     freq_mem = ctl.calc_clus_freq(labels)
 
-    print('Running clus sig\n')
-    significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
-
     results = dict()
-    results['significance'] = significance
+
+    if run_significance_calc:
+        print('Running clus sig\n')
+        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
+        results['significance'] = significance
 
     if ref_solver is not None and ref_patterns_area is not None:
         print('Running compare\n')
@@ -180,6 +183,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     results['lon_area'] = lon_area
     results['labels'] = labels
     results['centroids'] = centroids
+    results['dist_centroid'] = dist_centroid
 
     if not output_results_only:
         results['var_area'] = var_area

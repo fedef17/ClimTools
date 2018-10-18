@@ -107,6 +107,12 @@ plt.ylabel('Significance')
 fig.savefig(cart+'Significance.pdf')
 
 
+hrsigs = sig_HR + [sig[mod] for mod in sig.keys() if 'HR' in mod]
+lrsigs = sig_LR + [sig[mod] for mod in sig.keys() if 'LR' in mod]
+
+np.savetxt(cart+'HRsigs.dat', hrsigs, fmt = '%7.3f')
+np.savetxt(cart+'LRsigs.dat', lrsigs, fmt = '%7.3f')
+
 patt_ref = results['cluspattern']['ERA']
 lat = np.arange(-90., 91., 2.5)
 lon = np.arange(0., 360., 2.5)
@@ -127,9 +133,18 @@ patnames_short = ['NP', 'BL', 'NN', 'AR']
 #         nunam = cartout+'clus_'+pps+'_'+tag+'.pdf'
 #         ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
 
+
+filename = cart+'HadGEM_blocking_example.pdf'
+subtitles = ['ERA-Interim', 'HadGEM LR', 'HadGEM HR']
+patts = [results['cluspattern']['ERA'][1], results['cluspattern']['HadGEM_LR'][1], results['cluspattern']['HadGEM_HR'][1]]
+ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = 'polar', central_lat_lon = (50.,0.), cmap = 'RdBu_r', title = 'Blocking regime', subtitles = subtitles, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (1,3), number_subplots = False, figsize = (16,8))
+
 # Taylor plots
+fig = plt.figure(figsize=(16,12))
 
 for num, patt in enumerate(patnames):
+    ax = plt.subplot(2, 2, num+1, polar = True)
+
     obs = results['cluspattern_area']['ERA'][num, ...]
     modpats_HR = [results['cluspattern_area'][tag+'_HR'][num, ...] for tag in models]
     tags = [tag+'_HR' for tag in models]
@@ -145,7 +160,7 @@ for num, patt in enumerate(patnames):
 
     tags += ['NCEP']
 
-    colors = ctl.color_set(len(modpats_HR)+1)
+    colors = ctl.color_set(len(modpats_HR)+1, bright_thres = 0.3)
     colors = colors[:-1] + colors[:-1] + [colors[-1]]
     syms = ['$H$']*len(modpats_HR) + ['$L$']*len(modpats_HR) + ['D']
     labels = ['ECE', 'HadGEM', 'CMCC', 'CNRM', 'MPI', 'ECMWF']+6*[None]+['NCEP']
@@ -153,8 +168,37 @@ for num, patt in enumerate(patnames):
     filename = cart+'TaylorPlot_{}.pdf'.format(patnames_short[num])
     label_ERMS_axis = 'Total RMS error (m)'
     label_bias_axis = 'Pattern mean (m)'
-    ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = syms, only_first_quarter = True, legend = True, marker_edge = None, labels = labels, obs_label = 'ERA')
+    #ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = syms, only_first_quarter = True, legend = True, marker_edge = None, labels = labels, obs_label = 'ERA')
+    legok = False
+    ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = syms, only_first_quarter = True, legend = legok, labels = labels, obs_label = 'ERA', mod_points_size = 50, obs_points_size = 70)
 
+#Custom legend
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+
+legend_elements = []
+for col, lab in zip(colors, labels):
+    if lab is None:
+        break
+    legend_elements.append(Line2D([0], [0], marker='o', color=col, label=lab, linestyle = ''))
+
+legend_elements.append(Line2D([0], [0], marker='D', color=colors[-1], label=labels[-1], linestyle = ''))
+legend_elements.append(Line2D([0], [0], marker='D', color='black', label='ERA', linestyle = ''))
+fig.legend(handles=legend_elements, loc=1, fontsize = 'large')
+
+fig.tight_layout()
+n1 = plt.text(0.15,0.6,'NAO +',transform=fig.transFigure, fontsize = 20)
+n2 = plt.text(0.15,0.1,'NAO -',transform=fig.transFigure, fontsize = 20)
+n3 = plt.text(0.6,0.6,'Blocking',transform=fig.transFigure, fontsize = 20)
+n4 = plt.text(0.6,0.1,'Atl.Ridge',transform=fig.transFigure, fontsize = 20)
+bbox=dict(facecolor = 'lightsteelblue', alpha = 0.7, edgecolor='black', boxstyle='round,pad=0.2')
+n1.set_bbox(bbox)
+n2.set_bbox(bbox)
+n3.set_bbox(bbox)
+n4.set_bbox(bbox)
+
+fig.savefig(cart+'TaylorPlot_Stream1.pdf')
+sys.exit()
 
 colors = 4*['orange']+6*['green']+[colors[-1]]
 syms = 4*['$H$'] + 6*['$L$'] + ['D']

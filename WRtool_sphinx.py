@@ -58,12 +58,12 @@ stoc_tags = ['lcs0', 'lcs1', 'lcs2']
 tot_files = base_files+stoc_files
 tot_tags = base_tags+stoc_tags
 
-years1 = np.arange(1850,2071,10)
-years2 = np.arange(1880,2101,10)
+years1 = np.arange(1850,2071,5)
+years2 = np.arange(1880,2101,5)
 
 yr_ranges = []
-yr_ranges.append((1850,2005))
-yr_ranges.append((2006,2100))
+#yr_ranges.append((1850,2005))
+#yr_ranges.append((2006,2100))
 for y1, y2 in zip(years1, years2):
     yr_ranges.append((y1,y2))
 
