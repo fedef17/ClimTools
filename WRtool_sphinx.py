@@ -83,6 +83,7 @@ for fil,tag in zip(tot_files, tot_tags):
     dates_season_pdh = pd.to_datetime(dates_season)
 
     for ran in yr_ranges:
+        runsig = True
         if ran[1]-ran[0] > 50:
             runsig = False
         print('analyzing range {}\n'.format(ran))
@@ -103,4 +104,4 @@ for fil,tag in zip(tot_files, tot_tags):
         results[(tag, area, ran)] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX_allperiod.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_new_oksig.p','w'))
