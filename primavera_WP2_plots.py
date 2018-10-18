@@ -117,23 +117,23 @@ patt_ref = results['cluspattern']['ERA']
 lat = np.arange(-90., 91., 2.5)
 lon = np.arange(0., 360., 2.5)
 
-patnames = ['NAO +', 'Blocking', 'NAO -', 'Alt. Ridge']
+patnames = ['NAO +', 'Blocking', 'NAO -', 'Atl. Ridge']
 patnames_short = ['NP', 'BL', 'NN', 'AR']
-# for tag in mod_tags:
-#     print('adesso {}\n'.format(tag))
-#     patt = results['cluspattern'][tag]
-#     if np.any(np.isnan(patt)):
-#         print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
-#         patt[np.isnan(patt)] = 0.0
-#     cartout = cart+'Model_{}/'.format(tag)
-#     if not os.path.exists(cartout): os.mkdir(cartout)
-#     filename = cartout+'Allclus_'+tag+'.pdf'
-#     ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'polar', central_lat_lon = (50.,0.), cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
-#     for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
-#         nunam = cartout+'clus_'+pps+'_'+tag+'.pdf'
-#         ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
+for tag in mod_tags:
+    print('adesso {}\n'.format(tag))
+    patt = results['cluspattern'][tag]
+    if np.any(np.isnan(patt)):
+        print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
+        patt[np.isnan(patt)] = 0.0
+    cartout = cart+'Model_{}/'.format(tag)
+    if not os.path.exists(cartout): os.mkdir(cartout)
+    filename = cartout+'Allclus_'+tag+'.pdf'
+    ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'polar', central_lat_lon = (50.,0.), cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+    for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
+        nunam = cartout+'clus_'+pps+'_'+tag+'.pdf'
+        ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
 
-
+sys.exit()
 filename = cart+'HadGEM_blocking_example.pdf'
 subtitles = ['ERA-Interim', 'HadGEM LR', 'HadGEM HR']
 patts = [results['cluspattern']['ERA'][1], results['cluspattern']['HadGEM_LR'][1], results['cluspattern']['HadGEM_HR'][1]]

@@ -1352,6 +1352,20 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     return perm, centroids, labels, et, patcor
 
 
+def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_ref_AREA):
+    """
+    Compares a set of patterns with a reference set.
+    Returns the patterns ordered in the best match to the reference ones and the RMS distance and the pattern correlation between the two sets.
+    """
+
+    perm = match_pc_sets(cluspattern_ref_AREA, cluspattern_AREA)
+    centroids, labels = change_clus_order(centroids, labels, perm)
+
+    et, patcor = calc_RMS_and_patcor(cluspattern_ref_AREA, cluspattern_AREA[perm, ...])
+
+    return perm, centroids, labels, et, patcor
+
+
 def match_pc_sets(pcset_ref, pcset, verbose = False):
     """
     Find the best possible match between two sets of PCs.
@@ -1367,7 +1381,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False):
     if pcset_ref.shape != pcset.shape:
         raise ValueError('the PC sets must have the same dimensionality')
 
-    numclus, numpcs = pcset_ref.shape
+    numclus = pcset_ref.shape[0]
 
     perms = list(itt.permutations(range(numclus)))
     nperms = len(perms)
@@ -2078,8 +2092,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
                         rect.set_linewidth(6.0)
                         ax.add_artist(rect)
 
-        #cax = plt.axes([0.1, 0.06, 0.8, 0.03])
-        cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+        cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+        #cax = plt.axes([0.1, 0.1, 0.8, 0.05])
         cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
         cb.ax.tick_params(labelsize=18)
         cb.set_label(cb_label, fontsize=20)
