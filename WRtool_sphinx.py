@@ -58,14 +58,18 @@ stoc_tags = ['lcs0', 'lcs1', 'lcs2']
 tot_files = base_files+stoc_files
 tot_tags = base_tags+stoc_tags
 
-years1 = np.arange(1850,2071,5)
-years2 = np.arange(1880,2101,5)
+#years1 = np.arange(1855,2066,10)
+#years2 = np.arange(1885,2096,10)
+years1 = np.arange(1850,2071,10)
+years2 = np.arange(1880,2101,10)
 
 yr_ranges = []
-#yr_ranges.append((1850,2005))
-#yr_ranges.append((2006,2100))
-for y1, y2 in zip(years1, years2):
-    yr_ranges.append((y1,y2))
+yr_ranges.append((1850,2005))
+yr_ranges.append((2006,2100))
+# for y1, y2 in zip(years1, years2):
+#     yr_ranges.append((y1,y2))
+
+runsig = False
 
 results = dict()
 # Beginning the analysis
@@ -83,11 +87,11 @@ for fil,tag in zip(tot_files, tot_tags):
         dates_season_range = dates_season[okdat, ...]
 
         area = 'EAT'
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, run_significance_calc = runsig)
         results[(tag, area, ran)] = resu
         area = 'PNA'
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 3)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 3, run_significance_calc = runsig)
         results[(tag, area, ran)] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_allperiod.p','w'))
