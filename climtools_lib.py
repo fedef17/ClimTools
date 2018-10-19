@@ -890,6 +890,16 @@ def check_daily(dates):
         return False
 
 
+def running_mean(var, wnd):
+    """
+    Performs a running mean.
+    """
+    tempser = pd.Series(var)
+    rollpi_temp = tempser.rolling(wnd, center = True).mean()
+
+    return rollpi_temp
+
+
 def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
     """
     Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a daily or monthly climatology on var with the specified window.
