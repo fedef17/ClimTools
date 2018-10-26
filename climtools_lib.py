@@ -11,6 +11,7 @@ import matplotlib.patheffects as PathEffects
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
+import cartopy.util as cutil
 import pandas as pd
 
 from numpy import linalg as LA
@@ -1296,7 +1297,7 @@ def calc_clus_freq(labels):
     Calculates clusters frequency.
     """
     numclus = int(np.max(labels)+1)
-    print('yo',labels.shape)
+    #print('yo',labels.shape)
 
     num_mem = []
     for i in range(numclus):
@@ -1313,7 +1314,7 @@ def change_clus_order(centroids, labels, new_ord):
     Changes order of cluster centroids and labels according to new_order.
     """
     numclus = int(np.max(labels)+1)
-    print('yo',labels.shape, new_ord)
+    #print('yo',labels.shape, new_ord)
 
     labels_new = np.array(labels)
     for nu, i in zip(range(numclus), new_ord):
@@ -1330,7 +1331,7 @@ def clus_order_by_frequency(centroids, labels):
     Orders the clusters in decreasing frequency. Returns new labels and ordered centroids.
     """
     numclus = int(np.max(labels)+1)
-    print('yo',labels.shape)
+    #print('yo',labels.shape)
 
     freq_mem = calc_clus_freq(labels)
     new_ord = freq_mem.argsort()[::-1]
@@ -1592,7 +1593,7 @@ def compute_clusterpatterns(var, labels):
 
     labels = np.array(labels)
     numclus = int(np.max(labels)+1)
-    print('yo',labels.shape)
+    #print('yo',labels.shape)
 
     cluspatt = []
     freqs = []
@@ -1765,19 +1766,28 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     """
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    print(clevels)
+    print(np.min(data), np.max(data))
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
 
     if isinstance(proj, ccrs.Orthographic):
         # add longitude to complete the globe
-        lon = np.append(lon, 360-1e-4)
-        data = np.c_[data,data[:,0]]
+        #lon = np.append(lon, 360)
+        #data = np.c_[data,data[:,0]]
+        data, lon = cutil.add_cyclic_point(data, coord = lon)
+
+        # if np.min(lat) >= 0:
+        #     latpiu = np.sort(-1.0*lat[lat > 0])
+        #     lat = np.concatenate([latpiu, lat])
+        #     data = np.concatenate([np.zeros((len(latpiu), len(lon))), data])
+
     xi,yi = np.meshgrid(lon,lat)
 
-    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both')
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
     if draw_contour_lines:
-        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = proj, linewidth = 0.5)
+        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
     if isinstance(proj, ccrs.PlateCarree):
         latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
@@ -1947,10 +1957,10 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     fig = plt.figure(figsize=(24,14))
 
     ax = plt.subplot(1, 2, 1, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data1, lat, lon, proj, cmappa, cbar_range)
+    map_plot = plot_mapc_on_ax(ax, data1, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_1, fontsize = 25)
     ax = plt.subplot(1, 2, 2, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data2, lat, lon, proj, cmappa, cbar_range)
+    map_plot = plot_mapc_on_ax(ax, data2, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -2076,7 +2086,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
 
             if number_subplots:
                 subtit = nens

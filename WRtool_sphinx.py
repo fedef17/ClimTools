@@ -69,9 +69,11 @@ yr_ranges.append((2006,2100))
 for y1, y2 in zip(years1, years2):
     yr_ranges.append((y1,y2))
 
+yr_ranges = [(1850,2100)]
+
 erafile = cart_in + 'era_1979-2014_nh.nc'
 ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJF', 'EAT', extract_level_4D = 50000., numclus = 4, output_results_only = False)
-ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJF', 'PNA', extract_level_4D = 50000., numclus = 3, output_results_only = False)
+ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJF', 'PNA', extract_level_4D = 50000., numclus = 4, output_results_only = False)
 
 results = dict()
 # Beginning the analysis
@@ -100,8 +102,8 @@ for fil,tag in zip(tot_files, tot_tags):
         area = 'PNA'
         ref_solver = ERA_ref_PNA['solver']
         ref_patterns_area = ERA_ref_PNA['cluspattern_area']
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 3, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 4, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area)
         results[(tag, area, ran)] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX_new_oksig.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_fullperiod.p','w'))
