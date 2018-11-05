@@ -169,7 +169,11 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
 
     dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
 
-    cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
+    if detrended_anom_for_clustering:
+        cluspattern = ctl.compute_clusterpatterns(var_anom_dtr, labels)
+    else:
+        cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
+
     cluspatt_area = []
     for clu in cluspattern:
         cluarea, _, _ = ctl.sel_area(lat, lon, clu, area)
