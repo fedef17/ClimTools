@@ -96,13 +96,13 @@ for fil,tag in zip(tot_files, tot_tags):
         area = 'EAT'
         ref_solver = ERA_ref_EAT['solver']
         ref_patterns_area = ERA_ref_EAT['cluspattern_area']
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
         results[(tag, area, ran)] = resu
 
         area = 'PNA'
         ref_solver = ERA_ref_PNA['solver']
         ref_patterns_area = ERA_ref_PNA['cluspattern_area']
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 4, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area)
+        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 4, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
         results[(tag, area, ran)] = resu
 
 

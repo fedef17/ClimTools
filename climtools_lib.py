@@ -919,6 +919,29 @@ def running_mean(var, wnd):
     return rollpi_temp
 
 
+def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_days = 5, window_years = 20, step_year = 5):
+    """
+    Calculates the daily anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_daily_climat().
+    """
+    dates_pdh = pd.to_datetime(dates)
+    if climat_mean is None or dates_climate_mean is None:
+        climat_mean, dates_climate_mean = trend_daily_climat(var, dates, window_days = window_days, window_years = window_years, step_year = step_year)
+
+    var_anom_tot = []
+    year_steps = np.unique(dates_pdh.year)[::step_year]
+
+    for yea, clm, dtclm in zip(year_steps, climat_mean, dates_climate_mean):
+        okye = (dates_pdh.year >= yea - step_year/2.) & (dates_pdh.year < yea + step_year/2.)
+        var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = clm, dates_climate_mean = dtclm, window = window_days)
+        var_anom_tot.append(var_anom)
+
+    var_anom_tot = np.concatenate(var_anom_tot)
+    if len(var_anom_tot) != len(var):
+        raise ValueError('{} and {} differ'.format(len(var_anom_tot), len(var)))
+
+    return var_anom_tot
+
+
 def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
     """
     Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a daily or monthly climatology on var with the specified window.
