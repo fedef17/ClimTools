@@ -106,4 +106,4 @@ for fil,tag in zip(tot_files, tot_tags):
         results[(tag, area, ran)] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX_fullperiod.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_fullperiod_detrended.p','w'))
