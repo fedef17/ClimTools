@@ -934,11 +934,11 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
     #okyetot = np.zeros(len(var), dtype=bool)
 
     for yea in np.unique(dates_pdh.year):
-        yearef = np.argmin(year_steps - yea)
+        yearef = np.argmin(abs(year_steps - yea))
         okye = dates_pdh.year == yea
         var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
         var_anom_tot.append(var_anom)
-    
+
     # for yea, clm, dtclm in zip(year_steps, climat_mean, dates_climate_mean):
     #     okye = (dates_pdh.year >= yea - step_year/2.) & (dates_pdh.year < yea + step_year/2.)
     #     print(dates[okye][0], dates[okye][-1])
