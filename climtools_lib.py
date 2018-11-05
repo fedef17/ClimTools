@@ -833,7 +833,9 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     dates_pdh = pd.to_datetime(dates)
     climat_mean = []
     dates_climate_mean = []
-    for yea in np.unique(dates_pdh.year)[::step_year]:
+    years = np.unique(dates_pdh.year)[::step_year]
+
+    for yea in years:
         okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
         clm, dtclm, _ = daily_climatology(var[okye], dates[okye], window_days, refyear = yea)
         climat_mean.append(clm)
@@ -931,13 +933,19 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
     year_steps = np.unique(dates_pdh.year)[::step_year]
     #okyetot = np.zeros(len(var), dtype=bool)
 
-    for yea, clm, dtclm in zip(year_steps, climat_mean, dates_climate_mean):
-        okye = (dates_pdh.year >= yea - step_year/2.) & (dates_pdh.year < yea + step_year/2.)
-        print(dates[okye][0], dates[okye][-1])
-        var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = clm, dates_climate_mean = dtclm, window = window_days)
-
-        #okyetot = okyetot | okye
+    for yea in np.unique(dates_pdh.year):
+        yearef = np.argmin(year_steps - yea)
+        okye = dates_pdh.year == yea
+        var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
         var_anom_tot.append(var_anom)
+    
+    # for yea, clm, dtclm in zip(year_steps, climat_mean, dates_climate_mean):
+    #     okye = (dates_pdh.year >= yea - step_year/2.) & (dates_pdh.year < yea + step_year/2.)
+    #     print(dates[okye][0], dates[okye][-1])
+    #     var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = clm, dates_climate_mean = dtclm, window = window_days)
+    #
+    #     #okyetot = okyetot | okye
+    #     var_anom_tot.append(var_anom)
 
     var_anom_tot = np.concatenate(var_anom_tot)
     if len(var_anom_tot) != len(var):
