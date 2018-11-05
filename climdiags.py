@@ -136,7 +136,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
         # Detrending
         print('Detrended eof calculation\n')
         climat_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season, dates_season, window_days = wnd)
-        var_anom_dtr = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr)
+        var_anom_dtr = ctl.anomalies_daily_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr)
         var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
 
         print('Running compute\n')
