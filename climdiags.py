@@ -108,7 +108,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, output_results_only = True, run_significance_calc = True):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, output_results_only = True, run_significance_calc = True, detrended_eof_calculation = True, detrended_anom_for_clustering = True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -123,20 +123,45 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     < output_results_only > : bool. Output only the main results: cluspatterns, significance, patcor, et, labels. Instead outputs the eof solver and the local and global anomalies fields as well.
 
     < ref_solver >, < ref_patterns_area > : reference solver (ERA) and reference cluster pattern for cluster comparison.
+
+    < detrended_eof_calculation > : Calculates a 20-year running mean for the geopotential before calculating the eofs.
+    < detrended_anom_for_clustering > : Calculates the anomalies for clustering using the same detrended running mean.
     """
     ## PRECOMPUTE
+    if detrended_anom_for_clustering and not detrended_eof_calculation:
+        detrended_eof_calculation = True
+        print('Setting detrended_eof_calculation = True\n')
 
-    climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
+    if detrended_eof_calculation:
+        # Detrending
+        print('Detrended eof calculation\n')
+        climat_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season, dates_season, window_days = wnd)
+        var_anom_dtr = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr)
+        var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
 
-    var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+        print('Running compute\n')
+        #### EOF COMPUTATION
+        eof_solver = ctl.eof_computation(var_area_dtr, lat_area)
 
-    var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
-    print(var_area.shape)
+        if detrended_anom_for_clustering:
+            # Use detrended anomalies for clustering calculations
+            PCs = eof_solver.pcs()[:, :numpcs]
+        else:
+            # Use anomalies wrt total time mean for clustering calculations
+            climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
+            var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+            var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
-    print('Running compute\n')
-    #### EOF COMPUTATION
-    eof_solver = ctl.eof_computation(var_area, lat_area)
-    PCs = eof_solver.pcs()[:, :numpcs]
+            PCs = eof_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
+    else:
+        climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
+        var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+        var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
+
+        print('Running compute\n')
+        #### EOF COMPUTATION
+        eof_solver = ctl.eof_computation(var_area, lat_area)
+        PCs = eof_solver.pcs()[:, :numpcs]
 
     print('Running clustering\n')
     #### CLUSTERING

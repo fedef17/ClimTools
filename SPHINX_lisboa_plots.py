@@ -128,7 +128,7 @@ patnames_short['PNA'] = ['AR', 'PT', 'AH']
 #         filename = cart + 'Clus_{}{}_all_1850-2005.pdf'.format(area,num)
 #         ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = 'polar', central_lat_lon = (90.,0.), cmap = 'RdBu_r', title = 'Regime {} on {}'.format(num, area), subtitles = ensmem, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,3), number_subplots = False, figsize = (15,15))
 
-
+results_fullp = pickle.load(open(cart+'results_SPHINX_fullperiod.p','r'))
 
 results = pickle.load(open(cart+'results_SPHINX_new_oksig.p','r'))
 years1 = np.arange(1850,2071,5)
@@ -141,6 +141,8 @@ cyea = [np.mean(ran) for ran in yr_ranges]
 
 histran = (1850, 2005)
 futran = (2006, 2100)
+
+cartsig = cart + 'sig/'
 
 sigs_EAT = []
 sigs_PNA = []
@@ -162,7 +164,7 @@ for area in ['EAT', 'PNA']:
     plt.ylabel('Significance')
     plt.xlabel('central year of 30yr period')
     plt.title(area+' - base runs')
-    fig.savefig(cart+'Sig_{}_base_5yr.pdf'.format(area))
+    fig.savefig(cartsig+'Sig_{}_base_5yr.pdf'.format(area))
 
     fig = plt.figure()
     for ens in stoc_ens:
@@ -173,7 +175,7 @@ for area in ['EAT', 'PNA']:
     plt.ylabel('Significance')
     plt.xlabel('central year of 30yr period')
     plt.title(area+' - stoc runs')
-    fig.savefig(cart+'Sig_{}_stoc_5yr.pdf'.format(area))
+    fig.savefig(cartsig+'Sig_{}_stoc_5yr.pdf'.format(area))
 
     fig = plt.figure()
     for ens in base_ens:
@@ -185,7 +187,7 @@ for area in ['EAT', 'PNA']:
     plt.ylabel('Significance')
     plt.xlabel('central year of 30yr period')
     plt.title(area+' - base runs (25 yr smooth)')
-    fig.savefig(cart+'Sig_{}_base_20yr_smooth.pdf'.format(area))
+    fig.savefig(cartsig+'Sig_{}_base_20yr_smooth.pdf'.format(area))
 
     fig = plt.figure()
     for ens in stoc_ens:
@@ -197,7 +199,7 @@ for area in ['EAT', 'PNA']:
     plt.ylabel('Significance')
     plt.xlabel('central year of 30yr period')
     plt.title(area+' - stoc runs (25 yr smooth)')
-    fig.savefig(cart+'Sig_{}_stoc_20yr_smooth.pdf'.format(area))
+    fig.savefig(cartsig+'Sig_{}_stoc_20yr_smooth.pdf'.format(area))
 
 
 
@@ -292,7 +294,71 @@ for area in ['EAT', 'PNA']:
         fig.savefig(cartper+'persistence_{}_{}_fut_vs_hist__base.pdf'.format(area, pts, ran[0], ran[1]))
 
 
+#####################################################################################
+#####################################################################################
+### CLUSTER Frequency
+
 era_freq = ctl.calc_clus_freq(lab_era)
+
+timed = pd.Timedelta('90 days')
+dates_pdh = pd.to_datetime(dates)
+pi = (dates_pdh.month == 12) | (dates_pdh.month == 1) | (dates_pdh.month == 2)
+pi2 = (pi) & (dates_pdh > dates_pdh[0]+timed) & (dates_pdh < dates_pdh[-1]-timed)
+datespi2 = dates[pi2]
+
+labs_fullp = []
+dist_fullp = []
+freqs_yr_all = dict()
+for ens in ensmem:
+    labs_fullp.append(results_fullp[(ens, 'EAT', (1850,2100))]['labels'])
+    dist_fullp.append(results_fullp[(ens, 'EAT', (1850,2100))]['dist_centroid'])
+    if ens == 'lcb1':
+        dates_ok = datespi2[90:]
+    else:
+        dates_ok = datespi2
+    freqs_yr_all[ens] = ctl.calc_seasonal_clus_freq(labs_fullp[-1], dates_ok)
+
+cartfr = cart+'freq_fullp/'
+if not os.path.exists(cartfr):
+    os.mkdir(cartfr)
+
+plt.close('all')
+
+yearsall = np.arange(1851, 2101)
+
+for ens in ensmem:
+    fig = plt.figure()
+    if ens == 'lcb1':
+        years = yearsall[1:]
+    else:
+        years = yearsall
+    #plt.bar(years, freqs_yr_all[ens])
+    for clu, clunam in enumerate(patnames['EAT']):
+        smut = ctl.running_mean(freqs_yr_all[ens][:,clu], wnd = 5)
+        plt.plot(years, smut, label = clunam)
+
+    plt.legend()
+    fig.savefig(cartfr+'freq_fullp_{}.pdf'.format(ens))
+
+cartmap = cart + 'Maps/'
+area = 'EAT'
+for num, nam in enumerate(patnames[area]):
+    patts = [results_fullp[(ens, area, (1850,2100))]['cluspattern'][num] for ens in ensmem]
+    #patts = [hist_runs[(ens,area)]['cluspattern'][num] for ens in ensmem]
+
+    filename = cartmap + 'Clusfullp_{}{}_all_new.pdf'.format('EAT',num)
+    print(filename)
+    for pa in patts:
+        print(ens, pa.min())
+    if area == 'EAT':
+        clatlo = (70.,0.)
+    else:
+        clatlo = (70.,-90.)
+    ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = 'polar', central_lat_lon = clatlo, cmap = 'RdBu_r', title = nam, subtitles = ensmem, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,3), number_subplots = False, figsize = (15,15), draw_contour_lines = False)
+
+sys.exit()
+
+cartfr = cart+'freq_histo/'
 
 for area in ['EAT', 'PNA']:
     for ran in [histran, futran]:
@@ -313,7 +379,7 @@ for area in ['EAT', 'PNA']:
         plt.legend()
         plt.xlabel('Regime')
         plt.ylabel('Freq')
-        fig.savefig(cart+'frequency_{}_base_vs_stoc_{}-{}.pdf'.format(area, ran[0], ran[1]))
+        fig.savefig(cartfr+'frequency_{}_base_vs_stoc_{}-{}.pdf'.format(area, ran[0], ran[1]))
 
         fig = plt.figure()
         lab1 = 'base'
@@ -335,7 +401,7 @@ for area in ['EAT', 'PNA']:
         plt.legend()
         plt.xlabel('Regime')
         plt.ylabel('Freq')
-        fig.savefig(cart+'frequency_{}_base_vs_stoc_{}-{}_compera.pdf'.format(area, ran[0], ran[1]))
+        fig.savefig(cartfr+'frequency_{}_base_vs_stoc_{}-{}_compera.pdf'.format(area, ran[0], ran[1]))
 
     for exp in ['base', 'stoc']:
         fig = plt.figure()
@@ -355,7 +421,7 @@ for area in ['EAT', 'PNA']:
         plt.legend()
         plt.xlabel('Regime')
         plt.ylabel('Freq')
-        fig.savefig(cart+'frequency_{}_{}_hist_vs_fut.pdf'.format(area, exp))
+        fig.savefig(cartfr+'frequency_{}_{}_hist_vs_fut.pdf'.format(area, exp))
 
     for ran in [histran, futran]:
         fig = plt.figure()
@@ -377,7 +443,7 @@ for area in ['EAT', 'PNA']:
         plt.legend()
         plt.xlabel('Regime')
         plt.ylabel('Freq')
-        fig.savefig(cart+'frequency_{}_base_vs_stoc_{}-{}_wandering.pdf'.format(area, ran[0], ran[1]))
+        fig.savefig(cartfr+'frequency_{}_base_vs_stoc_{}-{}_wandering.pdf'.format(area, ran[0], ran[1]))
 
     for exp in ['base', 'stoc']:
         fig = plt.figure()
@@ -401,7 +467,7 @@ for area in ['EAT', 'PNA']:
         plt.legend()
         plt.xlabel('Regime')
         plt.ylabel('Freq')
-        fig.savefig(cart+'frequency_{}_{}_hist_vs_fut_wandering.pdf'.format(area, exp))
+        fig.savefig(cartfr+'frequency_{}_{}_hist_vs_fut_wandering.pdf'.format(area, exp))
 
 
 clus_freq_ens = dict()
@@ -499,6 +565,7 @@ for smooth in [False, True]:
 
 
 #################################################################################################
+cartcp = cart + 'corrpat/'
 
 corrpat_ens = []
 for ens in ensmem:
@@ -518,7 +585,7 @@ plt.grid()
 plt.ylabel('Corr')
 plt.xlabel('central year of 30yr period')
 plt.title('base runs')
-fig.savefig(cart+'Corr_EATPNA_base.pdf')
+fig.savefig(cartcp+'Corr_EATPNA_base.pdf')
 
 fig = plt.figure()
 for ens, cpa in zip(stoc_ens, corrpat_ens[3:]):
@@ -529,7 +596,7 @@ plt.grid()
 plt.ylabel('Corr')
 plt.xlabel('central year of 30yr period')
 plt.title('base runs')
-fig.savefig(cart+'Corr_EATPNA_stoc.pdf')
+fig.savefig(cartcp+'Corr_EATPNA_stoc.pdf')
 
 
 fig = plt.figure()
@@ -541,7 +608,7 @@ plt.grid()
 plt.ylabel('Corr')
 plt.xlabel('central year of 30yr period')
 plt.title('base runs')
-fig.savefig(cart+'Corr_EATPNA_stoc.pdf')
+fig.savefig(cartcp+'Corr_EATPNA_stoc.pdf')
 
 
 
@@ -587,6 +654,38 @@ n3.set_bbox(bbox)
 n4.set_bbox(bbox)
 
 fig.savefig(cart+'TaylorPlot_ALL.pdf')
+
+
+# Taylor plots
+for gi, pio in zip(['lcb', 'lcs'], ['base', 'stoc']):
+    fig = plt.figure(figsize=(16,12))
+
+    for num, patt in enumerate(patnames['EAT']):
+        ax = plt.subplot(2, 2, num+1, polar = True)
+
+        modpats = []
+        for ran in yr_ranges:
+            mdpt = np.stack([results[(ens,'EAT',ran)]['cluspattern_area'][num] for ens in ensmem if gi in ens])
+            modpats.append(np.mean(mdpt, axis = 0))
+
+        obs = pat_era[num]
+
+        colors = ctl.color_set(len(yr_ranges), bright_thres = 0.2)
+
+        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, only_first_quarter = True, legend = False, obs_label = 'ERA', mod_points_size = 50, obs_points_size = 70)
+
+    fig.tight_layout()
+    n1 = plt.text(0.15,0.6,'NAO +',transform=fig.transFigure, fontsize = 20)
+    n2 = plt.text(0.15,0.1,'NAO -',transform=fig.transFigure, fontsize = 20)
+    n3 = plt.text(0.6,0.6,'Blocking',transform=fig.transFigure, fontsize = 20)
+    n4 = plt.text(0.6,0.1,'Atl.Ridge',transform=fig.transFigure, fontsize = 20)
+    bbox=dict(facecolor = 'lightsteelblue', alpha = 0.7, edgecolor='black', boxstyle='round,pad=0.2')
+    n1.set_bbox(bbox)
+    n2.set_bbox(bbox)
+    n3.set_bbox(bbox)
+    n4.set_bbox(bbox)
+
+    fig.savefig(cart+'TaylorPlot_30yrwnd_{}.pdf'.format(pio))
 # videino dei cluster patterns
 #for clus
 #ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))

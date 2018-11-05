@@ -8,6 +8,8 @@ import os
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
+import matplotlib.animation as animation
+from matplotlib.animation import ImageMagickFileWriter
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
@@ -805,7 +807,7 @@ def daily_climatology(var, dates, window, refyear = 2001):
 
     for mon, daymon in zip(months, daysok):
         for day in daymon:
-            data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,day), format='%Y%m%d')
+            data = pd.to_datetime('{:4d}{:02d}{:02d}'.format(refyear, mon,day), format='%Y%m%d')
             if window > 2:
                 doy = data.dayofyear
                 okdates = ((dates_pdh.dayofyear - doy) % 365 <= delta) | ((doy - dates_pdh.dayofyear) % 365 <= delta)
@@ -822,6 +824,22 @@ def daily_climatology(var, dates, window, refyear = 2001):
     filt_std = np.stack(filt_std)
 
     return filt_mean, dates_ok, filt_std
+
+
+def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year = 5):
+    """
+    Performs daily_climatology on a running window of n years, in order to take into account possible trends in the mean state.
+    """
+    dates_pdh = pd.to_datetime(dates)
+    climat_mean = []
+    dates_climate_mean = []
+    for yea in np.unique(dates_pdh.year)[::step_year]:
+        okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
+        clm, dtclm, _ = daily_climatology(var[okye], dates[okye], window_days, refyear = yea)
+        climat_mean.append(clm)
+        dates_climate_mean.append(dtclm)
+
+    return climat_mean, dates_climate_mean
 
 
 def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
@@ -1292,11 +1310,12 @@ def calc_varopt_molt(pcs, centroids, labels):
     return varopt
 
 
-def calc_clus_freq(labels):
+def calc_clus_freq(labels, numclus = None):
     """
     Calculates clusters frequency.
     """
-    numclus = int(np.max(labels)+1)
+    if numclus is None:
+        numclus = int(np.max(labels)+1)
     #print('yo',labels.shape)
 
     num_mem = []
@@ -1307,6 +1326,31 @@ def calc_clus_freq(labels):
     freq_mem = 100.*num_mem/len(labels)
 
     return freq_mem
+
+
+def calc_seasonal_clus_freq(labels, dates, nmonths_season = 3):
+    """
+    Calculates cluster frequency season by season.
+    """
+    numclus = int(np.max(labels)+1)
+
+    dates_pdh = pd.to_datetime(dates)
+    dates_init = dates_pdh[0]
+    season_range = pd.Timedelta('{} days 00:00:00'.format(nmonths_season*31))
+
+    freqs = []
+    while dates_init < dates_pdh[-1]:
+        dateok = (dates_pdh >= dates_init) & (dates_pdh < dates_init+season_range)
+        freqs.append(calc_clus_freq(labels[dateok], numclus = numclus))
+        nextdat = dates_pdh > dates_init+season_range
+        if np.sum(nextdat) > 0:
+            dates_init = dates_pdh[nextdat][0]
+        else:
+            break
+
+    freqs = np.stack(freqs)
+
+    return freqs
 
 
 def change_clus_order(centroids, labels, new_ord):
@@ -1748,7 +1792,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6, full_cb_range = Fal
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, clip_to_box = True):
     """
     Plots field contours on the axis of a figure.
 
@@ -1772,8 +1816,10 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     ax.set_global()
     ax.coastlines(linewidth = 2)
 
-    if isinstance(proj, ccrs.Orthographic):
-        # add longitude to complete the globe
+    cyclc = False
+    if max(lon)+10. % 360 > min(lon):
+        print('Adding cyclic point\n')
+        cyclic = True
         #lon = np.append(lon, 360)
         #data = np.c_[data,data[:,0]]
         data, lon = cutil.add_cyclic_point(data, coord = lon)
@@ -1789,8 +1835,11 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
-    if isinstance(proj, ccrs.PlateCarree):
-        latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
+    if clip_to_box:
+        if cyclic:
+            latlonlim = [-180, 180, lat.min(), lat.max()]
+        else:
+            latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
         ax.set_extent(latlonlim, crs = proj)
 
     return map_plot
@@ -1815,7 +1864,7 @@ def get_cbar_range(data, symmetrical = False, percentiles = (5,95), n_color_leve
     return (oko1, oko2)
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98), figsize = (8,6)):
     """
     Plots a single map to a figure.
 
@@ -1868,7 +1917,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     # Plotting figure
-    fig4 = plt.figure(figsize=(8,6))
+    fig4 = plt.figure(figsize = figsize)
     ax = plt.subplot(projection = proj)
 
     map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
@@ -2132,6 +2181,95 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         plt.close(fig)
 
     return
+
+
+def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98), figsize = (8,6)):
+    """
+    Shows animation of a sequence of maps or saves it to a gif file.
+    < maps > : list, the sequence of maps to be plotted.
+    < labels > : title of each map.
+
+    < filename > : if None the animation is run and shown, instead it is saved to filename.
+    < **kwargs > : all other kwargs as in plot_map_contour()
+    """
+
+    if labels is None:
+        labels = np.arange(len(maps))
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        if central_lat_lon is not None:
+            (clat, clon) = central_lat_lon
+        else:
+            clat = lat.min() + (lat.max()-lat.min())/2
+            clon = lon.min() + (lon.max()-lon.min())/2
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+    if cbar_range is None:
+        mi = np.percentile(maps, color_percentiles[0])
+        ma = np.percentile(maps, color_percentiles[1])
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
+
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+
+    # Plotting figure
+    fig = plt.figure(figsize = figsize)
+    ax = plt.subplot(projection = proj)
+
+    plt.title(title)
+
+    def update_lines(num):
+        print(num)
+        lab = labels[num]
+        mapa = maps[num]
+
+        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+        showdate.set_text('{}'.format(lab))
+
+        return
+
+    mapa = maps[0]
+    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight = 'bold', color = 'black', bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
+
+    #cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+    cb = plt.colorbar(map_plot, orientation='horizontal') #cax=cax, labelsize=18)
+    cb.ax.tick_params(labelsize=14)
+    cb.set_label(cb_label, fontsize=16)
+
+    if filename is not None:
+        metadata = dict(title=title, artist='climtools_lib')
+        writer = ImageMagickFileWriter(fps = fps_anim, metadata = metadata)#, frame_size = (1200, 900))
+        with writer.saving(fig, filename, 100):
+            for i, lab in enumerate(labels):
+                print(lab)
+                update_lines(i)
+                writer.grab_frame()
+
+        return writer
+    else:
+        print('vai?')
+        print(len(maps))
+        line_ani = animation.FuncAnimation(fig, update_lines, len(maps), interval = 100./fps_anim, blit=False)
+
+        return line_ani
 
 
 def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, show_numbers = True, only_numbers = False, colors_all = None, cluster_labels = None, cluster_colors = None, repr_cluster = None, verbose = True):
