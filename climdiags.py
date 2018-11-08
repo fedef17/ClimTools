@@ -108,7 +108,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, output_results_only = True, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -120,7 +120,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     < clus_algorhitm > : 'molteni' or 'sklearn', algorithm to be used for clustering.
     < nrsamp_sig > : number of samples to be used for significance calculation.
 
-    < output_results_only > : bool. Output only the main results: cluspatterns, significance, patcor, et, labels. Instead outputs the eof solver and the local and global anomalies fields as well.
+    < heavy_output > : bool. Output only the main results: cluspatterns, significance, patcor, et, labels. Instead outputs the eof solver and the local and global anomalies fields as well.
 
     < ref_solver >, < ref_patterns_area > : reference solver (ERA) and reference cluster pattern for cluster comparison.
 
@@ -214,9 +214,18 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     results['centroids'] = centroids
     results['dist_centroid'] = dist_centroid
 
-    if not output_results_only:
-        results['var_area'] = var_area
-        results['var_glob'] = var_anom
+    results['pcs'] = PCs
+    results['eofs'] = eof_solver.eofs()[:numpcs]
+    results['eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
+    results['eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
+
+    if heavy_output:
+        if detrended_anom_for_clustering:
+            results['var_area'] = var_area_dtr
+            results['var_glob'] = var_anom_dtr
+        else:
+            results['var_area'] = var_area
+            results['var_glob'] = var_anom
         results['solver'] = eof_solver
 
     return results

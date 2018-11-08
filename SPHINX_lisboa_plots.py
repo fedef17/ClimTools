@@ -128,7 +128,7 @@ patnames_short['PNA'] = ['AR', 'PT', 'AH']
 #         filename = cart + 'Clus_{}{}_all_1850-2005.pdf'.format(area,num)
 #         ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = 'polar', central_lat_lon = (90.,0.), cmap = 'RdBu_r', title = 'Regime {} on {}'.format(num, area), subtitles = ensmem, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,3), number_subplots = False, figsize = (15,15))
 
-results_fullp = pickle.load(open(cart+'results_SPHINX_fullperiod.p','r'))
+results_fullp = pickle.load(open(cart+'results_SPHINX_fullperiod_detrended.p','r'))
 
 results = pickle.load(open(cart+'results_SPHINX_new_oksig.p','r'))
 years1 = np.arange(1850,2071,5)
@@ -253,9 +253,9 @@ for area in ['EAT', 'PNA']:
         gigi[greylabs] = np.max(stoc_labels)+1
         freq[('stoc', area, ran, 'filt80')] = ctl.calc_clus_freq(gigi)
 
-        rs_base, dates_init_b = ctl.calc_residence_times(base_labels, dates = dates_long)
+        rs_base, dates_init_b = ctl.calc_regime_residtimes(base_labels, dates = dates_long)
         resid_times[('base', area, ran)] = rs_base
-        rs_stoc, dates_init_s = ctl.calc_residence_times(stoc_labels, dates = dates_long)
+        rs_stoc, dates_init_s = ctl.calc_regime_residtimes(stoc_labels, dates = dates_long)
         resid_times[('stoc', area, ran)] = rs_stoc
 
 cartper = cart + 'resid_times/'
@@ -334,11 +334,27 @@ for ens in ensmem:
         years = yearsall
     #plt.bar(years, freqs_yr_all[ens])
     for clu, clunam in enumerate(patnames['EAT']):
-        smut = ctl.running_mean(freqs_yr_all[ens][:,clu], wnd = 5)
+        smut = ctl.running_mean(freqs_yr_all[ens][:,clu], wnd = 10)
         plt.plot(years, smut, label = clunam)
 
     plt.legend()
     fig.savefig(cartfr+'freq_fullp_{}.pdf'.format(ens))
+
+freqs_yr_all['lcb1'] = np.vstack([freqs_yr_all['lcb1'][0,:],freqs_yr_all['lcb1']])
+
+for cos in ['base', 'stoc']:
+    fig = plt.figure()
+    if cos == 'base':
+        okfrq = np.mean([freqs_yr_all[ens][1:] for ens in ensmem[:3]], axis = 0)
+    else:
+        okfrq = np.mean([freqs_yr_all[ens][1:] for ens in ensmem[3:]], axis = 0)
+    #plt.bar(years, freqs_yr_all[ens])
+    for clu, clunam in enumerate(patnames['EAT']):
+        smut = ctl.running_mean(okfrq[:,clu], wnd = 30)
+        plt.plot(years[1:], smut, label = clunam)
+
+    plt.legend()
+    fig.savefig(cartfr+'freq_fullp_{}.pdf'.format(cos))
 
 cartmap = cart + 'Maps/'
 area = 'EAT'

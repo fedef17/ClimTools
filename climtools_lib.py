@@ -1550,7 +1550,7 @@ def calc_composite_map(var, mask):
     return pattern #, pattern_std
 
 
-def calc_residence_times(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
+def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
     """
     Calculates residence times given a set of indices indicating cluster numbers.
 
@@ -1602,29 +1602,36 @@ def calc_residence_times(indices, dates = None, count_incomplete = True, skip_si
     else:
         dates = pd.to_datetime(dates)
         duday = pd.Timedelta('2 days 00:00:00')
-        dates_init = []
+        dates_reg = []
         for clu in range(numclus):
             clu_resids = []
-            clu_dates_init = []
+            clu_dates_reg = []
             okclu = indices == clu
             init = False
             pause = False
 
             old_date = dates[0]
             for el, dat in zip(okclu, dates):
+                #print(dat)
                 if dat - old_date > duday:
-                    init = False
-                    if count_incomplete:
+                    #print('new season\n')
+                    if init and count_incomplete:
+                        #print('count incompleeeete \n')
                         clu_resids.append(num_days)
-                    else:
-                        clu_dates_init.pop()
+                        clu_dates_reg.append((date_reg[0], date_reg[-1]))
+                    init = False
+
                 if el:
                     if not init:
+                        #print('new regime period\n')
                         init = True
                         num_days = 1
-                        clu_dates_init.append(dat)
+                        date_reg = [dat]
+                        #clu_dates_reg.append(dat)
                     else:
+                        #print('+1\n')
                         num_days += 1
+                        date_reg.append(dat)
                         if pause:
                             # regime started again after one day pause
                             pause = False
@@ -1636,22 +1643,174 @@ def calc_residence_times(indices, dates = None, count_incomplete = True, skip_si
                         elif init and pause:
                             # this is the second day of pause, closing regime period
                             clu_resids.append(num_days)
+                            clu_dates_reg.append((date_reg[0], date_reg[-1]))
                             init = False
                             pause = False
                     else:
                         if init:
                             clu_resids.append(num_days)
+                            clu_dates_reg.append((date_reg[0], date_reg[-1]))
                             init = False
 
                 old_date = dat
 
             resid_times.append(np.array(clu_resids))
-            dates_init.append(np.array(clu_dates_init))
+            dates_reg.append(np.array(clu_dates_reg))
 
     if dates is None:
         return np.array(resid_times)
     else:
-        return np.array(resid_times), np.array(dates_init)
+        return np.array(resid_times), np.array(dates_reg)
+
+
+def calc_regime_transmatrix(indices_set, dates_set, n_ens = 1, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
+    """
+    This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. Works with multimember ensemble.
+
+    < n_ens > : number of ensemble members.
+    < indices_set > : indices array or list of indices array, one per each ensemble member.
+    < dates_set > : dates array or list of dates array, one per each ensemble member.
+
+    < filter_longer_than > : excludes residende periods shorter than # days. If set to 0, single day transition are considered. Default is 1, so that single day regime periods are skipped.
+    < filter_shorter_than > : excludes residende periods longer than # days.
+    < max_days_between > : maximum number of days before the next regime to consider the transition.
+    """
+
+    if n_ens > 1:
+        for ens in range(n_ens):
+            trans_matrix_ens, _ = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
+            if ens == 0:
+                trans_matrix = trans_matrix_ens
+            else:
+                trans_matrix += trans_matrix_ens
+    else:
+        trans_matrix, _ = count_regime_transitions(indices_set, dates_set, max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
+
+    for n in range(trans_matrix.shape[0]):
+        trans_matrix[n, :] = trans_matrix[n, :]/np.sum(trans_matrix[n, :])
+
+    return trans_matrix
+
+
+def find_transition_pcs(indices_set, dates_set, pcs_set, n_ens = 1, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
+    """
+    This finds the pcs corresponding to regime transitions or to regime residences. All are saved in a matrix-like format of shape numclus x numclus. Works with multimember ensemble.
+
+    < n_ens > : number of ensemble members.
+    < indices_set > : indices array or list of indices arrays, one per each ensemble member.
+    < dates_set > : dates array or list of dates arrays, one per each ensemble member.
+    < pcs_set > : pcs array or list of pcs arrays, one per each ensemble member.
+
+    < filter_longer_than > : excludes residende periods shorter than # days. If set to 0, single day transition are considered. Default is 1, so that single day regime periods are skipped.
+    < filter_shorter_than > : excludes residende periods longer than # days.
+    < max_days_between > : maximum number of days before the next regime to consider the transition.
+    """
+
+    if n_ens == 1:
+        dates_set = [dates_set]
+        indices_set = [indices_set]
+        pcs_set = [pcs_set]
+
+    for ens in range(n_ens):
+        trans_matrix_ens, trans_matrix_dates_ens = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
+        if ens == 0:
+            trans_matrix = np.empty(trans_matrix_ens.shape, dtype=object)
+            numclus = trans_matrix.shape[0]
+            for i in range(numclus):
+                for j in range(numclus):
+                    trans_matrix[i,j] = []
+
+        for i in range(numclus):
+            for j in range(numclus):
+                datesok = trans_matrix_dates_ens[i,j]
+                for (dain, daou) in datesok:
+                    okin = (dates_set[ens] == dain).argmax()
+                    okou = (dates_set[ens] == daou).argmax()
+                    trans_matrix[i,j].append(pcs_set[ens][okin:okou+1, :])
+
+    return trans_matrix
+
+
+def count_regime_transitions(indices, dates, filter_longer_than = 1, filter_shorter_than = None, max_days_between = 3):
+    """
+    This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. count_incomplete is defaulted to True, but the last season' regime is only used for considering the transition from the previous one.
+
+    < indices > and < dates > may be lists of indices and dates referring to different experiments.
+
+    < filter_longer_than > : excludes residende periods shorter than # days. If set to 0, single day transition are considered. Default is 1, so that single day regime periods are skipped.
+    < filter_shorter_than > : excludes residende periods longer than # days.
+    < max_days_between > : maximum number of days before the next regime to consider the transition.
+    """
+
+    if filter_longer_than < 1:
+        skip_singleday_pause = False
+    else:
+        skip_singleday_pause = True
+
+    resid_times, dates_reg = calc_regime_residtimes(indices, dates = dates, count_incomplete = True, skip_singleday_pause = skip_singleday_pause)
+
+    numclus = len(resid_times)
+
+    # Filtering day length
+    filt_resid_times = []
+    filt_dates_init = []
+    filt_dates_fin = []
+    for reg, rsd, dat in zip(range(numclus), resid_times, dates_reg):
+        oks = rsd > filter_longer_than
+        if filter_shorter_than is not None:
+            oks = oks & (rsd < filter_shorter_than)
+        filt_resid_times.append(rsd[oks])
+        filt_dates_init.append([da[0] for da in dat[oks]])
+        filt_dates_fin.append([da[1] for da in dat[oks]])
+
+    # metto in ordine i periodi e le date
+    all_dats_ini = np.concatenate(filt_dates_init)
+    all_dats_fin = np.concatenate(filt_dates_fin)
+    all_rsd = np.concatenate(filt_resid_times)
+    all_clus = np.concatenate([num*np.ones(len(filt_resid_times[num]), dtype = int) for num in range(numclus)])
+
+    sortdat = all_dats_ini.argsort()
+    all_dats_ini = all_dats_ini[sortdat]
+    all_dats_fin = all_dats_fin[sortdat]
+    all_rsd = all_rsd[sortdat]
+    all_clus = all_clus[sortdat]
+
+    trans_matrix = np.zeros((numclus, numclus))
+    trans_matrix_dates = np.empty((numclus, numclus), dtype = object)
+    for i in range(numclus):
+        for j in range(numclus):
+            trans_matrix_dates[i,j] = []
+
+    timedel = pd.Timedelta('{} days'.format(max_days_between))
+
+    n_tot = len(all_rsd)
+    for num, day_in, day_out, lenday, reg in zip(range(n_tot), all_dats_ini, all_dats_fin, all_rsd, all_clus):
+        i = num + 1
+        if i >= n_tot: break
+
+        day_new = all_dats_ini[i]
+        if day_new - day_out > timedel: continue
+
+        trans_matrix[reg,reg] += len(pd.date_range(day_in, day_out))-1-filter_longer_than
+        trans_matrix_dates[reg,reg].append((day_in, day_out))
+        #print('perm', reg, len(pd.date_range(day_in, day_out))-1-filter_longer_than, (day_in-all_dats_ini[0]).days)
+
+        reg_new = all_clus[num+1]
+        #print('trans', reg, reg_new, (day_new-all_dats_ini[0]).days)
+        trans_matrix[reg,reg_new] += 1
+        trans_matrix_dates[reg,reg_new].append((day_out, day_new))
+
+    return trans_matrix, trans_matrix_dates
+
+
+def calc_pdf(data):
+    """
+    Calculates pdf using Gaussian kernel on a set of data (scipy gaussian_kde). Returns a function that can be evaluated on a grid for plotting purposes.
+    """
+
+    k = stats.kde.gaussian_kde(data)
+
+    return k
 
 
 def compute_centroid_distance(PCs, centroids, labels):
@@ -1851,8 +2010,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     ax.set_global()
     ax.coastlines(linewidth = 2)
 
-    cyclc = False
-    if max(lon)+10. % 360 > min(lon):
+    cyclic = False
+    if max(lon)+10. > 360 and min(lon)-10. < 0.:
         print('Adding cyclic point\n')
         cyclic = True
         #lon = np.append(lon, 360)
@@ -1872,7 +2031,10 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     if clip_to_box:
         if cyclic:
-            latlonlim = [-180, 180, lat.min(), lat.max()]
+            lon_180 = lon
+            if np.any(lon > 180):
+                lon_180[lon > 180] = lon[lon > 180] - 360
+            latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
         else:
             latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
         ax.set_extent(latlonlim, crs = proj)
@@ -1918,6 +2080,8 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < n_lines >: number of lines to draw.
 
     """
+    if filename is None:
+        plt.ion()
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
@@ -1977,13 +2141,11 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     if filename is not None:
         fig4.savefig(filename)
         plt.close(fig4)
-    else:
-        plt.show(fig4)
 
     return
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = None, stitle_2 = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98)):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98)):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -2003,6 +2165,9 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     < color_percentiles > : define the range of data to be represented in the color bar. e.g. (0,100) to full range, (5,95) to enhance features.
 
     """
+
+    if filename is None:
+        plt.ion()
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
@@ -2067,8 +2232,6 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     if filename is not None:
         fig.savefig(filename)
         plt.close(fig)
-    else:
-        plt.show(fig)
 
     return
 
@@ -2227,7 +2390,8 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     < filename > : if None the animation is run and shown, instead it is saved to filename.
     < **kwargs > : all other kwargs as in plot_map_contour()
     """
-
+    if filename is None:
+        plt.ion()
     if labels is None:
         labels = np.arange(len(maps))
 

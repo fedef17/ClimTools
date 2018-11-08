@@ -72,8 +72,8 @@ for y1, y2 in zip(years1, years2):
 yr_ranges = [(1850,2100)]
 
 erafile = cart_in + 'era_1979-2014_nh.nc'
-ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJF', 'EAT', extract_level_4D = 50000., numclus = 4, output_results_only = False)
-ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJF', 'PNA', extract_level_4D = 50000., numclus = 4, output_results_only = False)
+ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJF', 'EAT', extract_level_4D = 50000., numclus = 4, heavy_output = True)
+ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJF', 'PNA', extract_level_4D = 50000., numclus = 4, heavy_output = True)
 
 results = dict()
 # Beginning the analysis
