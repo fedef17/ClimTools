@@ -89,13 +89,13 @@ for fil,tag in zip(tot_files, tot_tags):
 area = 'EAT'
 ref_solver = ERA_ref_EAT['solver']
 ref_patterns_area = ERA_ref_EAT['cluspattern_area']
-resu = cd.WRtool_core_ensemble(var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
+resu = cd.WRtool_core_ensemble(6, var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
 results[area] = resu
 
 area = 'PNA'
 ref_solver = ERA_ref_PNA['solver']
 ref_patterns_area = ERA_ref_PNA['cluspattern_area']
-resu = cd.WRtool_core_ensemble(var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
+resu = cd.WRtool_core_ensemble(6, var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
 results[area] = resu
 
 
