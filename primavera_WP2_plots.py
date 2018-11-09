@@ -39,7 +39,7 @@ results_ecmwf = pickle.load(open(cart_ecmwf+'res_primavera.p','r'))
 cart_ecmwf_full = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_ECMWF_full/'
 results_ecmwf_full = pickle.load(open(cart_ecmwf_full+'res_primavera.p','r'))
 
-res_tags = ['labels', 'freq_mem', 'patcor', 'cluspattern', 'significance', 'et', 'cluspattern_area']
+res_tags = ['labels', 'freq_clus', 'patcor', 'cluspattern', 'significance', 'et', 'cluspattern_area']
 
 mod_tags = ['ECE_HR', 'HadGEM_HR', 'MPI_LR', 'ECE_LR', 'CMCC_LR','CNRM_LR', 'ECMWF_LR', 'CMCC_HR', 'CNRM_HR','ECMWF_HR', 'NCEP', 'MPI_HR', 'HadGEM_LR', 'ERA']
 models = ['ECE', 'HadGEM', 'CMCC', 'CNRM', 'MPI', 'ECMWF']

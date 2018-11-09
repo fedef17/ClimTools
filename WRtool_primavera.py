@@ -94,19 +94,19 @@ def compute(ifile):
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     print('varopt: {:8.4f}\n'.format(varopt))
-    freq_mem = ctl.calc_clus_freq(labels)
+    freq_clus = ctl.calc_clus_freq(labels)
 
     print('Running clus sig\n')
     significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
     # significance_2 = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = 5000)
     # print('Significances: {:7.3f} vs {:7.3f}\n'.format(significance, significance_2))
 
-    return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance
+    return lat, lon, var_anom, eof_solver, centroids, labels, cluspattern, cluspatt_area, freq_clus, significance
 
 #############################################
 results = dict()
 results['significance'] = dict()
-results['freq_mem'] = dict()
+results['freq_clus'] = dict()
 results['cluspattern'] = dict()
 results['cluspattern_area'] = dict()
 results['labels'] = dict()
@@ -114,30 +114,30 @@ results['et'] = dict()
 results['patcor'] = dict()
 
 ### ERA reference
-lat, lon, var_ERA, solver_ERA, centroids_ERA, labels_ERA, cluspattern_ERA, cluspatt_area_ERA, freq_mem_ERA, significance_ERA = compute(cart_in+ifile_ERA)
+lat, lon, var_ERA, solver_ERA, centroids_ERA, labels_ERA, cluspattern_ERA, cluspatt_area_ERA, freq_clus_ERA, significance_ERA = compute(cart_in+ifile_ERA)
 
 tag = 'ERA'
 print('\n ----------------------\n')
 print('Results for {}\n'.format(tag))
 results['significance'][tag] = significance_ERA
 print('Significance: {:6.3f}\n'.format(significance_ERA))
-results['freq_mem'][tag] = freq_mem_ERA
-print('frequency: {}\n'.format(freq_mem_ERA))
+results['freq_clus'][tag] = freq_clus_ERA
+print('frequency: {}\n'.format(freq_clus_ERA))
 results['cluspattern'][tag] = cluspattern_ERA
 results['cluspattern_area'][tag] = cluspatt_area_ERA
 results['labels'][tag] = labels_ERA
 print('----------------------\n')
 
 ### NCEP reference
-lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_NCEP, freq_mem_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
+lat, lon, var_NCEP, solver_NCEP, centroids_NCEP, labels_NCEP, cluspattern_NCEP, cluspatt_area_NCEP, freq_clus_NCEP, significance_NCEP = compute(cart_in+ifile_NCEP)
 
 tag = 'NCEP'
 print('\n ----------------------\n')
 print('Results for {}\n'.format(tag))
 results['significance'][tag] = significance_NCEP
 print('Significance: {:6.3f}\n'.format(significance_NCEP))
-results['freq_mem'][tag] = freq_mem_NCEP
-print('frequency: {}\n'.format(freq_mem_NCEP))
+results['freq_clus'][tag] = freq_clus_NCEP
+print('frequency: {}\n'.format(freq_clus_NCEP))
 results['cluspattern'][tag] = cluspattern_NCEP
 results['cluspattern_area'][tag] = cluspatt_area_NCEP
 results['labels'][tag] = labels_NCEP
@@ -145,15 +145,15 @@ print('----------------------\n')
 
 for fil, tag in zip(filenames, tags):
     print('\n analyzing: {} --> {} \n'.format(fil, tag))
-    lat, lon, var_anom, solver, centroids, labels, cluspattern, cluspatt_area, freq_mem, significance = compute(cart_in+fil)
+    lat, lon, var_anom, solver, centroids, labels, cluspattern, cluspatt_area, freq_clus, significance = compute(cart_in+fil)
 
     perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, cluspatt_area_ERA, solver_ERA, numpcs)
 
     cluspattern = cluspattern[perm, ...]
     cluspatt_area = cluspatt_area[perm, ...]
-    print(freq_mem, perm)
-    freq_mem = np.array(freq_mem)
-    freq_mem = freq_mem[perm]
+    print(freq_clus, perm)
+    freq_clus = np.array(freq_clus)
+    freq_clus = freq_clus[perm]
 
     namef=cart_out+'regime_indices_{}.txt'.format(tag)
     np.savetxt(namef, labels, fmt='%d')
@@ -162,8 +162,8 @@ for fil, tag in zip(filenames, tags):
     print('Results for {}\n'.format(tag))
     results['significance'][tag] = significance
     print('Significance: {:6.3f}\n'.format(significance))
-    results['freq_mem'][tag] = freq_mem
-    print('frequency: {}\n'.format(freq_mem))
+    results['freq_clus'][tag] = freq_clus
+    print('frequency: {}\n'.format(freq_clus))
     results['cluspattern'][tag] = cluspattern
     results['cluspattern_area'][tag] = cluspatt_area
     results['labels'][tag] = labels

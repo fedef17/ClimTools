@@ -1334,9 +1334,9 @@ def calc_varopt_molt(pcs, centroids, labels):
     """
 
     numpcs = centroids.shape[1]
-    freq_mem_abs = calc_clus_freq(labels)/100.
+    freq_clus_abs = calc_clus_freq(labels)/100.
 
-    varopt = np.sum(freq_mem_abs*np.sum(centroids**2, axis = 1))
+    varopt = np.sum(freq_clus_abs*np.sum(centroids**2, axis = 1))
 
     varint = np.sum([np.sum((pc-centroids[lab])**2) for pc, lab in zip(pcs, labels)])/len(labels)
 
@@ -1358,9 +1358,9 @@ def calc_clus_freq(labels, numclus = None):
         num_mem.append(np.sum(labels == i))
     num_mem = np.array(num_mem)
 
-    freq_mem = 100.*num_mem/len(labels)
+    freq_clus = 100.*num_mem/len(labels)
 
-    return freq_mem
+    return freq_clus
 
 
 def calc_seasonal_clus_freq(labels, dates, nmonths_season = 3):
@@ -1412,8 +1412,8 @@ def clus_order_by_frequency(centroids, labels):
     numclus = int(np.max(labels)+1)
     #print('yo',labels.shape)
 
-    freq_mem = calc_clus_freq(labels)
-    new_ord = freq_mem.argsort()[::-1]
+    freq_clus = calc_clus_freq(labels)
+    new_ord = freq_clus.argsort()[::-1]
 
     centroids, labels = change_clus_order(centroids, labels, new_ord)
 
@@ -1663,7 +1663,7 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
         return np.array(resid_times), np.array(dates_reg)
 
 
-def calc_regime_transmatrix(indices_set, dates_set, n_ens = 1, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
+def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
     """
     This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. Works with multimember ensemble.
 
@@ -1692,7 +1692,7 @@ def calc_regime_transmatrix(indices_set, dates_set, n_ens = 1, max_days_between 
     return trans_matrix
 
 
-def find_transition_pcs(indices_set, dates_set, pcs_set, n_ens = 1, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
+def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
     """
     This finds the pcs corresponding to regime transitions or to regime residences. All are saved in a matrix-like format of shape numclus x numclus. Works with multimember ensemble.
 
@@ -1734,8 +1734,6 @@ def find_transition_pcs(indices_set, dates_set, pcs_set, n_ens = 1, max_days_bet
 def count_regime_transitions(indices, dates, filter_longer_than = 1, filter_shorter_than = None, max_days_between = 3):
     """
     This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. count_incomplete is defaulted to True, but the last season' regime is only used for considering the transition from the previous one.
-
-    < indices > and < dates > may be lists of indices and dates referring to different experiments.
 
     < filter_longer_than > : excludes residende periods shorter than # days. If set to 0, single day transition are considered. Default is 1, so that single day regime periods are skipped.
     < filter_shorter_than > : excludes residende periods longer than # days.

@@ -72,38 +72,31 @@ for y1, y2 in zip(years1, years2):
 yr_ranges = [(1850,2100)]
 
 erafile = cart_in + 'era_1979-2014_nh.nc'
-ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJF', 'EAT', extract_level_4D = 50000., numclus = 4, heavy_output = True)
-ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJF', 'PNA', extract_level_4D = 50000., numclus = 4, heavy_output = True)
+ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJFM', 'EAT', extract_level_4D = 50000., numclus = 4, heavy_output = True, run_significance_calc = False)
+ERA_ref_PNA = cd.WRtool_from_file(erafile, 'DJFM', 'PNA', extract_level_4D = 50000., numclus = 4, heavy_output = True, run_significance_calc = False)
 
 results = dict()
 # Beginning the analysis
+var_season_all = []
+dates_season_all = []
 for fil,tag in zip(tot_files, tot_tags):
     print('Analyzing {}\n'.format(tag))
     var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(cart_in+fil, extract_level = 50000.)
+    var_season, dates_season = ctl.sel_season(var, dates, 'DJFM')
+    var_season_all.append(var_season)
+    dates_season_all.append(dates_season)
 
-    var_season, dates_season = ctl.sel_season(var, dates, 'DJF')
-    dates_season_pdh = pd.to_datetime(dates_season)
+area = 'EAT'
+ref_solver = ERA_ref_EAT['solver']
+ref_patterns_area = ERA_ref_EAT['cluspattern_area']
+resu = cd.WRtool_core_ensemble(var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
+results[area] = resu
 
-    for ran in yr_ranges:
-        runsig = True
-        if ran[1]-ran[0] > 50:
-            runsig = False
-        print('analyzing range {}\n'.format(ran))
-        okdat = (dates_season_pdh.year >= ran[0]) & (dates_season_pdh.year <= ran[1])
-        var_season_range = var_season[okdat, ...]
-        dates_season_range = dates_season[okdat, ...]
-
-        area = 'EAT'
-        ref_solver = ERA_ref_EAT['solver']
-        ref_patterns_area = ERA_ref_EAT['cluspattern_area']
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
-        results[(tag, area, ran)] = resu
-
-        area = 'PNA'
-        ref_solver = ERA_ref_PNA['solver']
-        ref_patterns_area = ERA_ref_PNA['cluspattern_area']
-        resu = cd.WRtool_core(var_season_range, lat, lon, dates_season_range, area, numclus = 4, run_significance_calc = runsig, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
-        results[(tag, area, ran)] = resu
+area = 'PNA'
+ref_solver = ERA_ref_PNA['solver']
+ref_patterns_area = ERA_ref_PNA['cluspattern_area']
+resu = cd.WRtool_core_ensemble(var_season_all, lat, lon, dates_season_all, area, run_significance_calc = False, ref_solver = ref_solver, ref_patterns_area = ref_patterns_area, detrended_eof_calculation = True, detrended_anom_for_clustering = True)
+results[area] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX_fullperiod_detrended.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_definitivo.p','w'))
