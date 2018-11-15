@@ -220,10 +220,10 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     results['eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
 
     results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
-    results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs)
     results['dates'] = dates_season
 
     if heavy_output:
+        results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs, filter_longer_than = 3)
         if detrended_anom_for_clustering:
             results['var_area'] = var_area_dtr
             results['var_glob'] = var_anom_dtr
@@ -275,8 +275,9 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
             print('Detrended eof calculation\n')
             climat_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season_set[ens], dates_season_set[ens], window_days = wnd)
             trace_ens.append(len(var_season_set[ens]))
-            results[ens_names[ens]]['climate_mean_dtr'] = climat_mean_dtr
-            results[ens_names[ens]]['climate_mean_dtr_dates'] = dates_climat_dtr
+            if heavy_output:
+                results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climat_mean_dtr), axis = 1)
+                results[ens_names[ens]]['climate_mean_dtr_dates'] = pd.to_datetime(dates_climat_dtr).year
             var_anom_dtr.append(ctl.anomalies_daily_detrended(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr))
 
         var_anom_dtr = np.concatenate(var_anom_dtr)
@@ -295,8 +296,9 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
             for ens in range(n_ens):
                 # Detrending
                 climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
-                results[ens_names[ens]]['climate_mean'] = climat_mean_dtr
-                results[ens_names[ens]]['climate_mean_dates'] = dates_climat_dtr
+                if heavy_output:
+                    results[ens_names[ens]]['climate_mean'] = np.mean(climat_mean, axis = 1)
+                    results[ens_names[ens]]['climate_mean_dates'] = dates_climat
                 var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean, dates_climate_mean = dates_climat))
 
             var_anom = np.concatenate(var_anom)
@@ -308,8 +310,9 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         for ens in range(n_ens):
             trace_ens.append(len(var_season_set[ens]))
             climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
-            results[ens_names[ens]]['climate_mean'] = climat_mean_dtr
-            results[ens_names[ens]]['climate_mean_dates'] = dates_climat_dtr
+            if heavy_output:
+                results[ens_names[ens]]['climate_mean'] = np.mean(climat_mean, axis = 1)
+                results[ens_names[ens]]['climate_mean_dates'] = dates_climat
             var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean, dates_climate_mean = dates_climat))
 
         var_anom = np.concatenate(var_anom)
@@ -394,6 +397,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
                 results[ennam]['var_glob'] = var_anom[ind1:ind2]
 
     results['all']['trans_matrix'] = ctl.calc_regime_transmatrix(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set)
-    results['all']['regime_transition_pcs'] = ctl.find_transition_pcs(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set, [results[ennam]['pcs'] for ennam in ens_names])
+    if heavy_output:
+        results['all']['regime_transition_pcs'] = ctl.find_transition_pcs(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set, [results[ennam]['pcs'] for ennam in ens_names], filter_longer_than = 3)
 
     return results

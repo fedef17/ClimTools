@@ -155,6 +155,31 @@ def read_inputs(nomefile, key_strings, n_lines = None, itype = None, defaults = 
     return dict(zip(key_strings,variables))
 
 
+def get_size(obj, seen=None):
+    """
+    Recursively finds size of objects.
+
+    After https://gist.github.com/bosswissam/
+    """
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+
+    return size
+
 #######################################################
 #
 ###     Data reading/writing and pre-treatment
@@ -252,7 +277,12 @@ def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True):
     time        = fh.variables['time'][:]
     time_units  = fh.variables['time'].units
     time_cal    = fh.variables['time'].calendar
-    var_units   = fh.variables[variabs[-1]].units
+
+    try:
+        var_units   = fh.variables[variabs[-1]].units
+    except:
+        var_units = None
+
     if extract_level is not None:
         lvel = extract_level
         if nlevs > 1:
@@ -360,7 +390,13 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
 
     time        = fh.variables['time'][:]
     time_units  = fh.variables['time'].units
-    var_units   = fh.variables[variabs[-1]].units
+    time_cal    = fh.variables['time'].calendar
+    
+    try:
+        var_units   = fh.variables[variabs[-1]].units
+    except:
+        var_units = None
+
     var         = fh.variables[variabs[-1]][:,:,:]
     txt='{0} dimension [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
 
@@ -409,7 +445,10 @@ def read2Dncfield(ifile):
 
     #var_units   = fh.variables[variabs[2]].units
     var         = fh.variables[variabs[2]][:,:]
-    var_units   = fh.variables[variabs[3]].units
+    try:
+        var_units   = fh.variables[variabs[-1]].units
+    except:
+        var_units = None
 
     txt='{0} dimension [lat x lon]: {1}'.format(variabs[2],var.shape)
     #print(fh.variables)
@@ -1563,55 +1602,48 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
     """
     indices = np.array(indices)
     numclus = int(indices.max() + 1)
+    numseq = np.arange(len(indices))
 
     resid_times = []
+    regime_nums = []
     if dates is None:
         for clu in range(numclus):
             clu_resids = []
+            clu_num_reg = []
             okclu = indices == clu
             init = False
-            pause = False
 
-            for el in okclu:
+            for el, num in zip(okclu, numseq):
                 if el:
                     if not init:
                         init = True
                         num_days = 1
+                        num_reg = [num]
                     else:
                         num_days += 1
-                        if pause:
-                            # regime started again after one day pause
-                            pause = False
+                        num_reg.append(num)
                 else:
-                    if skip_singleday_pause:
-                        if init and not pause:
-                            # first day of pause
-                            pause = True
-                        elif init and pause:
-                            # this is the second day of pause, closing regime period
-                            clu_resids.append(num_days)
-                            init = False
-                            pause = False
-                    else:
-                        if init:
-                            clu_resids.append(num_days)
-                            init = False
-
+                    if init:
+                        clu_resids.append(num_days)
+                        clu_num_reg.append((num_reg[0], num_reg[-1]))
+                        init = False
 
             resid_times.append(np.array(clu_resids))
+            regime_nums.append(np.array(clu_num_reg))
     else:
         dates = pd.to_datetime(dates)
         duday = pd.Timedelta('2 days 00:00:00')
-        dates_reg = []
+        regime_dates = []
         for clu in range(numclus):
             clu_resids = []
             clu_dates_reg = []
+            clu_num_reg = []
             okclu = indices == clu
             init = False
             pause = False
 
             old_date = dates[0]
-            for el, dat in zip(okclu, dates):
+            for el, dat, num in zip(okclu, dates, numseq):
                 #print(dat)
                 if dat - old_date > duday:
                     #print('new season\n')
@@ -1619,6 +1651,7 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
                         #print('count incompleeeete \n')
                         clu_resids.append(num_days)
                         clu_dates_reg.append((date_reg[0], date_reg[-1]))
+                        clu_num_reg.append((num_reg[0], num_reg[-1]))
                     init = False
 
                 if el:
@@ -1627,11 +1660,13 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
                         init = True
                         num_days = 1
                         date_reg = [dat]
+                        num_reg = [num]
                         #clu_dates_reg.append(dat)
                     else:
                         #print('+1\n')
                         num_days += 1
                         date_reg.append(dat)
+                        num_reg.append(num)
                         if pause:
                             # regime started again after one day pause
                             pause = False
@@ -1644,23 +1679,26 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
                             # this is the second day of pause, closing regime period
                             clu_resids.append(num_days)
                             clu_dates_reg.append((date_reg[0], date_reg[-1]))
+                            clu_num_reg.append((num_reg[0], num_reg[-1]))
                             init = False
                             pause = False
                     else:
                         if init:
                             clu_resids.append(num_days)
                             clu_dates_reg.append((date_reg[0], date_reg[-1]))
+                            clu_num_reg.append((num_reg[0], num_reg[-1]))
                             init = False
 
                 old_date = dat
 
             resid_times.append(np.array(clu_resids))
-            dates_reg.append(np.array(clu_dates_reg))
+            regime_dates.append(np.array(clu_dates_reg))
+            regime_nums.append(np.array(clu_num_reg))
 
     if dates is None:
         return np.array(resid_times)
     else:
-        return np.array(resid_times), np.array(dates_reg)
+        return np.array(resid_times), np.array(regime_dates), np.array(regime_nums)
 
 
 def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
@@ -1692,7 +1730,7 @@ def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3,
     return trans_matrix
 
 
-def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
+def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, fix_length = 2, filter_longer_than = 1, filter_shorter_than = None, skip_persistence = False, only_direct = False):
     """
     This finds the pcs corresponding to regime transitions or to regime residences. All are saved in a matrix-like format of shape numclus x numclus. Works with multimember ensemble.
 
@@ -1703,7 +1741,9 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, max_days_between
 
     < filter_longer_than > : excludes residende periods shorter than # days. If set to 0, single day transition are considered. Default is 1, so that single day regime periods are skipped.
     < filter_shorter_than > : excludes residende periods longer than # days.
-    < max_days_between > : maximum number of days before the next regime to consider the transition.
+
+    < fix_length > : all transitions are vector of pcs of fixed length. sets max_days_between to fix_length-1. Default is 2, only direct transitions are considered.
+    < only_direct > : regardless of fix_length, only direct transitions are considered.
     """
 
     if n_ens == 1:
@@ -1711,8 +1751,14 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, max_days_between
         indices_set = [indices_set]
         pcs_set = [pcs_set]
 
+    if only_direct:
+        max_days_between = 1
+    else:
+        max_days_between = fix_length-1
+
     for ens in range(n_ens):
-        trans_matrix_ens, trans_matrix_dates_ens = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
+        print('ens member {}\n'.format(ens))
+        trans_matrix_ens, trans_matrix_nums_ens = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
         if ens == 0:
             trans_matrix = np.empty(trans_matrix_ens.shape, dtype=object)
             numclus = trans_matrix.shape[0]
@@ -1722,10 +1768,18 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, max_days_between
 
         for i in range(numclus):
             for j in range(numclus):
-                datesok = trans_matrix_dates_ens[i,j]
-                for (dain, daou) in datesok:
-                    okin = (dates_set[ens] == dain).argmax()
-                    okou = (dates_set[ens] == daou).argmax()
+                if i == j and skip_persistence:
+                    print((i,j), '--> skipping..')
+                    continue
+                else:
+                    print((i,j))
+                numsok = trans_matrix_nums_ens[i,j]
+                for (okin, okou) in numsok:
+                    while okou-okin+1 < fix_length:
+                        okin -= 1
+                        okou += 1
+                    if okou-okin+1 > fix_length:
+                        okou -= 1
                     trans_matrix[i,j].append(pcs_set[ens][okin:okou+1, :])
 
     return trans_matrix
@@ -1745,68 +1799,117 @@ def count_regime_transitions(indices, dates, filter_longer_than = 1, filter_shor
     else:
         skip_singleday_pause = True
 
-    resid_times, dates_reg = calc_regime_residtimes(indices, dates = dates, count_incomplete = True, skip_singleday_pause = skip_singleday_pause)
+    resid_times, dates_reg, num_reg = calc_regime_residtimes(indices, dates = dates, count_incomplete = True, skip_singleday_pause = skip_singleday_pause)
 
     numclus = len(resid_times)
 
     # Filtering day length
     filt_resid_times = []
-    filt_dates_init = []
-    filt_dates_fin = []
-    for reg, rsd, dat in zip(range(numclus), resid_times, dates_reg):
+    #filt_dates_init = []
+    #filt_dates_fin = []
+    filt_num_init = []
+    filt_num_fin = []
+    for reg, rsd, dat, nu in zip(range(numclus), resid_times, dates_reg, num_reg):
         oks = rsd > filter_longer_than
         if filter_shorter_than is not None:
             oks = oks & (rsd < filter_shorter_than)
         filt_resid_times.append(rsd[oks])
-        filt_dates_init.append([da[0] for da in dat[oks]])
-        filt_dates_fin.append([da[1] for da in dat[oks]])
+        #filt_dates_init.append([da[0] for da in dat[oks]])
+        #filt_dates_fin.append([da[1] for da in dat[oks]])
+        filt_num_init.append([da[0] for da in nu[oks]])
+        filt_num_fin.append([da[1] for da in nu[oks]])
 
     # metto in ordine i periodi e le date
-    all_dats_ini = np.concatenate(filt_dates_init)
-    all_dats_fin = np.concatenate(filt_dates_fin)
+    #all_dats_ini = np.concatenate(filt_dates_init)
+    #all_dats_fin = np.concatenate(filt_dates_fin)
+    all_nums_ini = np.concatenate(filt_num_init)
+    all_nums_fin = np.concatenate(filt_num_fin)
     all_rsd = np.concatenate(filt_resid_times)
     all_clus = np.concatenate([num*np.ones(len(filt_resid_times[num]), dtype = int) for num in range(numclus)])
 
-    sortdat = all_dats_ini.argsort()
-    all_dats_ini = all_dats_ini[sortdat]
-    all_dats_fin = all_dats_fin[sortdat]
+    #sortdat = all_dats_ini.argsort()
+    sortdat = all_nums_ini.argsort()
+    #all_dats_ini = all_dats_ini[sortdat]
+    #all_dats_fin = all_dats_fin[sortdat]
+    all_nums_ini = all_nums_ini[sortdat]
+    all_nums_fin = all_nums_fin[sortdat]
     all_rsd = all_rsd[sortdat]
     all_clus = all_clus[sortdat]
 
     trans_matrix = np.zeros((numclus, numclus))
-    trans_matrix_dates = np.empty((numclus, numclus), dtype = object)
+    #trans_matrix_dates = np.empty((numclus, numclus), dtype = object)
+    trans_matrix_nums = np.empty((numclus, numclus), dtype = object)
     for i in range(numclus):
         for j in range(numclus):
-            trans_matrix_dates[i,j] = []
+            #trans_matrix_dates[i,j] = []
+            trans_matrix_nums[i,j] = []
 
-    timedel = pd.Timedelta('{} days'.format(max_days_between))
+    #timedel = pd.Timedelta('{} days'.format(max_days_between))
 
     n_tot = len(all_rsd)
-    for num, day_in, day_out, lenday, reg in zip(range(n_tot), all_dats_ini, all_dats_fin, all_rsd, all_clus):
+    #for num, day_in, day_out, lenday, reg in zip(range(n_tot), all_dats_ini, all_dats_fin, all_rsd, all_clus):
+    for num, day_in, day_out, lenday, reg in zip(range(n_tot), all_nums_ini, all_nums_fin, all_rsd, all_clus):
         i = num + 1
         if i >= n_tot: break
 
-        day_new = all_dats_ini[i]
-        if day_new - day_out > timedel: continue
+        #day_new = all_dats_ini[i]
+        #if day_new - day_out > timedel: continue
+        day_new = all_nums_ini[i]
+        if day_new - day_out > max_days_between: continue
 
-        trans_matrix[reg,reg] += len(pd.date_range(day_in, day_out))-1-filter_longer_than
-        trans_matrix_dates[reg,reg].append((day_in, day_out))
+        #trans_matrix[reg,reg] += len(pd.date_range(day_in, day_out))-1-filter_longer_than
+        trans_matrix[reg,reg] += day_out - day_in - filter_longer_than # devo fare anche -1?
+        #trans_matrix_dates[reg,reg].append((day_in, day_out))
+        trans_matrix_nums[reg,reg].append((day_in, day_out))
         #print('perm', reg, len(pd.date_range(day_in, day_out))-1-filter_longer_than, (day_in-all_dats_ini[0]).days)
 
         reg_new = all_clus[num+1]
         #print('trans', reg, reg_new, (day_new-all_dats_ini[0]).days)
         trans_matrix[reg,reg_new] += 1
-        trans_matrix_dates[reg,reg_new].append((day_out, day_new))
+        #trans_matrix_dates[reg,reg_new].append((day_out, day_new))
+        trans_matrix_nums[reg,reg_new].append((day_out, day_new))
 
-    return trans_matrix, trans_matrix_dates
+    return trans_matrix, trans_matrix_nums
 
 
-def calc_pdf(data):
+def rotate_space_interclus_section_3D(centroids, clusA, clusB, pcs, transitions = None):
+    """
+    Rotates the basis so as to have one axis match the intercluster vector linking clusA and clusB. This is done to have the space which maximizes the division between the two clusters and better visualize the dynamics.
+
+    Returns the projection of the new basis set onto the old one and the new set of rotated PCs.
+
+    All is done in 3D geometry. The pcs are returned in 3D as well.
+    """
+
+    icvec = centroids[clusB][:3]-centroids[clusA][:3]
+
+    #Find closest axis to interclus vector
+    iax = np.argmin(abs(icvec))
+    orig = np.zeros(3)
+    orig[iax] = 1
+
+    # Find the rotation that moves orig to icvec
+    rot = get_rotation_3D(orig, icvec)
+    invrot = rot.T
+
+    new_base = new_basis_set_3D(rot)
+    new_pcs = np.array([np.dot(invrot, pc[:3]) for pc in pcs])
+
+    if transitions is not None:
+        new_trans = []
+        for trans in transitions:
+            new_trans.append(np.array([np.dot(invrot, pc[:3]) for pc in trans]))
+        return new_base, new_pcs, new_trans
+    else:
+        return new_base, new_pcs
+
+
+def calc_pdf(data, bnd_width = None):
     """
     Calculates pdf using Gaussian kernel on a set of data (scipy gaussian_kde). Returns a function that can be evaluated on a grid for plotting purposes.
     """
 
-    k = stats.kde.gaussian_kde(data)
+    k = stats.kde.gaussian_kde(data, bw_method = bnd_width)
 
     return k
 
@@ -1945,6 +2048,91 @@ def clus_eval_indexes(PCs, centroids, labels):
     clus_eval['Sigma clusters'] = sigma_clusters
 
     return clus_eval
+
+#######################################################
+#
+###     Geometrical functions
+#
+#######################################################
+
+def normalize(vector):
+    norm_vector = vector/LA.norm(vector)
+    return norm_vector
+
+
+def orthogonal_plane(vector, point):
+    """
+    Finds the plane orthogonal to vector and passing from point. Returns a function plane(x,y). If the vector is in the (x,y) plane, returns a function plane(x,z).
+    """
+    line = normalize(vector)
+
+    if line[2] != 0:
+        #print('Returning plane as function of (x,y) couples')
+        def plane(x,y):
+            z = point[2] - ( line[0]*(x-point[0]) + line[1]*(y-point[1]) ) / line[2]
+            return np.array([x,y,z])
+    else:
+        print('vector is horizontal. Returning plane as function of (x,z) couples\n')
+        def plane(x,z):
+            y = point[1] - line[0] * (x-point[0]) / line[1]
+            return np.array([x,y,z])
+
+    return plane
+
+
+def skewsymmat(v):
+    """
+    Returns the skew symmetric matric produced by vector.
+    """
+    matr = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+
+    return matr
+
+
+def rotation_matrix_3D(axis, angle):
+    """
+    Calculates the rotation matrix for rotation of angle around axis, using the Euler-Rodriguez formula.
+    angle in radians.
+    """
+    idm = np.array([[1,0,0],[0,1,0],[0,0,1]])
+    kn = normalize(axis)
+
+    kx = skewsymmat(kn)
+    kxkx = np.dot(kx,kx)
+
+    rot = idm + np.sin(angle)*kx + (1-np.cos(angle))*kxkx
+
+    return rot
+
+
+def get_rotation_3D(a, b):
+    """
+    Finds the rotation matrix that transforms vector a in vector b. (the simplest)
+    """
+
+    k = np.cross(a,b)
+    angle = np.arccos(np.dot(a,b)/(LA.norm(a)*LA.norm(b)))
+
+    rot = rotation_matrix_3D(k, angle)
+
+    return rot
+
+
+def new_basis_set_3D(rot):
+    """
+    Components of the new basis set obtained through a 3D rotation in the original eof base.
+    """
+    basis = []
+    for el in range(3):
+        basis.append(rot[:,el])
+
+    return basis
+
+# def base_set(plane):
+#     """
+#     Finds an arbitrary base to project onto inside plane.
+#     """
+
 
 #######################################################
 #
