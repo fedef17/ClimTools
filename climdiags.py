@@ -33,7 +33,18 @@ import climtools_lib as ctl
 Diagnostics for standard climate outputs. Contains higher level tools that make use of climtools_lib.
 Tools contained:
 - WRtool
+- heat_flux_calc
 """
+##############################################
+### constants
+cp = 1005.0 # specific enthalpy dry air - J kg-1 K-1
+cpw = 1840.0 # specific enthalpy water vapor - J kg-1 K-1
+# per la moist air sarebbe cpm = cp + q*cpw, ma conta al massimo per un 3 %
+L = 2501000.0 # J kg-1
+Lsub = 2835000.0 # J kg-1
+g = 9.81 # m s-2
+Rearth = 6371.0e3 # mean radius
+#####################################
 
 ####################################################
 def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = None, **kwargs):
@@ -399,5 +410,256 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
     results['all']['trans_matrix'] = ctl.calc_regime_transmatrix(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set)
     if heavy_output:
         results['all']['regime_transition_pcs'] = ctl.find_transition_pcs(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set, [results[ennam]['pcs'] for ennam in ens_names], filter_longer_than = 3)
+
+    return results
+
+
+def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = None, seasons = ['DJF', 'JJA']):
+    """
+    Calculates meridional fluxes of quantity quant.
+
+    The following fields are needed at least at 6hrs frequency (actually only for the SH flux, the others should work with lower frequencies as well):
+    < va > : meridional wind (3d)
+    < quantity > : transported quantity (3d)
+
+    If < quantity > is not given, va is considered as the 3d flux. So, for example, for SH flux the v*T product may be given in input instead of va with quantity left None.
+
+    < lat, lon, levels > : the latitude, longitude and levels of the 3d grid.
+    < dates_6hrs > : the dates of the 6hrs quantities.
+
+    < ps > : surface pressure (same lat/lon grid)
+    < dates_ps > : dates of the surface pressure (daily or even monthly data are ok)
+
+    < seasons > : returns mean fluxes for each season.
+    """
+
+    print('Levels: {}\n'.format(levels))
+    if np.max(levels) < np.mean(ps)/2:
+        raise ValueError('Level units are not in Pa?')
+
+    press0 = dict()
+    press0['year'] = np.mean(ps, axis = 0)
+    for seas in seasons:
+        press0[seas] = np.mean(ctl.sel_season(ps, dates_ps, seas, cut = False)[0], axis = 0)
+
+    fluxes_levels = dict()
+    fluxes_cross = dict()
+    fluxes_maps = dict()
+    fluxes_zonal = dict()
+
+    if quantity is not None:
+        va = va*quantity
+        del quantity
+
+    for seas in seasons:
+        fluxes_levels[seas] = np.mean(ctl.sel_season(va, dates_6hrs, seas, cut = False)[0], axis = 0)
+    fluxes_levels['year'] = np.mean(va, axis = 0)
+    del va
+
+    zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
+    for flun in fluxes_levels.keys():
+        fluxes_cross[flun] = np.mean(fluxes_levels[flun], axis = -1)*zonal_factor
+        fluxes_maps[flun] = np.zeros(fluxes_levels[flun].shape[1:])
+
+    print('Starting vertical integration\n')
+    for seas in press0.keys():
+        for ila in range(len(lat)):
+            for ilo in range(len(lon)):
+                #print(lat[ila], lon[ilo])
+                p0 = press0[seas][ila, ilo]
+
+                # Selecting pressure levels lower than surface pressure
+                exclude_pres = levels > p0
+                if np.any(exclude_pres):
+                    lev0 = np.argmax(exclude_pres)
+                else:
+                    lev0 = None
+                levels_ok = np.append(levels[:lev0], p0)
+
+                if not np.all(np.diff(levels_ok) > 0):
+                    print(levels_ok)
+                    raise ValueError('levels not increasing')
+
+                coso = fluxes_levels[seas][:, ila, ilo]
+                coso = np.append(coso[:lev0], np.interp(p0, levels, coso))
+                fluxes_maps[seas][ila, ilo] = np.trapz(coso, x = levels_ok)
+
+    print('done\n')
+
+    zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
+    for fu in fluxes_maps.keys():
+        fluxes_zonal[fu] = np.mean(fluxes_maps[fu], axis = -1)*zonal_factor
+
+    results = dict()
+    results['zonal'] = fluxes_zonal
+    results['maps'] = fluxes_maps
+    results['cross'] = fluxes_cross
+
+    return results
+
+
+def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, zg_in_ERA_units = False, seasons = ['DJF', 'JJA']):
+    """
+    Calculates meridional heat fluxes: SH (sensible), LH (latent) and PE (potential energy).
+
+    The following fields are needed at least at 6hrs frequency (actually only for the SH flux, the others should work with lower frequencies as well): < va > meridional wind (3d), < ta > temperature (3d), < zg > geopotential (3d), < q > specific humidity (3d). These are read from the netcdf files in < file_list >. This can be either a single file with all variables in input or a single file for each variable. In the second case, the order matters and is v,t,z,q.
+
+    Due to memory errors, new option added:
+    < full_calculation > : if True, the product between variables are performed inside the routine (easier to overload the memory). Instead, precalculated <vt>, <vz> and <vq> products are considered (strictly in this order).
+
+    < file_list > : str or list. Read above for description.
+
+    < file_ps > : str, netcdf file containing surface pressure (same lat/lon grid, daily or even monthly data are ok)
+
+    < seasons > : list, returns mean fluxes for all the specified seasons and for the annual mean.
+
+    < zg_in_ERA_units > : the geopotential is in m**2 s**-2 units. If full_calculation is True, this is autodetected. If the products have already been performed this has to be specified by hand.
+    """
+    ##############################################
+
+    factors = {'SH': cp/g, 'PE': 1., 'LH': L/g}
+
+    press0row, latdad, londsad, datespress, time_units, var_units = ctl.read3Dncfield(file_ps)
+
+    figure_file_exp = cart_out+'hf_{}.pdf'.format(tag)
+    figures_exp = []
+    figure_file_exp_maps = cart_out+'hf_{}_maps.pdf'.format(tag)
+    figures_exp_maps = []
+
+    fluxes_levels = dict()
+    fluxes_cross = dict()
+    fluxes_maps = dict()
+    fluxes_zonal = dict()
+
+    varnames = [['v','va'], ['t','ta'], ['z','zg'], ['q','hus']]
+    fluxnames = ['SH', 'PE', 'LH']
+    results = dict()
+
+    if full_calculation:
+        vars = dict()
+        # leggo v
+        if type(file_list) is str:
+            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnames[0])
+        else:
+            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[0])
+            if varuna.keys()[0] not in varnames[0]:
+                raise ValueError('{} is not v. Please give input files in order v,t,z,q.'.format(varuna.keys()[0]))
+
+        # Changing to standard names
+        for varna in varuna.keys():
+            for varnamok in varnames:
+                if varna in varnamok: vars[varnamok[0]] = varuna.pop(varna)
+
+        print(varuna.keys(), vars.keys())
+
+        # leggo t
+        for i, (varnamok, flun) in enumerate(zip(varnames[1:], fluxnames)):
+            varname = varnamok[0]
+            print('Extracting {}\n'.format(varname))
+
+            if type(file_list) is str:
+                varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnamok)
+            else:
+                varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i+1])
+                if varuna.keys()[0] not in varnamok:
+                    raise ValueError('{} is not t. Please give input files in order v,t,z,q.'.format(varuna.keys()[0]))
+
+            vars[varname] = varuna.pop(varuna.keys()[0])
+            del varuna
+
+            if flun == 'PE' and var_units.values()[0] == 'm**2 s**-2':
+                fact = factors['PE']/g
+            else:
+                fact = factors[flun]
+
+            print('Calculating {}\n'.format(flun))
+            results[flun] = quant_flux_calc(vars['v'], lat, lon, level, dates, press0row, datespress, quantity = factors[flun]*vars[varname], seasons = seasons)
+            print('OK\n')
+            del vars[varname]
+
+        del vars
+    else:
+        for i, flun in enumerate(fluxnames):
+            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i])
+            varuna = varuna[varuna.keys()[0]]
+
+            if flun == 'PE' and zg_in_ERA_units:
+                fact = factors['PE']/g
+            else:
+                fact = factors[flun]
+            varuna *= fact
+
+            print('Calculating {}\n'.format(flun))
+            results[flun] = quant_flux_calc(varuna, lat, lon, level, dates, press0row, datespress, seasons = seasons)
+            print('OK\n')
+            del varuna
+
+    if not os.path.exists(cart_out): os.mkdir(cart_out)
+
+    for fu in results.keys():
+        filena = cart_out + '{}flux_map_{}_{}seasons.nc'.format(fu, tag, len(seasons))
+        vals = [results[fu]['maps'][key] for key in seasons]
+        vals.append(results[fu]['maps']['year'])
+        ctl.save_N_2Dfields(lat,lon,np.stack(vals), fu, 'W/m', filena)
+
+    # for fu in era_fluxes_zonal.keys():
+    #     #print(lat, era_lat, era_fluxes_zonal[fu])
+    #     era_fluxes_zonal_itrp[fu] = np.interp(lat, era_lat[::-1], era_fluxes_zonal[fu][::-1])
+    #     print('{:12.3e} - {:12.3e}\n'.format(era_fluxes_zonal_itrp[fu].min(), era_fluxes_zonal_itrp[fu].max()))
+    results['tot'] = dict()
+    for taw in ['zonal', 'maps', 'cross']:
+        results['tot'][taw] = dict()
+
+    for seas in seasons+['year']:
+        for taw in ['zonal', 'maps', 'cross']:
+            total = np.sum([results[flun][taw][seas] for flun in fluxnames], axis = 0)
+            results['tot'][taw][seas] = total
+
+    margins = dict()
+    for taw in ['zonal', 'maps', 'cross']:
+        for flu in results.keys():
+            margins[(flu, taw)] = (1.1*np.min([results[flu][taw][seas] for seas in seasons]), 1.1*np.max([results[flu][taw][seas] for seas in seasons]))
+
+    fluxnames = ['SH', 'PE', 'LH']
+    # Single exps, single season figures:
+    for seas in seasons+['year']:
+        fig = plt.figure()
+        plt.title('{} - Meridional heat fluxes - {}'.format(tag, seas))
+        for flun in fluxnames:
+            plt.plot(lat, results[flun]['zonal'][seas], label = flun)
+        plt.plot(lat, results['tot']['zonal'][seas], label = 'Total')
+        plt.legend()
+        plt.grid()
+        plt.ylim(margins[('tot', 'zonal')])
+        plt.xlabel('Latitude')
+        plt.ylabel('Integrated Net Heat Flux (W)')
+        figures_exp.append(fig)
+
+        for flun in fluxnames:
+            fig = ctl.plot_map_contour(results[flun]['maps'][seas], lat, lon, title = 'SH - {} - {}'.format(tag, seas), cbar_range = margins[(flun, 'maps')])
+            figures_exp_maps.append(fig)
+
+        fig = ctl.plot_map_contour(results['tot']['maps'][seas], lat, lon, title = 'Total meridional flux - {} - {}'.format(tag, seas), cbar_range = margins[('tot', 'maps')])
+        figures_exp_maps.append(fig)
+
+    for flun in fluxnames+['tot']:
+        fig = plt.figure()
+        plt.title('{} fluxes - {}'.format(flun, tag))
+        cset = ctl.color_set(len(seasons)+1, bright_thres = 1)
+        for seas, col in zip(seasons+['year'], cset):
+            plt.plot(lat, results[flun]['zonal'][seas], label = seas, color = col, linewidth = 2.)
+            #plt.plot(lat, era_fluxes_zonal_itrp[(seas, flun)], label = 'ERA '+seas, color = col, linewidth = 0.7, linestyle = '--')
+        plt.legend()
+        plt.grid()
+        plt.ylim(margins[(flun, 'zonal')])
+        plt.xlabel('Latitude')
+        plt.ylabel('Integrated Net Heat Flux (W)')
+        figures_exp.append(fig)
+
+    pickle.dump(results, open(cart_out+'out_hfc_{}_.p'.format(tag), 'w'))
+
+    print('Saving figures...\n')
+    ctl.plot_pdfpages(figure_file_exp, figures_exp)
+    ctl.plot_pdfpages(figure_file_exp_maps, figures_exp_maps)
 
     return results

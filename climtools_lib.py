@@ -220,27 +220,134 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def readxDncfield(ifile):
+def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True):
     """
-    Read a netCDF file as it is, preserving all dimensions.
+    Read a netCDF file as it is, preserving all dimensions and multiple variables.
+
+    < extract_level > : float. If set, only the corresponding level is extracted.
+    < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
     """
 
     fh = nc.Dataset(ifile)
-    ndim = len(fh.variables.keys()) - 1
-    print('Field as {} dimensions. All keys: {}'.format(ndim, fh.variables.keys()))
-    del fh
+    dimensions = fh.dimensions.keys()
+    ndim = len(dimensions)
 
-    if ndim == 2:
-        out = read2Dncfield(ifile)
-    elif ndim == 3:
-        out = read3Dncfield(ifile)
-    elif ndim == 4:
-        out = read4Dncfield(ifile)
+    variabs = fh.variables.keys()[ndim:]
+    nvars = len(variabs)
+    print('Field as {} dimensions and {} vars. All keys: {}'.format(ndim, nvars, fh.variables.keys()))
 
-    return out
+    try:
+        lat_o         = fh.variables['lat'][:]
+        lon_o         = fh.variables['lon'][:]
+    except KeyError as ke:
+        #print(repr(ke))
+        lat_o         = fh.variables['latitude'][:]
+        lon_o         = fh.variables['longitude'][:]
+    true_dim = 2
+
+    vars = dict()
+    if select_var is None:
+        for varna in variabs:
+            var = fh.variables[varna][:]
+            var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
+            vars[varna] = var
+    else:
+        print('Extracting {}\n'.format(select_var))
+        for varna in variabs:
+            if varna in select_var:
+                var = fh.variables[varna][:]
+                var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
+                vars[varna] = var
+        if len(vars.keys()) == 0:
+            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variabs))
 
 
-def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True):
+    if 'time' in dimensions:
+        true_dim += 1
+        time        = fh.variables['time'][:]
+        time_units  = fh.variables['time'].units
+        time_cal    = fh.variables['time'].calendar
+
+        time = list(time)
+        dates = nc.num2date(time,time_units,time_cal)
+
+        if time_cal == '365_day' or time_cal == 'noleap':
+            dates = adjust_noleap_dates(dates)
+        elif time_cal == '360_day':
+            dates = adjust_360day_dates(dates)
+
+        print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
+
+    if true_dim == 3 and ndim > 3:
+        lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
+        for levna in lev_names:
+            #print(levna)
+            if levna in dimensions:
+                oklevname = levna
+                level = fh.variables[levna][:]
+                nlevs = len(level)
+                true_dim += 1
+                break
+
+        level_units = fh.variables[levna].units
+        print('level units are {}\n'.format(level_units))
+        if pressure_in_Pa:
+            if level_units in ['millibar', 'millibars','hPa']:
+                level = 100.*level
+                level_units = 'Pa'
+                print('Converting level units from hPa to Pa\n')
+
+        if true_dim > 3:
+            if extract_level is not None:
+                lvel = extract_level
+                if nlevs > 1:
+                    if level_units=='millibar' or level_units=='hPa':
+                        l_sel=int(np.where(level==lvel)[0])
+                        print('Selecting level {0} millibar'.format(lvel))
+                    elif level_units=='Pa':
+                        l_sel=int(np.where(level==lvel*100)[0])
+                        print('Selecting level {0} Pa'.format(lvel*100))
+                    level = lvel
+                else:
+                    level = level[0]
+                    l_sel = 0
+
+                for varna in vars.keys():
+                    vars[varna] = vars[varna][:,l_sel,:,:]
+            else:
+                levord = level.argsort()
+                level = level[levord]
+                for varna in vars.keys():
+                    vars[varna] = vars[varna][:, levord, ...]
+
+    var_units = dict()
+    for varna in vars.keys():
+        try:
+            var_units[varna] = fh.variables[varna].units
+        except:
+            var_units[varna] = None
+
+        if var_units[varna] == 'm**2 s**-2':
+            print('From geopotential (m**2 s**-2) to geopotential height (m)')   # g0=9.80665 m/s2
+            vars[varna] = vars[varna]/9.80665
+            var_units[varna] = 'm'
+
+    if compress_dummy_dim:
+        for varna in vars.keys():
+            vars[varna] = vars[varna].squeeze()
+
+    # if len(vars.keys()) == 1:
+    #     vars = vars.values()[0]
+
+    if true_dim == 2:
+        return vars, lat, lon, var_units
+    elif true_dim == 3:
+        return vars, lat, lon, dates, time_units, var_units, time_cal
+    elif true_dim == 4:
+        return vars, level, lat, lon, dates, time_units, var_units, time_cal
+
+
+def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True, increasing_plev = True):
     '''
     GOAL
         Read netCDF file of 4Dfield, optionally selecting a level.
@@ -303,6 +410,11 @@ def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True):
     else:
         var         = fh.variables[variabs[-1]][:,:,:,:]
         txt='{0} dimension for a single ensemble member [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
+        if increasing_plev:
+            levord = level.argsort()
+            level = level[levord]
+            var = var[:, levord, ...]
+
     print(txt)
     #print(fh.variables)
     if var_units == 'm**2 s**-2':
@@ -391,7 +503,7 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     time        = fh.variables['time'][:]
     time_units  = fh.variables['time'].units
     time_cal    = fh.variables['time'].calendar
-    
+
     try:
         var_units   = fh.variables[variabs[-1]].units
     except:
@@ -656,7 +768,7 @@ def sel_area(lat,lon,var,area):
     USAGE
         var_area, lat_area, lon_area = sel_area(lat,lon,var,area)
 
-    :param area: can be 'EAT', 'PNA', 'NH', 'Eu' or 'Med'
+    :param area: str or list. If str: 'EAT', 'PNA', 'NH', 'Eu' or 'Med'. If list: a custom set can be defined. Order is (latS, latN, lonW, lonE).
     '''
     if area=='EAT':
         printarea='Euro-Atlantic'
@@ -726,6 +838,17 @@ def sel_area(lat,lon,var,area):
         else:
             var_roll=var
             lon_new=lon
+    elif (type(area) == list) or (type(area) == tuple) and len(area) == 4:
+        latS, latN, lonW, lonE = area
+        printarea='custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE)
+        if lon.min() >= 0:
+            lon_new=lon-180
+            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+        else:
+            var_roll=var
+            lon_new=lon
+    else:
+        raise ValueError('area {} not recognised'.format(area))
 
     latidx = (lat >= latS) & (lat <= latN)
     lonidx = (lon_new >= lonW) & (lon_new <= lonE)
@@ -779,14 +902,14 @@ def sel_season(var, dates, season, cut = True):
     else:
         raise ValueError('season not understood, should be in DJF, JJA, ND,... format or the short 3 letters name of a month (Jan, Feb, ...)')
 
-    var_season = var[mask,:,:]
+    var_season = var[mask, ...]
     dates_season = dates[mask]
     dates_season_pdh = pd.to_datetime(dates_season)
 
     if var_season.ndim == 2:
         var_season = var_season[np.newaxis, :]
 
-    if season in mesi_short:
+    if season in mesi_short or len(dates) <= 12:
         cut = False
 
     if cut:
@@ -805,7 +928,7 @@ def sel_season(var, dates, season, cut = True):
             else:
                 end = None
 
-            var_season = var_season[start:end,:,:]
+            var_season = var_season[start:end, ...]
             dates_season = dates_season[start:end]
 
     return var_season, dates_season
@@ -853,8 +976,8 @@ def daily_climatology(var, dates, window, refyear = 2001):
             else:
                 okdates = (dates_pdh.month == mon) & (dates_pdh.day == day)
             #print(mon,day,doy,np.sum(okdates))
-            filt_mean.append(np.mean(var[okdates,:,:], axis = 0))
-            filt_std.append(np.std(var[okdates,:,:], axis = 0))
+            filt_mean.append(np.mean(var[okdates, ...], axis = 0))
+            filt_std.append(np.std(var[okdates, ...], axis = 0))
             dates_filt.append(data)
 
     dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
@@ -909,8 +1032,8 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     for mon in months:
         data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,dayref), format='%Y%m%d')
         okdates = (dates_pdh.month == mon)
-        filt_mean.append(np.mean(var[okdates,:,:], axis = 0))
-        filt_std.append(np.std(var[okdates,:,:], axis = 0))
+        filt_mean.append(np.mean(var[okdates,...], axis = 0))
+        filt_std.append(np.std(var[okdates,...], axis = 0))
         dates_filt.append(data)
 
     dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
@@ -1016,12 +1139,12 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
 
     for el, dat in zip(climat_mean, dates_climate_mean_pdh):
         mask = (dates_pdh.month == dat.month) & (dates_pdh.day == dat.day)
-        var_anom[mask,:,:] = var[mask,:,:] - el
+        var_anom[mask, ...] = var[mask, ...] - el
 
     mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
     okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
 
-    var_anom[mask,:,:] = var[mask,:,:] - climat_mean[okel,:,:]
+    var_anom[mask, ...] = var[mask, ...] - climat_mean[okel, ...]
 
     return var_anom
 
@@ -1048,7 +1171,7 @@ def anomalies_monthly(var, dates, climat_mean = None, dates_climate_mean = None)
 
     for el, dat in zip(climat_mean, dates_climate_mean_pdh):
         mask = (dates_pdh.month == dat.month)
-        var_anom[mask,:,:] = var[mask,:,:] - el
+        var_anom[mask, ...] = var[mask, ...] - el
 
     return var_anom
 
@@ -1134,6 +1257,20 @@ def global_mean(field, latitude):
 
     zonal_field = zonal_mean(field)
     mea = np.average(zonal_field, weights = weights_array, axis = -1)
+
+    return mea
+
+
+def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
+    """
+    Calculates a global mean of field, weighting with the cosine of latitude.
+
+    Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
+    """
+    okpo = (latitude >= latmin) & (latitude >= latmax)
+    weights_array = abs(np.cos(np.deg2rad(latitude[okpo])))
+
+    mea = np.average(zonal_field[..., okpo], weights = weights_array, axis = -1)
 
     return mea
 
@@ -1583,8 +1720,8 @@ def calc_composite_map(var, mask):
     Calculates the composite, according to mask (boolean array). Var is assumed to be 3D.
     """
 
-    pattern = np.mean(var[mask,:,:], axis = 0)
-    # pattern_std = np.std(var[mask,:,:], axis = 0)
+    pattern = np.mean(var[mask, ...], axis = 0)
+    # pattern_std = np.std(var[mask, ...], axis = 0)
 
     return pattern #, pattern_std
 
@@ -1941,7 +2078,7 @@ def compute_clusterpatterns(var, labels):
         freq_perc = 100.0*np.sum(mask)/len(labels)
         freqs.append(freq_perc)
         print('CLUSTER {} ---> {:4.1f}%\n'.format(nclus, freq_perc))
-        cluspattern = np.mean(var[mask,:,:], axis=0)
+        cluspattern = np.mean(var[mask, ...], axis=0)
         cluspatt.append(cluspattern)
 
     cluspatt = np.stack(cluspatt)
@@ -2228,7 +2365,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     return map_plot
 
 
-def get_cbar_range(data, symmetrical = False, percentiles = (5,95), n_color_levels = None):
+def get_cbar_range(data, symmetrical = False, percentiles = (0,100), n_color_levels = None):
     mi = np.percentile(data, percentiles[0])
     ma = np.percentile(data, percentiles[1])
     if symmetrical:
@@ -2247,7 +2384,7 @@ def get_cbar_range(data, symmetrical = False, percentiles = (5,95), n_color_leve
     return (oko1, oko2)
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98), figsize = (8,6)):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
     """
     Plots a single map to a figure.
 
@@ -2266,8 +2403,8 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < n_lines >: number of lines to draw.
 
     """
-    if filename is None:
-        plt.ion()
+    #if filename is None:
+        #plt.ion()
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
@@ -2285,8 +2422,8 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     cmappa = cm.get_cmap(cmap)
 
     if cbar_range is None:
-        mi = np.percentile(data, 5)
-        ma = np.percentile(data, 95)
+        mi = np.percentile(data, color_percentiles[0])
+        ma = np.percentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -2328,10 +2465,10 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
         fig4.savefig(filename)
         plt.close(fig4)
 
-    return
+    return fig4
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98)):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -2350,10 +2487,12 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     < n_lines >: number of lines to draw.
     < color_percentiles > : define the range of data to be represented in the color bar. e.g. (0,100) to full range, (5,95) to enhance features.
 
+    < use_different_grids > : if True, lat and lon are read as 2-element lists [lat1, lat2] [lon1, lon2] which specify separately latitude and longitude of the two datasets. To be used if the datasets dimensions do not match.
+
     """
 
-    if filename is None:
-        plt.ion()
+    #if filename is None:
+    #    plt.ion()
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
@@ -2361,8 +2500,8 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         if central_lat_lon is not None:
             (clat, clon) = central_lat_lon
         else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
+            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
+            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
         proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
     else:
         raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
@@ -2370,9 +2509,9 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
 
-    data = np.stack([data1,data2])
 
     if cbar_range is None:
+        data = np.concatenate([data1.flatten(),data2.flatten()])
         mi = np.percentile(data, color_percentiles[0])
         ma = np.percentile(data, color_percentiles[1])
         if plot_anomalies:
@@ -2391,11 +2530,21 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     fig = plt.figure(figsize=(24,14))
 
+    if use_different_grids:
+        lat1, lat2 = lat
+        lon1, lon2 = lon
+    else:
+        lat1 = lat
+        lon1 = lon
+        lat2 = lat
+        lon2 = lon
+
     ax = plt.subplot(1, 2, 1, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data1, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_1, fontsize = 25)
+
     ax = plt.subplot(1, 2, 2, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data2, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -2419,7 +2568,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         fig.savefig(filename)
         plt.close(fig)
 
-    return
+    return fig
 
 
 def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12)):
@@ -2567,7 +2716,99 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     return
 
 
-def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (2,98), figsize = (8,6)):
+def plot_pdfpages(filename, figs):
+    """
+    Saves a list of figures to a pdf file.
+    """
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    pdf = PdfPages(filename)
+    for fig in figs:
+        pdf.savefig(fig)
+    pdf.close()
+
+    return
+
+
+def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False):
+    """
+    Plots a latitudinal cross section map.
+
+    < data >: the field to plot
+    < lat, levels >: latitude and levels
+    < filename >: name of the file to save the figure to. If None, the figure is just shown.
+
+    < cmap >: name of the color map.
+    < cbar_range >: limits of the color bar.
+
+    < plot_anomalies >: if True, the colorbar is symmetrical, so that zero corresponds to white. If cbar_range is set,  plot_anomalies is set to False.
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+
+    """
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+    if cbar_range is None:
+        mi = np.percentile(data, color_percentiles[0])
+        ma = np.percentile(data, color_percentiles[1])
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
+
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+
+    # Plotting figure
+    fig = plt.figure(figsize = figsize)
+    ax = fig.add_subplot(111)
+
+    xi,yi = np.meshgrid(lat, levels)
+    if pressure_levels == True:
+        plt.gca().invert_yaxis()
+        if set_logscale_levels:
+            ax.set_yscale('log')
+
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, extend = 'both', corner_mask = False)
+    if draw_contour_lines:
+        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', linewidth = 0.5)
+
+    plt.grid()
+
+    title_obj = plt.title(title, fontsize=20, fontweight='bold')
+    title_obj.set_position([.5, 1.05])
+
+    cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+    cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
+    cb.ax.tick_params(labelsize=14)
+    cb.set_label(cb_label, fontsize=16)
+
+    top    = 0.88  # the top of the subplots
+    bottom = 0.20    # the bottom of the subplots
+    left   = 0.1    # the left side
+    right  = 0.98  # the right side
+    hspace = 0.20   # height reserved for white space
+    wspace = 0.05    # width reserved for blank space
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+
+    # save the figure or show it
+    if filename is not None:
+        fig.savefig(filename)
+        plt.close(fig)
+
+    return fig
+
+
+def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
     """
     Shows animation of a sequence of maps or saves it to a gif file.
     < maps > : list, the sequence of maps to be plotted.
