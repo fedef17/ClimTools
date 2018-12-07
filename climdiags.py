@@ -498,7 +498,7 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
     return results
 
 
-def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, zg_in_ERA_units = False, seasons = ['DJF', 'JJA']):
+def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, zg_in_ERA_units = False, seasons = ['DJF', 'JJA'], netcdf_level_units = None):
     """
     Calculates meridional heat fluxes: SH (sensible), LH (latent) and PE (potential energy).
 

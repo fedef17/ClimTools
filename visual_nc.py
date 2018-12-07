@@ -12,7 +12,7 @@ import cartopy.crs as ccrs
 
 # Open nc file
 
-cart = '/home/fabiano/DATA/ECEARTHdata/SPHINX/AMIP/Z500T1279regrid/Z500base/zg500uab/'
+cart = '/data/fabiano/ECEARTHdata/SPHINX/AMIP/Z500T1279regrid/Z500base/zg500uab/'
 filename = 'zg500_Aday_EC-EARTH31_T1279base_regrid25_0_1979-2008.nc'
 
 data = nc.Dataset(cart+filename)

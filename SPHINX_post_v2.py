@@ -32,7 +32,7 @@ from copy import deepcopy as cp
 
 ##############################################
 ############ INPUTS #########
-erafile = '/home/fabiano/data/OBS/ERA/ERAInterim/zg500/zg500_Aday_ERAInterim_2deg_1979-2014.nc'
+erafile = '/data/fabiano/OBS/ERA/ERAInterim/zg500/zg500_Aday_ERAInterim_2deg_1979-2014.nc'
 ERA_ref_EAT = cd.WRtool_from_file(erafile, 'DJFM', 'EAT', extract_level_4D = 50000., numclus = 4, run_significance_calc = False)
 print('Transition matrix (reference)\n')
 print(ERA_ref_EAT['trans_matrix'])

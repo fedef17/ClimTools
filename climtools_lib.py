@@ -220,12 +220,15 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True):
+def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True, force_level_units = None):
     """
     Read a netCDF file as it is, preserving all dimensions and multiple variables.
 
     < extract_level > : float. If set, only the corresponding level is extracted.
     < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
+
+    < pressure_in_Pa > : bool. If True (default) pressure levels are converted to Pa.
+    < force_level_units > : str. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
     """
 
     fh = nc.Dataset(ifile)
@@ -289,7 +292,17 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
                 true_dim += 1
                 break
 
-        level_units = fh.variables[levna].units
+        try:
+            level_units = fh.variables[levna].units
+        except AttributeError as atara:
+            print('level units not found in file {}\n'.format(ifile))
+            if force_level_units is not None:
+                level_units = force_level_units
+                print('setting level units to {}\n'.format(force_level_units))
+                print('levels are {}\n'.format(level))
+            else:
+                raise atara
+
         print('level units are {}\n'.format(level_units))
         if pressure_in_Pa:
             if level_units in ['millibar', 'millibars','hPa']:
@@ -1267,7 +1280,7 @@ def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
 
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
-    okpo = (latitude >= latmin) & (latitude >= latmax)
+    okpo = (latitude >= latmin) & (latitude <= latmax)
     weights_array = abs(np.cos(np.deg2rad(latitude[okpo])))
 
     mea = np.average(zonal_field[..., okpo], weights = weights_array, axis = -1)

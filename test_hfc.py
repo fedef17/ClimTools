@@ -26,8 +26,8 @@ L = 2501000.0
 Rearth = 6371.0e3
 ##
 
-cart_in = '/home/fabiano/data/SPHINX/heat_flux/fluxes_row/'
-cart_in_ref = '/home/fabiano/data/OBS/ERA/ERAInterim/'
+cart_in = '/data/fabiano/SPHINX/heat_flux/fluxes_row/'
+cart_in_ref = '/data/fabiano/OBS/ERA/ERAInterim/'
 
 file_list = cart_in_ref+'ERAInterim_6hrs_1988_vatazgq.nc'
 file_ps = cart_in_ref+'ERAInterim_mon_1988_ps.nc'
@@ -81,7 +81,7 @@ for ens in ['lcb0', 'lcs0']:
             for flun in fluxnames[1:]:
                 filist.append(cart_in+'{}_m{}f_y{}.nc'.format(ens, flun.lower(), yea))
             tag = '{}_{}'.format(ens, yea)
-            results_year.append(cd.heat_flux_calc(filist, psfile, cart_out_results, tag, zg_in_ERA_units = False, full_calculation = False, seasons = seasons))
+            results_year.append(cd.heat_flux_calc(filist, psfile, cart_out_results, tag, zg_in_ERA_units = False, full_calculation = False, seasons = seasons, netcdf_level_units = 'Pa'))
 
         am = (a+b)/2
         for flun in fluxnames:
