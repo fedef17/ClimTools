@@ -481,10 +481,19 @@ def adjust_noleap_dates(dates):
     """
     dates_ok = []
     #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
+    # diffs = []
     for ci in dates:
-        dates_ok.append(pd.Timestamp(ci.strftime()).to_pydatetime())
+        # coso = ci.isoformat()
+        coso = ci.strftime()
+        nudat = pd.Timestamp(coso).to_pydatetime()
+        # print(coso, nudat)
+        # if ci-nudat >= pd.Timedelta('1 days'):
+        #     raise ValueError
+        # diffs.append(ci-nudat)
+        dates_ok.append(nudat)
 
     dates_ok = np.array(dates_ok)
+    # print(diffs)
 
     return dates_ok
 
@@ -540,18 +549,18 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     time_cal    = fh.variables['time'].calendar
 
     try:
-        var_units   = fh.variables[variabs[-1]].units
+        var_units   = fh.variables[variabs[0]].units
     except:
         var_units = None
 
-    var         = fh.variables[variabs[-1]][:,:,:]
+    var         = fh.variables[variabs[0]][:,:,:]
     txt='{0} dimension [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
 
     if compress_dummy_dim and var.ndim > 3:
         var = var.squeeze()
     #print(fh.variables)
     time = list(time)
-    dates=nc.num2date(time,time_units)
+    dates = nc.num2date(time, time_units, time_cal)
     fh.close()
 
     if time_cal == '365_day' or time_cal == 'noleap':
