@@ -220,7 +220,7 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True, force_level_units = None):
+def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
     """
     Read a netCDF file as it is, preserving all dimensions and multiple variables.
 
@@ -229,14 +229,19 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
 
     < pressure_in_Pa > : bool. If True (default) pressure levels are converted to Pa.
     < force_level_units > : str. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
+    < keep_only_Ndim_vars > : keeps only variables with correct size (excludes variables like time_bnds, lat_bnds, ..)
     """
 
     fh = nc.Dataset(ifile)
     dimensions = fh.dimensions.keys()
+    if verbose: print('Dimensions: {}\n'.format(dimensions))
     ndim = len(dimensions)
 
-    variabs = fh.variables.keys()[ndim:]
-    nvars = len(variabs)
+    variab_names = fh.variables.keys()
+    for nam in dimensions:
+        if nam in variab_names: variab_names.remove(nam)
+    if verbose: print('Variables: {}\n'.format(variab_names))
+    nvars = len(variab_names)
     print('Field as {} dimensions and {} vars. All keys: {}'.format(ndim, nvars, fh.variables.keys()))
 
     try:
@@ -250,19 +255,19 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
 
     vars = dict()
     if select_var is None:
-        for varna in variabs:
+        for varna in variab_names:
             var = fh.variables[varna][:]
             var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
             vars[varna] = var
     else:
         print('Extracting {}\n'.format(select_var))
-        for varna in variabs:
+        for varna in variab_names:
             if varna in select_var:
                 var = fh.variables[varna][:]
                 var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
                 vars[varna] = var
         if len(vars.keys()) == 0:
-            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variabs))
+            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variab_names))
 
 
     if 'time' in dimensions:
@@ -283,34 +288,39 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
 
     if true_dim == 3 and ndim > 3:
         lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
+        found = False
         for levna in lev_names:
-            #print(levna)
             if levna in dimensions:
                 oklevname = levna
                 level = fh.variables[levna][:]
                 nlevs = len(level)
-                true_dim += 1
+                found = True
                 break
 
-        try:
-            level_units = fh.variables[levna].units
-        except AttributeError as atara:
-            print('level units not found in file {}\n'.format(ifile))
-            if force_level_units is not None:
-                level_units = force_level_units
-                print('setting level units to {}\n'.format(force_level_units))
-                print('levels are {}\n'.format(level))
-            else:
-                raise atara
+        if not found:
+            print('Level name not found among: {}\n'.format(lev_names))
+            print('Does the variable have levels?')
+        else:
+            true_dim += 1
 
-        print('level units are {}\n'.format(level_units))
-        if pressure_in_Pa:
-            if level_units in ['millibar', 'millibars','hPa']:
-                level = 100.*level
-                level_units = 'Pa'
-                print('Converting level units from hPa to Pa\n')
+            try:
+                level_units = fh.variables[oklevname].units
+            except AttributeError as atara:
+                print('level units not found in file {}\n'.format(ifile))
+                if force_level_units is not None:
+                    level_units = force_level_units
+                    print('setting level units to {}\n'.format(force_level_units))
+                    print('levels are {}\n'.format(level))
+                else:
+                    raise atara
 
-        if true_dim > 3:
+            print('level units are {}\n'.format(level_units))
+            if pressure_in_Pa:
+                if level_units in ['millibar', 'millibars','hPa']:
+                    level = 100.*level
+                    level_units = 'Pa'
+                    print('Converting level units from hPa to Pa\n')
+
             if extract_level is not None:
                 lvel = extract_level
                 if nlevs > 1:
@@ -326,7 +336,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
                     l_sel = 0
 
                 for varna in vars.keys():
-                    vars[varna] = vars[varna][:,l_sel,:,:]
+                    vars[varna] = vars[varna][:,l_sel, ...]
             else:
                 levord = level.argsort()
                 level = level[levord]
@@ -345,12 +355,24 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
             vars[varna] = vars[varna]/9.80665
             var_units[varna] = 'm'
 
-    if compress_dummy_dim:
-        for varna in vars.keys():
-            vars[varna] = vars[varna].squeeze()
 
     # if len(vars.keys()) == 1:
     #     vars = vars.values()[0]
+    print('Dimension of variables is {}\n'.format(true_dim))
+    if keep_only_Ndim_vars:
+        for varna in vars.keys():
+            if len(vars[varna].shape) < true_dim:
+                print('Erasing variable {}\n'.format(varna))
+                vars.pop(varna)
+
+    n_compressed = 0
+    if compress_dummy_dim:
+        for varna in vars.keys():
+            if 1 in vars[varna].shape:
+                n_compressed = np.sum(np.array(vars[varna].shape) == 1)
+                vars[varna] = vars[varna].squeeze()
+
+    true_dim -= n_compressed
 
     if true_dim == 2:
         return vars, lat, lon, var_units
