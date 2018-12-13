@@ -10,24 +10,13 @@ import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
 
 import netCDF4 as nc
-import cartopy.crs as ccrs
-import pandas as pd
-
-from numpy import linalg as LA
-from eofs.standard import Eof
-from scipy import stats
-import itertools as itt
-
-from sklearn.cluster import KMeans
-import ctool
-import ctp
-
 from datetime import datetime
 import pickle
+from copy import deepcopy as copy
 
 import climtools_lib as ctl
 
-####################################################
+###############################################################################
 
 """
 Diagnostics for standard climate outputs. Contains higher level tools that make use of climtools_lib.
@@ -35,7 +24,7 @@ Tools contained:
 - WRtool
 - heat_flux_calc
 """
-##############################################
+###############################################################################
 ### constants
 cp = 1005.0 # specific enthalpy dry air - J kg-1 K-1
 cpw = 1840.0 # specific enthalpy water vapor - J kg-1 K-1
@@ -44,9 +33,17 @@ L = 2501000.0 # J kg-1
 Lsub = 2835000.0 # J kg-1
 g = 9.81 # m s-2
 Rearth = 6371.0e3 # mean radius
-#####################################
+###############################################################################
 
-####################################################
+#############################################################################
+#############################################################################
+
+##########            Weather Regimes and Transitions              ##########
+
+#############################################################################
+#############################################################################
+
+
 def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = None, **kwargs):
     """
     Wrapper for inputing a filename.
@@ -62,7 +59,9 @@ def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = N
 
     print('Running precompute\n')
     if type(ifile) is not list:
-        var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(ifile, extract_level = extract_level_4D)
+        var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_4D)
+        print(type(var))
+        print(var.shape)
 
         var_season, dates_season = ctl.sel_season(var, dates, season)
     else:
@@ -70,7 +69,7 @@ def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = N
         var = []
         dates = []
         for fil in ifile:
-            var, level, lat, lon, dates, time_units, var_units, time_cal = ctl.read4Dncfield(fil, extract_level = extract_level_4D)
+            var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_4D)
 
             var_season, dates_season = ctl.sel_season(var, dates, season)
             var.append(var_season)
@@ -414,6 +413,15 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
     return results
 
 
+#############################################################################
+#############################################################################
+
+##########          Energy balance, heat fluxes                    ##########
+
+#############################################################################
+#############################################################################
+
+
 def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = None, seasons = ['DJF', 'JJA']):
     """
     Calculates meridional fluxes of quantity quant.
@@ -663,3 +671,154 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
     ctl.plot_pdfpages(figure_file_exp_maps, figures_exp_maps)
 
     return results
+
+#############################################################################
+#############################################################################
+
+##########              Plots and visualization                    ##########
+
+#############################################################################
+#############################################################################
+
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None):#, groups = None, cluster_names = None):
+    """
+    Plot the results of WRtool.
+
+    < n_ens > : int, number of ensemble members
+    < result_models > : dict, output of WRtool, either for single or multiple member analysis
+    < result_obs > : dict, output of WRtool for a single reference observation
+
+    < model_name > : str, only needed for single member. For the multi-member the names are taken from results.keys().
+    #< groups > : dict, only needed for multimember. Each entry contains a list of results.keys() belonging to that group. Group names are the group dict keys().
+
+    """
+    symbols = ['o', 'd', 'v', '*', 'P', 'h', 'X', 'p', '1']
+    cart_out = cart_out + tag + '/'
+    if not os.path.exists(cart_out): os.mkdir(cart_out)
+
+    if model_name is None:
+        model_name = 'model'
+    if obs_name is None:
+        obs_name = 'Obs'
+
+    if n_ens == 1:
+        resultooo = copy(result_models)
+        result_models = dict()
+        result_models[model_name] = resultooo
+
+    all_figures = []
+
+    # syms = []
+    # labels = []
+    # colors = []
+    # if groups is not None:
+    #     for grounam in groups.keys()
+    #     labels = results.keys()
+    #     colors = ctl.color_set(len(models)+1)
+    colors = ctl.color_set(len(result_models)+1, only_darker_colors = True)
+    labels = result_models.keys()
+
+    if 'significance' in result_models.values()[0].keys():
+        wi = 0.6
+        fig = plt.figure()
+        for i, (mod, col) in enumerate(zip(labels, colors)):
+            plt.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
+        plt.bar(i+1, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        plt.legend(fontsize = 'small', loc = 4)
+        plt.title('Significance of regime structure')
+        plt.xticks(range(len(labels+[obs_name])), labels+[obs_name], size='small')
+        plt.ylabel('Significance')
+        fig.savefig(cart_out+'Significance_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+    patt_ref = result_obs['cluspattern']
+    lat = result_obs['lat']
+    lon = result_obs['lon']
+
+    if len(patt_ref) == 4:
+        if patnames is None:
+            patnames = ['NAO +', 'Blocking', 'NAO -', 'Atl. Ridge']
+        if patnames_short is None:
+            patnames_short = ['NP', 'BL', 'NN', 'AR']
+    else:
+        patnames = ['clus_{}'.format(i) for i in range(len(patt_ref))]
+        patnames_short = ['c{}'.format(i) for i in range(len(patt_ref))]
+
+    for lab in labels:
+        patt = result_models[lab]['cluspattern']
+        if np.any(np.isnan(patt)):
+            print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
+            patt[np.isnan(patt)] = 0.0
+        cartout_mod = cart_out + 'mod_{}/'.format(lab)
+        if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
+
+        filename = cartout_mod+'Allclus_'+lab+'.pdf'
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'polar', central_lat_lon = (50.,0.), cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+        all_figures += figs
+        for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
+            nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
+            print(patuno.max(), patuno.min())
+            print(lat.max(), lat.min())
+            print(lon.max(), lon.min())
+            fig = ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
+            all_figures.append(fig)
+
+    # Taylor plots
+    for num, patt in enumerate(patnames):
+        obs = result_obs['cluspattern_area'][num, ...]
+        modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
+
+        colors = ctl.color_set(len(modpats), bright_thres = 0.3)
+
+        filename = cart_out + 'TaylorPlot_{}.pdf'.format(patnames_short[num])
+        label_ERMS_axis = 'Total RMS error (m)'
+        label_bias_axis = 'Pattern mean (m)'
+
+        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70)
+        all_figures += figs
+
+    fig = plt.figure(figsize=(16,12))
+    for num, patt in enumerate(patnames):
+        ax = plt.subplot(2, 2, num+1, polar = True)
+
+        obs = result_obs['cluspattern_area'][num, ...]
+        modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
+
+        colors = ctl.color_set(len(modpats), bright_thres = 0.3)
+
+        legok = False
+        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = None, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70)
+
+
+    #Custom legend
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+
+    legend_elements = []
+    for col, lab in zip(colors, labels):
+        if lab is None:
+            break
+        legend_elements.append(Line2D([0], [0], marker='o', color=col, label=lab, linestyle = ''))
+
+    legend_elements.append(Line2D([0], [0], marker='D', color='black', label='ERA', linestyle = ''))
+    fig.legend(handles=legend_elements, loc=1, fontsize = 'large')
+
+    fig.tight_layout()
+    if len(patnames) == 4:
+        n1 = plt.text(0.15,0.6,patnames[0],transform=fig.transFigure, fontsize = 20)
+        n3 = plt.text(0.6,0.6,patnames[1],transform=fig.transFigure, fontsize = 20)
+        n2 = plt.text(0.15,0.1,patnames[2],transform=fig.transFigure, fontsize = 20)
+        n4 = plt.text(0.6,0.1,patnames[3],transform=fig.transFigure, fontsize = 20)
+        bbox=dict(facecolor = 'lightsteelblue', alpha = 0.7, edgecolor='black', boxstyle='round,pad=0.2')
+        n1.set_bbox(bbox)
+        n2.set_bbox(bbox)
+        n3.set_bbox(bbox)
+        n4.set_bbox(bbox)
+
+    fig.savefig(cart_out + 'TaylorPlot.pdf')
+    all_figures.append(fig)
+
+    filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)
+    ctl.plot_pdfpages(filename, all_figures)
+
+    return

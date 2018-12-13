@@ -220,7 +220,7 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy_dim = True, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
+def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
     """
     Read a netCDF file as it is, preserving all dimensions and multiple variables.
 
@@ -232,10 +232,14 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
     < keep_only_Ndim_vars > : keeps only variables with correct size (excludes variables like time_bnds, lat_bnds, ..)
     """
 
+    print('Reading {}\n'.format(ifile))
+
     fh = nc.Dataset(ifile)
     dimensions = fh.dimensions.keys()
     if verbose: print('Dimensions: {}\n'.format(dimensions))
     ndim = len(dimensions)
+
+    all_variabs = fh.variables.keys()
 
     variab_names = fh.variables.keys()
     for nam in dimensions:
@@ -270,7 +274,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
             raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variab_names))
 
 
-    if 'time' in dimensions:
+    if 'time' in all_variabs:
         true_dim += 1
         time        = fh.variables['time'][:]
         time_units  = fh.variables['time'].units
@@ -278,6 +282,13 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
 
         time = list(time)
         dates = nc.num2date(time,time_units,time_cal)
+
+        try:
+            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
+        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
+            print(obd)
+            print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+            dates = adjust_outofbound_dates(dates)
 
         if time_cal == '365_day' or time_cal == 'noleap':
             dates = adjust_noleap_dates(dates)
@@ -290,11 +301,14 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
         lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
         found = False
         for levna in lev_names:
-            if levna in dimensions:
+            if levna in all_variabs:
                 oklevname = levna
                 level = fh.variables[levna][:]
-                nlevs = len(level)
-                found = True
+                try:
+                    nlevs = len(level)
+                    found = True
+                except:
+                    found = False
                 break
 
         if not found:
@@ -302,7 +316,6 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
             print('Does the variable have levels?')
         else:
             true_dim += 1
-
             try:
                 level_units = fh.variables[oklevname].units
             except AttributeError as atara:
@@ -321,27 +334,36 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
                     level_units = 'Pa'
                     print('Converting level units from hPa to Pa\n')
 
-            if extract_level is not None:
-                lvel = extract_level
-                if nlevs > 1:
-                    if level_units=='millibar' or level_units=='hPa':
-                        l_sel=int(np.where(level==lvel)[0])
-                        print('Selecting level {0} millibar'.format(lvel))
-                    elif level_units=='Pa':
-                        l_sel=int(np.where(level==lvel*100)[0])
-                        print('Selecting level {0} Pa'.format(lvel*100))
-                    level = lvel
-                else:
-                    level = level[0]
-                    l_sel = 0
+    print('Dimension of variables is {}\n'.format(true_dim))
+    if keep_only_Ndim_vars:
+        for varna in vars.keys():
+            if len(vars[varna].shape) < true_dim:
+                print('Erasing variable {}\n'.format(varna))
+                vars.pop(varna)
 
-                for varna in vars.keys():
-                    vars[varna] = vars[varna][:,l_sel, ...]
+    if true_dim == 4:
+        if extract_level is not None:
+            lvel = extract_level
+            if nlevs > 1:
+                if level_units=='millibar' or level_units=='hPa':
+                    l_sel=int(np.where(level==lvel)[0])
+                    print('Selecting level {0} millibar'.format(lvel))
+                elif level_units=='Pa':
+                    l_sel=int(np.where(level==lvel*100)[0])
+                    print('Selecting level {0} Pa'.format(lvel*100))
+                level = lvel
             else:
-                levord = level.argsort()
-                level = level[levord]
-                for varna in vars.keys():
-                    vars[varna] = vars[varna][:, levord, ...]
+                level = level[0]
+                l_sel = 0
+
+            for varna in vars.keys():
+                vars[varna] = vars[varna][:,l_sel, ...].squeeze()
+            true_dim = true_dim - 1
+        else:
+            levord = level.argsort()
+            level = level[levord]
+            for varna in vars.keys():
+                vars[varna] = vars[varna][:, levord, ...]
 
     var_units = dict()
     for varna in vars.keys():
@@ -355,24 +377,10 @@ def readxDncfield(ifile, extract_level = None, select_var = None, compress_dummy
             vars[varna] = vars[varna]/9.80665
             var_units[varna] = 'm'
 
-
-    # if len(vars.keys()) == 1:
-    #     vars = vars.values()[0]
-    print('Dimension of variables is {}\n'.format(true_dim))
-    if keep_only_Ndim_vars:
-        for varna in vars.keys():
-            if len(vars[varna].shape) < true_dim:
-                print('Erasing variable {}\n'.format(varna))
-                vars.pop(varna)
-
-    n_compressed = 0
-    if compress_dummy_dim:
-        for varna in vars.keys():
-            if 1 in vars[varna].shape:
-                n_compressed = np.sum(np.array(vars[varna].shape) == 1)
-                vars[varna] = vars[varna].squeeze()
-
-    true_dim -= n_compressed
+    print('Returned variables are: {}'.format(vars.keys()))
+    if len(vars.keys()) == 1:
+        vars = vars.values()[0]
+        var_units = var_units.values()[0]
 
     if true_dim == 2:
         return vars, lat, lon, var_units
@@ -498,6 +506,29 @@ def adjust_noleap_dates(dates):
     return dates_ok
 
 
+def adjust_outofbound_dates(dates):
+    """
+    Pandas datetime index is limited to 1677-2256.
+    This temporary fix allows to handle with pandas outside that range, simply adding 1700 years to the dates.
+    Still this will give problems with longer integrations... planned migration from pandas datetime to Datetime.datetime.
+    """
+    dates_ok = []
+    diff = 2000
+
+    for ci in dates:
+        coso = ci.isoformat()
+        listasp = coso.split('-')
+        listasp[0] = '{:04d}'.format(int(listasp[0])+diff)
+        coso = '-'.join(listasp)
+
+        nudat = pd.Timestamp(coso).to_pydatetime()
+        dates_ok.append(nudat)
+
+    dates_ok = np.array(dates_ok)
+
+    return dates_ok
+
+
 def adjust_360day_dates(dates):
     """
     When the time_calendar is 360_day (please not!), nc.num2date() returns a cftime array which is not convertible to datetime (obviously)(and to pandas DatetimeIndex). This fixes this problem in a completely arbitrary way, missing one day each two months. Returns the usual datetime array.
@@ -549,11 +580,11 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     time_cal    = fh.variables['time'].calendar
 
     try:
-        var_units   = fh.variables[variabs[0]].units
+        var_units   = fh.variables[variabs[-1]].units
     except:
         var_units = None
 
-    var         = fh.variables[variabs[0]][:,:,:]
+    var         = fh.variables[variabs[-1]][:,:,:]
     txt='{0} dimension [time x lat x lon]: {1}'.format(variabs[-1],var.shape)
 
     if compress_dummy_dim and var.ndim > 3:
@@ -2324,12 +2355,18 @@ def new_basis_set_3D(rot):
 def color_brightness(color):
     return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
 
-def color_set(n, cmap = 'nipy_spectral', bright_thres = 0.6, full_cb_range = False):
+def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
 
     < full_cb_range > : if True, takes all cb values. If false takes the portion 0.05/0.95.
     """
+    if bright_thres is None:
+        if only_darker_colors:
+            bright_thres = 0.6
+        else:
+            bright_thres = 1.0
+
     cmappa = cm.get_cmap(cmap)
     colors = []
 
@@ -2397,14 +2434,20 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
     if clip_to_box:
-        if cyclic:
-            lon_180 = lon
-            if np.any(lon > 180):
-                lon_180[lon > 180] = lon[lon > 180] - 360
-            latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
+        if isinstance(proj, ccrs.Orthographic):
+            print('WARNING: yet no clipping possible in Cartopy for Orthographic projection')
+            # Note: for the Orthographic projection yet no clipping is available... Only this stupid squared clipping with distances set in meters! So, better not.
+            # ax.set_extent([-4000000,4000000,-4000000,4000000], crs = ccrs.Orthographic())
+            # Check that the values provided are within the valid range (x_limits=[-6378073.21863, 6378073.21863], y_limits=[-6378073.21863, 6378073.21863]).
         else:
-            latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
-        ax.set_extent(latlonlim, crs = proj)
+            if cyclic:
+                lon_180 = lon
+                if np.any(lon > 180):
+                    lon_180[lon > 180] = lon[lon > 180] - 360
+                latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
+            else:
+                latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
+            ax.set_extent(latlonlim, crs = proj)
 
     return map_plot
 
@@ -2507,7 +2550,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     # save the figure or show it
     if filename is not None:
         fig4.savefig(filename)
-        plt.close(fig4)
+        # plt.close(fig4)
 
     return fig4
 
@@ -2610,7 +2653,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     # save the figure or show it
     if filename is not None:
         fig.savefig(filename)
-        plt.close(fig)
+        # plt.close(fig)
 
     return fig
 
@@ -2706,6 +2749,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         if cluster_colors is None:
             cluster_colors = color_set(numclus)
 
+    all_figures = []
     for i in range(num_figs):
         fig = plt.figure(figsize = figsize)#(24,14)
         for nens in range(numens_ok*i, numens_ok*(i+1)):
@@ -2755,9 +2799,10 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 
         fig.savefig(namef[i])
-        plt.close(fig)
+        all_figures.append(fig)
+        # plt.close(fig)
 
-    return
+    return all_figures
 
 
 def plot_pdfpages(filename, figs):
@@ -3113,14 +3158,17 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     < colors > : list of colors for each model point
     < markers > : list of markers for each model point
     """
-    if ax is None and filename is None:
-        raise ValueError('Where do I plot this? specify ax or filename')
-    elif filename is not None and ax is not None:
-        raise ValueError('Where do I plot this? specify ax OR filename, not BOTH')
+    # if ax is None and filename is None:
+    #     raise ValueError('Where do I plot this? specify ax or filename')
+    # elif filename is not None and ax is not None:
+    #     raise ValueError('Where do I plot this? specify ax OR filename, not BOTH')
 
     if ax is None:
         fig6 = plt.figure(figsize=(8,6))
         ax = fig6.add_subplot(111, polar = True)
+        ax_specified = False
+    else:
+        ax_specified = True
 
     if title is not None:
         ax.set_title(title)
@@ -3156,7 +3204,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     if labels is None:
         labels = [None]*len(angles)
     for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
-        ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab)
+        ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
 
@@ -3165,9 +3213,9 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         ax.add_artist(circle)
 
     if legend:
-        ax.legend(fontsize = 'small', loc = 1)
+        ax.legend(fontsize = 'small')
 
-    if filename is None:
+    if ax_specified:
         return
 
     top    = 0.88  # the top of the subplots
@@ -3176,12 +3224,13 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     right  = 0.98  # the right side
     plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top)
 
-    fig6.savefig(filename)
+    if filename is not None:
+        fig6.savefig(filename)
 
-    indp = filename.rfind('.')
-    figform = filename[indp:]
-    basename = filename[:indp]
-    nuname = basename+'_biases'+figform
+        indp = filename.rfind('.')
+        figform = filename[indp:]
+        basename = filename[:indp]
+        nuname = basename+'_biases'+figform
 
     fig7 = plt.figure(figsize=(8,6))
     ax = fig7.add_subplot(111)
@@ -3196,24 +3245,25 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     if labels is None:
         labels = [None]*len(angles)
     for bia, ctpr, col, sym, lab in zip(biases, ctr_patt_RMS, colors, markers, labels):
-        ax.scatter(bia, ctpr, s = mod_points_size+20, color = col, marker = sym, edgecolor = marker_edge, label = lab)
+        ax.scatter(bia, ctpr, s = mod_points_size+20, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
 
     plt.xlabel(label_bias_axis)
     plt.ylabel(label_ERMS_axis)
 
     for sig in [1., 2., 3.]:
-        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs, fill = False, edgecolor = 'black', linestyle = '--')
+        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs, fill = False, edgecolor = 'black', linestyle = '--', clip_on=False)
         ax.add_artist(circle)
 
     plt.scatter(np.mean(observation), 0., color = 'black', s = obs_points_size+20, marker = 'D', zorder = 5, label = obs_label)
 
     if legend:
-        plt.legend(fontsize = 'small', loc = 1)
+        plt.legend(fontsize = 'small')
     plt.grid()
 
-    fig7.savefig(nuname)
+    if filename is not None:
+        fig7.savefig(nuname)
 
-    return
+    return fig6, fig7
 
 
 def clus_visualize_2D():
