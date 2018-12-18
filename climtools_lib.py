@@ -1322,7 +1322,7 @@ def yearly_average(var, dates):
     return nuvar, nudates
 
 
-def global_mean(field, latitude):
+def global_mean(field, latitude, mask = None):
     """
     Calculates a global mean of field, weighting with the cosine of latitude.
 
@@ -1330,8 +1330,24 @@ def global_mean(field, latitude):
     """
     weights_array = abs(np.cos(np.deg2rad(latitude)))
 
-    zonal_field = zonal_mean(field)
+    if mask is not None:
+        if field.ndim == 3 and mask.ndim == 2:
+            mask = np.tile(mask, (field.shape[0],1,1))
+
+    zonal_field = zonal_mean(field, mask = mask)
+    #print(zonal_field.shape)
+    if np.any(np.isnan(zonal_field)):
+        if zonal_field.ndim == 2:
+            indexes = np.isnan(zonal_field)[0,:]
+        else:
+            indexes = np.isnan(zonal_field)
+        weights_array[indexes] = 0
+        zonal_field[np.isnan(zonal_field)] = 0.0
     mea = np.average(zonal_field, weights = weights_array, axis = -1)
+
+    if np.any(np.isnan(mea)):
+        print('non dovrebbe essere NaN')
+        raise ValueError
 
     return mea
 
@@ -1350,14 +1366,23 @@ def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
     return mea
 
 
-def zonal_mean(field):
+def zonal_mean(field, mask = None):
     """
     Calculates a zonal mean of field.
 
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
 
-    mea = np.mean(field, axis = -1)
+    if mask is not None:
+        zonal_mask = np.any(mask, axis = -1)
+        if np.all(zonal_mask):
+            mea = np.average(field, axis = -1, weights = mask)
+        else:
+            mask[~ zonal_mask, 0] = True
+            mea = np.average(field, axis = -1, weights = mask)
+            mea[~ zonal_mask] = np.nan
+    else:
+        mea = np.average(field, axis = -1)
 
     return mea
 
@@ -2469,6 +2494,40 @@ def get_cbar_range(data, symmetrical = False, percentiles = (0,100), n_color_lev
         oko2 = ma
 
     return (oko1, oko2)
+
+
+def adjust_ax_scale(axes, sel_axis = 'both'):
+    """
+    Given a set of axes, uniformizes the scales.
+    < sel_axis > : 'x', 'y' or 'both' (default)
+    """
+
+    if sel_axis == 'x' or sel_axis == 'both':
+        limits_min = []
+        limits_max = []
+        for ax in axes:
+            limits_min.append(ax.get_xlim()[0])
+            limits_max.append(ax.get_xlim()[1])
+
+        maxlim = np.max(limits_max)
+        minlim = np.min(limits_min)
+        for ax in axes:
+            ax.set_xlim((minlim,maxlim))
+
+    if sel_axis == 'y' or sel_axis == 'both':
+        limits_min = []
+        limits_max = []
+        for ax in axes:
+            limits_min.append(ax.get_ylim()[0])
+            limits_max.append(ax.get_ylim()[1])
+
+        maxlim = np.max(limits_max)
+        minlim = np.min(limits_min)
+        for ax in axes:
+            ax.set_ylim((minlim,maxlim))
+
+    return
+
 
 
 def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
