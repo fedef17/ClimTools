@@ -36,6 +36,7 @@ logging.basicConfig()
 
 ##############################################
 KtoC = 273.15
+tommday = 86400
 
 cart_in = '/data/fabiano/SPHINX/tas_pr_mon/'
 cart_in_3d = '/data/fabiano/SPHINX/va_ua_ta_mon/'
@@ -44,6 +45,14 @@ cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/mean_climates/'
 
 varss = ['tas', 'pr', 'tasmax', 'tasmin']
 varss3d = ['va', 'ta', 'ua']
+
+cblabels = dict()
+for varna in varss+varss3d:
+    if 'ta' in varna:
+        cblabels[varna] = 'Temp (C)'
+cblabels['ua'] = 'u (m/s)'
+cblabels['va'] = 'v (m/s)'
+cblabels['pr'] = 'pr (mm/day)'
 
 ann = np.arange(1960,2101,20)
 annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
@@ -142,21 +151,27 @@ varuna, level, lat, lon, datesuna, time_units, var_units, time_cal = ctl.read4Dn
 #     for seas in seasons+['year']:
 #         cross3d[('base', varna, seas)] = np.mean([cross3d[(ens, varna, seas)] for ens in ensmem[:3]], axis = 0)
 #         cross3d[('stoc', varna, seas)] = np.mean([cross3d[(ens, varna, seas)] for ens in ensmem[3:]], axis = 0)
-
-#pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX.p','w'))
+#
+# for key in globalme.keys():
+#     if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
+#         globalme[key] = globalme[key]-KtoC
+#     if 'pr' in key:
+#         globalme[key] = globalme[key]*tommday
+#
+# for key in climat.keys():
+#     if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
+#         climat[key] = climat[key]-KtoC
+#         zonal[key] = zonal[key]-KtoC
+#     if 'pr' in key:
+#         climat[key] = climat[key]*tommday
+#         zonal[key] = zonal[key]*tommday
+#
+# for key in cross3d.keys():
+#     if 'ta' in key:
+#         cross3d[key] = cross3d[key]-KtoC
+#
+# pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX.p','w'))
 globalme, zonal, climat, cross3d = pickle.load(open(cart_out+'out_meanclim_SPHINX.p','r'))
-for key in globalme.keys():
-    if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
-        globalme[key] = globalme[key]-KtoC
-
-for key in climat.keys():
-    if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
-        climat[key] = climat[key]-KtoC
-        zonal[key] = zonal[key]-KtoC
-
-for key in cross3d.keys():
-    if 'ta' in key:
-        cross3d[key] = cross3d[key]-KtoC
 
 figures = []
 #varlabels = ['tas (K)', 'pr ()']
@@ -227,7 +242,7 @@ for varna in varss:
     mimax = np.max([abs(mino), abs(maxo)])
     for seas in ['year']+seasons:
         for i, ann in enumerate(annme):
-            fig = ctl.plot_map_contour(climat[('stoc', varna, seas)][i]-climat[('base', varna, seas)][i], lat, lon, title = 'diff stoc-base {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cb_label = varna, cbar_range = (-mimax, mimax))
+            fig = ctl.plot_map_contour(climat[('stoc', varna, seas)][i]-climat[('base', varna, seas)][i], lat, lon, title = 'diff stoc-base {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (-mimax, mimax), cb_label = cblabels[varna])
             figure_maps.append(fig)
 ctl.plot_pdfpages(figure_file, figure_maps)
 plt.close('all')
@@ -240,38 +255,52 @@ for varna in varss3d:
     mimax = np.max([abs(mino), abs(maxo)])
     for seas in ['year']+seasons:
         for i, ann in enumerate(annme):
-            fig = ctl.plot_lat_crosssection(cross3d[('stoc', varna, seas)][i]-cross3d[('base', varna, seas)][i], lat, level, title = 'diff stoc-base {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (-mimax, mimax), set_logscale_levels = True)
+            fig = ctl.plot_lat_crosssection(cross3d[('stoc', varna, seas)][i]-cross3d[('base', varna, seas)][i], lat, level, title = 'diff stoc-base {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (-mimax, mimax), set_logscale_levels = True, cb_label = cblabels[varna])
             figure_cross.append(fig)
 ctl.plot_pdfpages(figure_file, figure_cross)
 plt.close('all')
 
 for coso in ['base', 'stoc']:
     figure_maps = []
+    figure_maps_diff = []
     for varna in varss:
         mino = np.percentile([climat[key] for key in climat.keys() if varna in key], 1)
         maxo = np.percentile([climat[key] for key in climat.keys() if varna in key], 99)
         for seas in ['year']+seasons:
             for i, ann in enumerate(annme):
                 print(coso,varna,seas,ann)
-                fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i], lat, lon, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo))
+                fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i], lat, lon, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo), cb_label = cblabels[varna])
                 figure_maps.append(fig)
+            fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i]-climat[(coso, varna, seas)][0], lat, lon, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), cb_label = cblabels[varna], plot_anomalies = True)
+            figure_maps_diff.append(fig)
 
     figure_file = cart_out + '{}_maps.pdf'.format(coso)
     ctl.plot_pdfpages(figure_file, figure_maps)
+    figure_file = cart_out + '{}_maps_futdiff.pdf'.format(coso)
+    ctl.plot_pdfpages(figure_file, figure_maps_diff)
     plt.close('all')
 
     figure_cross = []
+    figure_cross_diff = []
     for varna in varss3d:
         mino = np.percentile([cross3d[key] for key in cross3d.keys() if varna in key], 1)
         maxo = np.percentile([cross3d[key] for key in cross3d.keys() if varna in key], 99)
+        mimax = np.max([abs(mino), abs(maxo)])
+        if varna == 'ua' or varna == 'va':
+            mino = -mimax
+            maxo = mimax
         for seas in ['year']+seasons:
             for i, ann in enumerate(annme):
                 print(coso,varna,seas,ann)
-                fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i], lat, level, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo), set_logscale_levels = True)
+                fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i], lat, level, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo), cb_label = cblabels[varna], set_logscale_levels = True)
                 figure_cross.append(fig)
+            fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i]-cross3d[(coso, varna, seas)][0], lat, level, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), plot_anomalies = True, cb_label = cblabels[varna], set_logscale_levels = True)
+            figure_cross_diff.append(fig)
 
     figure_file = cart_out + '{}_cross.pdf'.format(coso)
     ctl.plot_pdfpages(figure_file, figure_cross)
+    figure_file = cart_out + '{}_cross_futdiff.pdf'.format(coso)
+    ctl.plot_pdfpages(figure_file, figure_cross_diff)
     plt.close('all')
 
 # faccio mean climates (prec e temp e tasmax e tasmin) ogni:

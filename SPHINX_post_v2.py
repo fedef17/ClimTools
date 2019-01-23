@@ -8,6 +8,7 @@ import os
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
+from matplotlib.colors import LogNorm
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
@@ -152,14 +153,14 @@ for cou in coups:
         li3 = li[:,cou]
         p0 = li3[0]
         dp = li3[1]-li3[0]
-        plt.arrow(p0[0], p0[1], dp[0], dp[1], color = 'red')
+        plt.arrow(p0[0], p0[1], dp[0], dp[1], color = 'red', linestyle = ':', linewidth = 0.5)
         #plt.plot(li3[0], li3[1], color = 'grey')
 
     for li in new_trans_10:
         li3 = li[:,cou]
         p0 = li3[0]
         dp = li3[1]-li3[0]
-        plt.arrow(p0[0], p0[1], dp[0], dp[1], color = 'blue')
+        plt.arrow(p0[0], p0[1], dp[0], dp[1], color = 'blue', linestyle = '--', linewidth = 0.4)
 
     for clus, namcm in enumerate(['Purples','Blues','Greens','Oranges']):
         plt.contour(xi, yi, regime_pdf_2D[clus].reshape(xi.shape), cmap = cm.get_cmap(namcm))
@@ -168,6 +169,29 @@ for cou in coups:
     plt.xlabel('EOF {}'.format(cou[0]))
     plt.ylabel('EOF {}'.format(cou[1]))
 
+
+cmappa = cm.get_cmap('RdBu_r')
+
+fig = plt.figure()
+#plt.imshow(trans_base_matrix, norm= LogNorm(vmin = 0.01, vmax = 0.2))
+plt.imshow(trans_base_matrix, vmin = 0.01, vmax = 0.1)
+plt.colorbar()
+plt.title('Transition Frequencies')
+
+fig = plt.figure()
+plt.imshow(trans_stoc_matrix-trans_base_matrix, vmin = -0.01, vmax = 0.01, cmap = cmappa)
+plt.colorbar()
+plt.title('stoc - base')
+
+fig = plt.figure()
+plt.imshow(trans_base_matrix-ERA_ref_EAT['trans_matrix'], vmin = -0.02, vmax = 0.02, cmap = cmappa)
+plt.colorbar()
+plt.title('base - ERA')
+
+fig = plt.figure()
+plt.imshow(trans_fut_matrix-trans_hist_matrix, vmin = -0.01, vmax = 0.01, cmap = cmappa)
+plt.colorbar()
+plt.title('fut - hist')
 
 # from mpl_toolkits.mplot3d import Axes3D
 #

@@ -18,7 +18,7 @@ import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
-from scipy import stats
+from scipy import stats, optimize
 import itertools as itt
 
 from sklearn.cluster import KMeans
@@ -1458,6 +1458,152 @@ def cosine_cp(x,y):
     return cosine(x1,y1)
 
 
+def linear_regre(x, y, return_resids = False, fix_intercept = None):
+    """
+    Makes a linear regression of dataset y in function of x. Returns the coefficient m and c: y = mx + c.
+    """
+
+    xord = np.argsort(x)
+    x = x[xord]
+    y = y[xord]
+
+    if fix_intercept is not None:
+        c = fix_intercept
+        res = np.linalg.lstsq(x.T,(y-c))
+        m = res[0]
+        resid = res[1]
+    else:
+        A = np.vstack([x,np.ones(len(x))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
+        res = np.linalg.lstsq(A,y)
+        m,c = res[0]
+        resid = res[1]
+
+    if return_resids:
+        return m, c, resid
+    else:
+        return m, c
+
+
+def cutline_fit(x, y, n_cut = 1, approx_cut = None):
+    """
+    Makes a linear regression with a series of n_cut+1 segments. Finds the points where to "cut" by minimizing the residuals of the least squares fit.
+
+    < n_cut > : number of cuts of the polygonal chain.
+    < approx_cut > : list of tuples (x1, x2). The cut point is in this region. Accurate approx_cut speeds up the (stupid) calculation.
+    """
+
+    xord = np.argsort(x)
+    x = x[xord]
+    y = y[xord]
+
+    if approx_cut is None:
+        approx_cut = n_cut*[(x[0], x[-1])]
+
+    if n_cut != 1:
+        raise ValueError('Not developed yet for n_cut > 1')
+
+    finished = 0
+    x1 = approx_cut[0][0]
+    x2 = approx_cut[0][1]
+    oks = np.where(x > x1)[0]
+    icut_ini = oks[0]
+    icut_fin = oks[1]
+    print('INTERVAL ', x[icut_ini], x[icut_fin])
+
+    r1s = []
+    r2s = []
+    resids = []
+    for icut in range(icut_ini, icut_fin):
+        xfit1 = x[:icut]
+        yfit1 = y[:icut]
+        m1, c1, resid1 = linear_regre(xfit1, yfit1, return_resids = True)
+        xfit2 = x[icut:]
+        yfit2 = y[icut:]
+        m2, c2, resid2 = linear_regre(xfit2, yfit2, return_resids = True, fix_intercept = c1)
+
+        r1s.append((m1, c1))
+        r2s.append((m2, c2))
+        resids.append(np.sum(resid1)+np.sum(resid2))
+
+
+    best_fit = np.argmin(resids)
+    r1_best = r1s[best_fit]
+    r2_best = r2s[best_fit]
+
+    xcut = (x[best_fit+icut_ini]+x[best_fit+icut_ini-1])/2.
+
+    return xcut, r1_best, r2_best
+
+
+def cutline2_fit(x, y, n_cut = 1, approx_par = None):
+    """
+    Makes a linear regression with a series of n_cut+1 segments. Finds the points where to "cut" by minimizing the residuals of the least squares fit.
+
+    < n_cut > : number of cuts of the polygonal chain.
+    < approx_cut > : list of tuples (x1, x2). The cut point is in this region. Accurate approx_cut speeds up the (stupid) calculation.
+    """
+
+    xord = np.argsort(x)
+    x = x[xord]
+    y = y[xord]
+
+    if n_cut > 2:
+        raise ValueError('Not developed yet for n_cut > 2')
+
+    if n_cut == 0:
+        def func(x, m1, c1):
+            y = m1*x+c1
+            return y
+
+        result = optimize.curve_fit(func, x, y, p0 = approx_par)
+        m1, c1 = result[0]
+
+        xcuts = []
+        lines = [(m1,c1)]
+    elif n_cut == 1:
+        def func(x, m1, m2, c1, xcut):
+            c2 = xcut*(m1-m2)+c1
+            x1 = x[x < xcut]
+            y1 = m1*x1+c1
+            x2 = x[x >= xcut]
+            y2 = m2*x2+c2
+
+            y = np.concatenate([y1,y2])
+            return y
+
+        result = optimize.curve_fit(func, x, y, p0 = approx_par)
+        m1, m2, c1, xcut = result[0]
+        c2 = xcut*(m1-m2)+c1
+
+        xcuts = [xcut]
+        lines = [(m1,c1), (m2,c2)]
+    elif n_cut == 2:
+        def func(x, m1, m2, m3, c1, xcut1, xcut2):
+            c2 = xcut1*(m1-m2)+c1
+            c3 = xcut2*(m2-m3)+c2
+            x1 = x[x < xcut1]
+            y1 = m1*x1+c1
+
+            x2 = x[(x >= xcut1) & (x < xcut2)]
+            y2 = m2*x2+c2
+
+            x3 = x[x >= xcut2]
+            y3 = m3*x3+c3
+
+            y = np.concatenate([y1,y2,y3])
+            return y
+
+        result = optimize.curve_fit(func, x, y, p0 = approx_par)
+        m1, m2, m3, c1, xcut1, xcut2 = result[0]
+        c2 = xcut1*(m1-m2)+c1
+        c3 = xcut2*(m2-m3)+c2
+
+        xcuts = [xcut1, xcut2]
+        lines = [(m1,c1), (m2,c2), (m3,c3)]
+
+    return xcuts, lines
+
+
 def eof_computation_bkp(var, varunits, lat, lon):
     """
     Compatibility version.
@@ -2717,6 +2863,118 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
+    """
+    Plots multiple maps on a single figure (or more figures if needed).
+
+    < data1, data2 >: the fields to plot
+    < lat, lon >: latitude and longitude
+    < filename >: name of the file to save the figure to. If more figures are needed, the others are named as filename_1.pdf, filename_2.pdf, ...
+
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
+    < cmap >: name of the color map.
+    < cbar_range >: limits of the color bar.
+
+    < plot_anomalies >: if True, the colorbar is symmetrical, so that zero corresponds to white. If cbar_range is set, plot_anomalies is set to False.
+    < n_color_levels >: number of color levels.
+    < draw_contour_lines >: draw lines in addition to the color levels?
+    < n_lines >: number of lines to draw.
+    < color_percentiles > : define the range of data to be represented in the color bar. e.g. (0,100) to full range, (5,95) to enhance features.
+
+    < use_different_grids > : if True, lat and lon are read as 2-element lists [lat1, lat2] [lon1, lon2] which specify separately latitude and longitude of the two datasets. To be used if the datasets dimensions do not match.
+
+    """
+
+    #if filename is None:
+    #    plt.ion()
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        if central_lat_lon is not None:
+            (clat, clon) = central_lat_lon
+        else:
+            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
+            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    # Determining color levels
+    cmappa = cm.get_cmap(cmap)
+
+
+    if cbar_range is None:
+        data = np.concatenate([data1.flatten(),data2.flatten()])
+        mi = np.percentile(data, color_percentiles[0])
+        ma = np.percentile(data, color_percentiles[1])
+        if plot_anomalies:
+            # making a symmetrical color axis
+            oko = max(abs(mi), abs(ma))
+            spi = 2*oko/(n_color_levels-1)
+            spi_ok = np.ceil(spi*100)/100
+            oko2 = spi_ok*(n_color_levels-1)/2
+            oko1 = -oko2
+        else:
+            oko1 = mi
+            oko2 = ma
+        cbar_range = (oko1, oko2)
+
+    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+
+    fig = plt.figure(figsize=(36,14))
+
+    if use_different_grids:
+        lat1, lat2 = lat
+        lon1, lon2 = lon
+    else:
+        lat1 = lat
+        lon1 = lon
+        lat2 = lat
+        lon2 = lon
+
+    ax = plt.subplot(1, 3, 1, projection=proj)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    ax.set_title(stitle_1, fontsize = 25)
+
+    ax = plt.subplot(1, 3, 2, projection=proj)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    ax.set_title(stitle_2, fontsize = 25)
+
+    if use_different_grids:
+        raise ValueError('To be implemented')
+    else:
+        diff = data1-data2
+
+    ax = plt.subplot(1, 3, 2, projection=proj)
+    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    ax.set_title('Diff', fontsize = 25)
+
+    cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+    cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
+    cb.ax.tick_params(labelsize=18)
+    cb.set_label(cb_label, fontsize=20)
+
+    plt.suptitle(title, fontsize=35, fontweight='bold')
+
+    plt.subplots_adjust(top=0.85)
+    top    = 0.90  # the top of the subplots
+    bottom = 0.13    # the bottom
+    left   = 0.02    # the left side
+    right  = 0.98  # the right side
+    hspace = 0.20   # the amount of height reserved for white space between subplots
+    wspace = 0.05    # the amount of width reserved for blank space between subplots
+    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+
+    # save the figure or show it
+    if filename is not None:
+        fig.savefig(filename)
+        # plt.close(fig)
+
+    return fig
+
+
 def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12)):
     """
     Plots multiple maps on a single figure (or more figures if needed).
@@ -2878,7 +3136,7 @@ def plot_pdfpages(filename, figs):
     return
 
 
-def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False):
+def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False, return_ax = False):
     """
     Plots a latitudinal cross section map.
 
@@ -2953,7 +3211,10 @@ def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', t
         fig.savefig(filename)
         plt.close(fig)
 
-    return fig
+    if return_ax:
+        return fig, ax
+    else:
+        return fig
 
 
 def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
@@ -3323,6 +3584,46 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         fig7.savefig(nuname)
 
     return fig6, fig7
+
+
+def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = None, format = 'pdf'):
+    """
+    Plots correlation graph between x and y, fitting a line and calculating Pearson's R coeff.
+    :param filename: abs. path of the graph
+    :params xlabel, ylabel: labels for x and y axes
+    """
+    pearR = np.corrcoef(x,y)[1,0]
+    A = np.vstack([x,np.ones(len(x))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
+    m,c = np.linalg.lstsq(A,y)[0]
+    xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
+
+    fig = pl.figure(figsize=(8, 6), dpi=150)
+    ax = fig.add_subplot(111)
+    pl.xlabel(xlabel)
+    pl.ylabel(ylabel)
+    pl.grid()
+    pl.scatter(x, y, label='Data', color='blue', s=4, zorder=3)
+    if xlim is not None:
+        if np.isnan(xlim[1]):
+            pl.xlim(xlim[0],pl.xlim()[1])
+        elif np.isnan(xlim[0]):
+            pl.xlim(pl.xlim()[0],xlim[1])
+        else:
+            pl.xlim(xlim[0],xlim[1])
+    if ylim is not None:
+        if np.isnan(ylim[1]):
+            pl.ylim(ylim[0],pl.ylim()[1])
+        elif np.isnan(ylim[0]):
+            pl.ylim(pl.ylim()[0],ylim[1])
+        else:
+            pl.ylim(ylim[0],ylim[1])
+    pl.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
+    pl.title("Pearson's R = {:5.2f}".format(pearR))
+    pl.legend(loc=4,fancybox =1)
+    fig.savefig(filename, format=format, dpi=150)
+    pl.close()
+
+    return
 
 
 def clus_visualize_2D():
