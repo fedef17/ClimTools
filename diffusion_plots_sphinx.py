@@ -53,6 +53,7 @@ del varniuu
 
 serie = dict() # serie contiene tutte le serie puramente temporali che vado a plottare
 zonals = dict() # zonals contiene varie medie zonali, per ognuna c'è un valore pi (1850-1900), uno pd (1985-2005) e uno fut (2080-2100). Più uno tra 14.0 e 14.5 e uno tra 16.5 e 17.0
+locseascyc = dict() # seasonal cycle locale in diverse zone che sono 'TROP', 'ML' e 'ART'
 years = np.arange(1850,2101)
 
 ensmems = ['lcb0', 'lcb1', 'lcb2', 'lcs0', 'lcs1', 'lcs2']
@@ -71,9 +72,10 @@ time_horiz['pi'] = (1850,1900)
 time_horiz['pd'] = (1985,2005)
 time_horiz['fut'] = (2080,2100)
 
-temp_horiz = [(14.5, 15.5), (15.5, 16.5), (16.5, 17.5)]
+temp_horiz = [(13.5, 14.5), (14.5, 15.5), (15.5, 16.5), (16.5, 17.5)]
 
-for coso in ['base', 'stoc']:
+#for coso in ['base', 'stoc']:
+for coso in ensmems:
     for th in time_horiz.keys():
         yok = (years >= time_horiz[th][0]) & (years <= time_horiz[th][1])
         for varna in radvars:
@@ -88,6 +90,12 @@ for coso in ['base', 'stoc']:
         for varna in cloudvars:
             zonals[(varna, th, coso)] = np.mean(cloudclim[('zonal', coso, varna)][yok, ...], axis = 0)
         zonals[('tas', th, coso)] = np.mean(zonalme[coso][yok, ...], axis = 0)
+
+
+for th in temp_horiz+time_horiz.keys():
+    for varna in allvars:
+        zonals[(varna, th, 'base')] = np.mean([zonals[(varna, th, ens)] for ens in ensmems[:3]], axis = 0)
+        zonals[(varna, th, 'stoc')] = np.mean([zonals[(varna, th, ens)] for ens in ensmems[3:]], axis = 0)
 
 for ky in zonals.keys():
     if 'toa_balance' in ky:
@@ -215,9 +223,9 @@ figures = []
 
 for var, varunits in zip(allvarsbl, allvarunitsbl):
     fig = plt.figure()
-    plt.title('{} change btw 15 and 17 C'.format(var))
-    difsto = zonals[(var, temp_horiz[2], 'stoc')]-zonals[(var, temp_horiz[0], 'stoc')]
-    difbas = zonals[(var, temp_horiz[2], 'base')]-zonals[(var, temp_horiz[0], 'base')]
+    plt.title('{} change btw 14 and 17 C'.format(var))
+    difsto = zonals[(var, temp_horiz[3], 'stoc')]-zonals[(var, temp_horiz[0], 'stoc')]
+    difbas = zonals[(var, temp_horiz[3], 'base')]-zonals[(var, temp_horiz[0], 'base')]
     plt.plot(lat, difsto, label = 'stoc', linewidth = 1.5)
     plt.plot(lat, difbas, label = 'base', linewidth = 1.5)
     plt.plot(lat, difsto-difbas, label = 'diff (s-b)', linewidth = 1.0, linestyle = '--')

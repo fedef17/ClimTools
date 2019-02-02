@@ -8,6 +8,7 @@ import os
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
+from matplotlib.colors import LogNorm
 
 import netCDF4 as nc
 from datetime import datetime
@@ -118,7 +119,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -229,6 +230,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, n
     results['eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
     results['eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
 
+    results['resid_times'] = ctl.calc_regime_residtimes(labels, dates = dates_season)[0]
     results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
     results['dates'] = dates_season
 
@@ -396,6 +398,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         results[ennam]['dates'] = dates_season_set[ens]
 
         results[ennam]['freq_clus'] = ctl.calc_clus_freq(labels[ind1:ind2])
+        results[ennam]['resid_times'] = ctl.calc_regime_residtimes(labels[ind1:ind2], dates = dates_season_set[ens])[0]
         results[ennam]['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels[ind1:ind2], dates_season_set[ens])
 
         if heavy_output:
@@ -680,7 +683,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None):#, groups = None, cluster_names = None):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0)):#, groups = None, cluster_names = None):
     """
     Plot the results of WRtool.
 
@@ -690,11 +693,16 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     < model_name > : str, only needed for single member. For the multi-member the names are taken from results.keys().
     #< groups > : dict, only needed for multimember. Each entry contains a list of results.keys() belonging to that group. Group names are the group dict keys().
+    < custom_model_colors > : len(models)+1 colors for the models.
+    < compare_models > : list of tuples. Each tuple (model_1, model_2) is compared directly (regime statistics, patterns, ecc.)
 
+    < central_lat_lon > : tuple. Latitude and longitude of the central point in the maps. Usually (70,0) for EAT, (70,-90) per PNA.
     """
     symbols = ['o', 'd', 'v', '*', 'P', 'h', 'X', 'p', '1']
     cart_out = cart_out + tag + '/'
     if not os.path.exists(cart_out): os.mkdir(cart_out)
+
+    n_clus = len(result_obs['cluspattern'])
 
     if model_name is None:
         model_name = 'model'
@@ -715,7 +723,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     #     for grounam in groups.keys()
     #     labels = results.keys()
     #     colors = ctl.color_set(len(models)+1)
-    colors = ctl.color_set(len(result_models)+1, only_darker_colors = True)
+    if custom_model_colors is None:
+        colors = ctl.color_set(len(result_models)+1, only_darker_colors = True)
+    else:
+        if len(custom_model_colors) != len(result_models)+1:
+            raise ValueError('Need {} custom_model_colors, {} given.'.format(len(result_models)+1, len(custom_model_colors)))
+        colors = custom_model_colors
     labels = result_models.keys()
 
     if 'significance' in result_models.values()[0].keys():
@@ -735,15 +748,148 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat = result_obs['lat']
     lon = result_obs['lon']
 
-    if len(patt_ref) == 4:
-        if patnames is None:
-            patnames = ['NAO +', 'Blocking', 'NAO -', 'Atl. Ridge']
-        if patnames_short is None:
-            patnames_short = ['NP', 'BL', 'NN', 'AR']
-    else:
+    if patnames is None:
         patnames = ['clus_{}'.format(i) for i in range(len(patt_ref))]
+    if patnames_short is None:
         patnames_short = ['c{}'.format(i) for i in range(len(patt_ref))]
 
+    # PLOTTIN the frequency histogram
+    if 'freq_clus' in result_models.values()[0].keys():
+        fig = plt.figure()
+        plt.grid(axis = 'y', zorder = 0)
+        wi = 0.8
+        n_tot = len(labels)+1
+        for j in range(n_clus):
+            central = j*(n_tot*1.5)
+            for i, (mod, col) in enumerate(zip(labels, colors)):
+                labelmod = None
+                if j == 0: labelmod = mod
+                plt.bar(central-(n_tot-1)/2.+i, result_models[mod]['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
+            labelmod = None
+            if j == 0: labelmod = obs_name
+            plt.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j], width = wi,  color = 'black', label = labelmod, zorder = 5)
+        plt.legend(fontsize = 'small', loc = 1)
+        plt.title('Regimes frequencies')
+        plt.xticks([j*(n_tot*1.5) for j in range(n_clus)], patnames_short, size='small')
+        plt.ylabel('Frequency')
+        fig.savefig(cart_out+'Regime_frequency_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+    # PLOTTIN the persistence histograms
+    if 'resid_times' in result_models.values()[0].keys():
+        axes = []
+        for lab in labels:
+            fig = plt.figure()
+            binzzz = np.arange(0,36,5)
+            i1 = int(np.ceil(np.sqrt(n_clus)))
+            i2 = n_clus/i1
+            if i2*i1 < n_clus:
+                i2 = i2 + 1
+            for j in range(n_clus):
+                ax = fig.add_subplot(i1,i2,j+1)
+                ax.set_title(patnames[j])
+                n, bins, patches = ax.hist(result_obs['resid_times'][j], bins = binzzz, alpha = 0.5, density = True, label = obs_name)
+                n2, bins2, patches2 = ax.hist(result_models[lab]['resid_times'][j], bins = binzzz, alpha = 0.5, density = True, label = lab)
+                ax.legend()
+                ax.set_xlabel('Days')
+                ax.set_ylabel('Frequency')
+                axes.append(ax)
+
+
+            plt.suptitle('Residence times - {}'.format(lab))
+            fig.tight_layout()
+            fig.subplots_adjust(top=0.88)
+
+            all_figures.append(fig)
+
+        if compare_models is not None:
+            for coup in compare_models:
+                fig = plt.figure()
+                binzzz = np.arange(0,36,5)
+                i1 = int(np.ceil(np.sqrt(n_clus)))
+                i2 = n_clus/i1
+                if i2*i1 < n_clus:
+                    i2 = i2 + 1
+                for j in range(n_clus):
+                    ax = fig.add_subplot(i1,i2,j+1)
+                    ax.set_title(patnames[j])
+                    n, bins, patches = ax.hist(result_models[coup[1]]['resid_times'][j], bins = binzzz, alpha = 0.5, density = True, label = coup[1])
+                    n2, bins2, patches2 = ax.hist(result_models[coup[0]]['resid_times'][j], bins = binzzz, alpha = 0.5, density = True, label = coup[0])
+                    ax.legend()
+                    ax.set_xlabel('Days')
+                    ax.set_ylabel('Frequency')
+                    axes.append(ax)
+
+                plt.suptitle('Residence times - {} vs {}'.format(coup[0], coup[1]))
+                fig.tight_layout()
+                fig.subplots_adjust(top=0.88)
+
+                all_figures.append(fig)
+
+        ctl.adjust_ax_scale(axes)
+
+    # PLOTTIN the transition matrices
+    if 'trans_matrix' in result_models.values()[0].keys():
+        cmapparu = cm.get_cmap('RdBu_r')
+        mappe = []
+
+        for lab in labels:
+            fig = plt.figure(figsize=(16,6))
+            ax = fig.add_subplot(121)
+            gigi = ax.imshow(result_models[lab]['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
+            ax.xaxis.tick_top()
+            #ax.invert_yaxis()
+            # ax.set_xticks(np.arange(n_clus)+0.5, minor=False)
+            # ax.set_yticks(np.arange(n_clus)+0.5, minor=False)
+            ax.set_xticks(np.arange(n_clus)+0.5, minor = False)
+            ax.set_xticklabels(patnames_short, size='small')
+            ax.set_yticks(np.arange(n_clus)+0.5, minor = False)
+            ax.set_yticklabels(patnames_short, size='small')
+            cb = plt.colorbar(gigi)
+            cb.set_label('Transition probability')
+
+            ax = fig.add_subplot(122)
+            vmin = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 5)
+            vmax = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 95)
+            cos = np.max(abs(np.array([vmin,vmax])))
+            gigi = ax.imshow(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
+            ax.xaxis.tick_top()
+            ax.set_xticks(np.arange(n_clus)+0.5, minor = False)
+            ax.set_xticklabels(patnames_short, size='small')
+            ax.set_yticks(np.arange(n_clus)+0.5, minor = False)
+            ax.set_yticklabels(patnames_short, size='small')
+            cb = plt.colorbar(gigi)
+            cb.set_label('Differences btw {} and {}'.format(lab, obs_name))
+            mappe.append(gigi)
+
+            fig.suptitle(lab)
+            fig.tight_layout()
+            fig.subplots_adjust(top=0.88)
+            all_figures.append(fig)
+
+            if compare_models is not None:
+                for coup in compare_models:
+                    if lab == coup[0]:
+                        fig = plt.figure()
+                        ax = fig.add_subplot(111)
+                        vmin = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 5)
+                        vmax = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 95)
+                        cos = np.max(abs(np.array([vmin,vmax])))
+                        gigi = ax.imshow(result_models[lab]['trans_matrix']-result_models[coup[1]]['trans_matrix'], vmin = -0.02, vmax = 0.02, cmap = cmapparu)
+                        ax.xaxis.tick_top()
+                        ax.set_xticks(np.arange(n_clus), minor = False)
+                        ax.set_xticklabels(patnames_short, size='small')
+                        ax.set_yticks(np.arange(n_clus), minor = False)
+                        ax.set_yticklabels(patnames_short, size='small')
+                        cb = plt.colorbar(gigi)
+                        cb.set_label('Transition Probability Diffs')
+                        plt.title('{} vs {}'.format(lab, coup[1]))
+                        mappe.append(gigi)
+                        all_figures.append(fig)
+
+        ctl.adjust_color_scale(mappe)
+
+    # PLOTTIN the cluster patterns
     for lab in labels:
         patt = result_models[lab]['cluspattern']
         if np.any(np.isnan(patt)):
@@ -753,16 +899,27 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
 
         filename = cartout_mod+'Allclus_'+lab+'.pdf'
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'polar', central_lat_lon = (50.,0.), cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'standard', central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
         all_figures += figs
         for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
             nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
-            print(patuno.max(), patuno.min())
-            print(lat.max(), lat.min())
-            print(lon.max(), lon.min())
-            #fig = ctl.plot_double_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
-            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = (50., 0.), title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = tag, stitle_2 = 'ERA', color_percentiles = (0.5,99.5))
+            print(nunam)
+            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'standard', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True)
             all_figures.append(fig)
+
+    if compare_models is not None:
+        for coup in compare_models:
+            patt = result_models[coup[0]]['cluspattern']
+            patt2 = result_models[coup[1]]['cluspattern']
+            if np.any(np.isnan(patt+patt2)):
+                print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt+patt2))))
+                patt[np.isnan(patt)] = 0.0
+                patt2[np.isnan(patt2)] = 0.0
+
+            for patuno, patuno_ref, pp, pps in zip(patt, patt2, patnames, patnames_short):
+                nunam = cart_out+'compare_clus_'+pps+'_'+coup[0]+'_vs_'+coup[1]+'.pdf'
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'standard', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True)
+                all_figures.append(fig)
 
     # Taylor plots
     for num, patt in enumerate(patnames):

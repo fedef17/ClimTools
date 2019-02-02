@@ -106,6 +106,41 @@ for fig, seas in zip(figures, ['mam', 'son']):
     fig.savefig(cart_out+'icec_{}_fit_doublecut.pdf'.format(seas))
 
 for seas in ['mam', 'son']:
+    fig = plt.figure(figsize=(8, 6), dpi=150)
+    x_stoc = np.concatenate([tas[exp] for exp in expmems if 'lcs' in exp])
+    y_stoc = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcs' in exp])
+    x_base = np.concatenate([tas[exp] for exp in expmems if 'lcb' in exp])
+    y_base = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcb' in exp])
+
+    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = 1, approx_par = p0s[(seas, 'lcs')])
+    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = 2, approx_par = p0s[(seas, 'lcb')])
+
+    #print(seas, exp, xcuts)
+    x = np.concatenate([x_stoc, x_base])
+    xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
+
+    xlins_stoc = []
+    xlins_stoc.append(np.linspace(xlin[0], xcuts_stoc[0], 5))
+    xlins_stoc.append(np.linspace(xcuts_stoc[0], xlin[-1], 5))
+
+    xlins_base = []
+    xlins_base.append(np.linspace(xlin[0], xcuts_base[0], 5))
+    xlins_base.append(np.linspace(xcuts_base[0], xcuts_base[1], 5))
+    xlins_base.append(np.linspace(xcuts_base[1], xlin[-1], 5))
+
+    plt.grid()
+    plt.scatter(x_stoc, y_stoc, label='stoc', color = 'lightsteelblue', s=6)
+    plt.scatter(x_base, y_base, label='base', color = 'lightcoral', s=6)
+    coses = ['-', '--', ':']
+    for i, (cos, xli, line) in enumerate(zip(coses, xlins_base, lines_base)):
+        plt.plot(xli, xli*line[0]+line[1], color = 'indianred', linewidth = 1.5, linestyle = cos)
+    coses = ['-', '--']
+    for i, (cos, xli, line) in enumerate(zip(coses, xlins_stoc, lines_stoc)):
+        plt.plot(xli, xli*line[0]+line[1], color = 'steelblue', linewidth = 1.5, linestyle = cos)
+    plt.legend(fontsize = 'small', loc = 1)
+    fig.savefig(cart_out+'icec_compare_{}_doublecut.pdf'.format(seas))
+
+for seas in ['mam', 'son']:
     for cos in ['lcb', 'lcs']:
         agag = [results[(seas, exp)][0] for exp in expmems if cos in exp]
         xcuts = np.mean(agag, axis = 0)
@@ -189,6 +224,35 @@ for fig, seas in zip(figures, ['mam', 'son']):
     fig.savefig(cart_out+'icec_{}_fit_singlecut.pdf'.format(seas))
 
 for seas in ['mam', 'son']:
+    fig = plt.figure(figsize=(8, 6), dpi=150)
+    x_stoc = np.concatenate([tas[exp] for exp in expmems if 'lcs' in exp])
+    y_stoc = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcs' in exp])
+    x_base = np.concatenate([tas[exp] for exp in expmems if 'lcb' in exp])
+    y_base = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcb' in exp])
+
+    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = 0, approx_par = p0s[(seas, 'lcs')])
+    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = 1, approx_par = p0s[(seas, 'lcb')])
+
+    #print(seas, exp, xcuts)
+    x = np.concatenate([x_stoc, x_base])
+    xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
+
+    xlins_stoc = [xlin]
+    xlins_base = [np.linspace(xlin[0], xcuts_base[0], 5)]
+    xlins_base.append(np.linspace(xcuts_base[0], xlin[-1], 5))
+
+    plt.grid()
+    plt.scatter(x_stoc, y_stoc, label='stoc', color = 'lightsteelblue', s=6)
+    plt.scatter(x_base, y_base, label='base', color = 'lightcoral', s=6)
+    cos = '-'
+    for i, (xli, line) in enumerate(zip(xlins_base, lines_base)):
+        plt.plot(xli, xli*line[0]+line[1], color = 'indianred', linewidth = 1.5, linestyle = cos)
+        cos = '--'
+    plt.plot(xlins_stoc[0], xlins_stoc[0]*lines_stoc[0][0]+lines_stoc[0][1], color = 'steelblue', linewidth = 1.5)
+    plt.legend(fontsize = 'small', loc = 1)
+    fig.savefig(cart_out+'icec_compare_{}_singlecut.pdf'.format(seas))
+
+for seas in ['mam', 'son']:
     for cos in ['lcb', 'lcs']:
         agag = [results[(seas, exp)][0] for exp in expmems if cos in exp]
         xcuts = np.mean(agag, axis = 0)
@@ -221,10 +285,14 @@ print('\n\n-----------------  CLIMATE SENSITIVITY --------------------\n')
 for delta in [10,20,30]:
     print('-----------------  {} yr window --------------------\n'.format(delta))
     clim_sens = dict()
+    t_piA = dict()
+    t_fuA = dict()
     for exp in expmems:
         t_pi = np.mean(tas[exp][:delta], axis = 0)
         t_fu = np.mean(tas[exp][-delta:], axis = 0)
         clim_sens[exp] = t_fu - t_pi
+        t_piA[exp] = t_pi
+        t_fuA[exp] = t_fu
 
     for cos in ['lcb', 'lcs']:
         agag = [clim_sens[exp] for exp in expmems if cos in exp]
@@ -233,3 +301,8 @@ for delta in [10,20,30]:
         print('--------------- {} ------------\n'.format(cos))
         print('T diff {}-2100 to 1850-{}: {:8.2f} pm {:6.2f}\n'.format(2100-delta, 1850+delta, cs, delta_cs))
 
+        for gigi in [t_piA, t_fuA]:
+            agag = [gigi[exp] for exp in expmems if cos in exp]
+            cs = np.mean(agag)
+            delta_cs = np.std(agag)
+            print('T: {:8.2f} pm {:6.2f}\n'.format(cs, delta_cs))

@@ -50,6 +50,23 @@ def str_to_bool(s):
     else:
          raise ValueError('Not a boolean value')
 
+def openlog(cart_out, tag = None, redirect_stderr = True):
+    if tag is None:
+        tag = datetime.strftime(datetime.now(), format = '%d%m%y_h%H%M')
+    # open our log file
+    logname = 'log_{}.log'.format(tag)
+    logfile = open(cart_out+logname,'w') #self.name, 'w', 0)
+
+    # re-open stdout without buffering
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
+    # redirect stdout and stderr to the log file opened above
+    os.dup2(logfile.fileno(), sys.stdout.fileno())
+    if redirect_stderr:
+        os.dup2(logfile.fileno(), sys.stderr.fileno())
+
+    return
+
 def read_inputs(nomefile, key_strings, n_lines = None, itype = None, defaults = None, verbose=False):
     """
     Standard reading for input files. Searches for the keys in the input file and assigns the value to variable. Returns a dictionary with all keys and variables assigned.
@@ -218,6 +235,174 @@ def check_increasing_latlon(var, lat, lon):
         lon = lon[::-1]
 
     return var, lat, lon
+
+
+def read_iris_nc(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
+    """
+    Read a netCDF file using the iris library.
+
+    < extract_level > : float. If set, only the corresponding level is extracted.
+    < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
+
+    < pressure_in_Pa > : bool. If True (default) pressure levels are converted to Pa.
+    < force_level_units > : str. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
+    < keep_only_Ndim_vars > : keeps only variables with correct size (excludes variables like time_bnds, lat_bnds, ..)
+    """
+
+    print('Reading {}\n'.format(ifile))
+
+    fh = iris.load(file)
+
+    dimensions = [cord.name() for cord in fh[0].coords()]
+
+    if verbose: print('Dimensions: {}\n'.format(dimensions))
+    ndim = len(dimensions)
+
+    variab_names = [cos.var_name for cos in fh]
+    if verbose: print('Variables: {}\n'.format(variab_names))
+    nvars = len(variab_names)
+    print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, variab_names))
+
+    try:
+        lat_o         = fh[0]['lat'].points
+        lon_o         = fh[0]['lon'][:]
+    except KeyError as ke:
+        #print(repr(ke))
+        lat_o         = fh.variables['latitude'][:]
+        lon_o         = fh.variables['longitude'][:]
+    true_dim = 2
+
+    vars = dict()
+    if select_var is None:
+        for varna in variab_names:
+            var = fh.variables[varna][:]
+            var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
+            vars[varna] = var
+    else:
+        print('Extracting {}\n'.format(select_var))
+        for varna in variab_names:
+            if varna in select_var:
+                var = fh.variables[varna][:]
+                var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
+                vars[varna] = var
+        if len(vars.keys()) == 0:
+            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variab_names))
+
+
+    if 'time' in all_variabs:
+        true_dim += 1
+        time        = fh.variables['time'][:]
+        time_units  = fh.variables['time'].units
+        time_cal    = fh.variables['time'].calendar
+
+        time = list(time)
+        dates = nc.num2date(time,time_units,time_cal)
+
+        try:
+            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
+        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
+            print(obd)
+            print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+            dates = adjust_outofbound_dates(dates)
+
+        if time_cal == '365_day' or time_cal == 'noleap':
+            dates = adjust_noleap_dates(dates)
+        elif time_cal == '360_day':
+            dates = adjust_360day_dates(dates)
+
+        print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
+
+    if true_dim == 3 and ndim > 3:
+        lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
+        found = False
+        for levna in lev_names:
+            if levna in all_variabs:
+                oklevname = levna
+                level = fh.variables[levna][:]
+                try:
+                    nlevs = len(level)
+                    found = True
+                except:
+                    found = False
+                break
+
+        if not found:
+            print('Level name not found among: {}\n'.format(lev_names))
+            print('Does the variable have levels?')
+        else:
+            true_dim += 1
+            try:
+                level_units = fh.variables[oklevname].units
+            except AttributeError as atara:
+                print('level units not found in file {}\n'.format(ifile))
+                if force_level_units is not None:
+                    level_units = force_level_units
+                    print('setting level units to {}\n'.format(force_level_units))
+                    print('levels are {}\n'.format(level))
+                else:
+                    raise atara
+
+            print('level units are {}\n'.format(level_units))
+            if pressure_in_Pa:
+                if level_units in ['millibar', 'millibars','hPa']:
+                    level = 100.*level
+                    level_units = 'Pa'
+                    print('Converting level units from hPa to Pa\n')
+
+    print('Dimension of variables is {}\n'.format(true_dim))
+    if keep_only_Ndim_vars:
+        for varna in vars.keys():
+            if len(vars[varna].shape) < true_dim:
+                print('Erasing variable {}\n'.format(varna))
+                vars.pop(varna)
+
+    if true_dim == 4:
+        if extract_level is not None:
+            lvel = extract_level
+            if nlevs > 1:
+                if level_units=='millibar' or level_units=='hPa':
+                    l_sel=int(np.where(level==lvel)[0])
+                    print('Selecting level {0} millibar'.format(lvel))
+                elif level_units=='Pa':
+                    l_sel=int(np.where(level==lvel*100)[0])
+                    print('Selecting level {0} Pa'.format(lvel*100))
+                level = lvel
+            else:
+                level = level[0]
+                l_sel = 0
+
+            for varna in vars.keys():
+                vars[varna] = vars[varna][:,l_sel, ...].squeeze()
+            true_dim = true_dim - 1
+        else:
+            levord = level.argsort()
+            level = level[levord]
+            for varna in vars.keys():
+                vars[varna] = vars[varna][:, levord, ...]
+
+    var_units = dict()
+    for varna in vars.keys():
+        try:
+            var_units[varna] = fh.variables[varna].units
+        except:
+            var_units[varna] = None
+
+        if var_units[varna] == 'm**2 s**-2':
+            print('From geopotential (m**2 s**-2) to geopotential height (m)')   # g0=9.80665 m/s2
+            vars[varna] = vars[varna]/9.80665
+            var_units[varna] = 'm'
+
+    print('Returned variables are: {}'.format(vars.keys()))
+    if len(vars.keys()) == 1:
+        vars = vars.values()[0]
+        var_units = var_units.values()[0]
+
+    if true_dim == 2:
+        return vars, lat, lon, var_units
+    elif true_dim == 3:
+        return vars, lat, lon, dates, time_units, var_units, time_cal
+    elif true_dim == 4:
+        return vars, level, lat, lon, dates, time_units, var_units, time_cal
 
 
 def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
@@ -1458,7 +1643,7 @@ def cosine_cp(x,y):
     return cosine(x1,y1)
 
 
-def linear_regre(x, y, return_resids = False, fix_intercept = None):
+def linear_regre(x, y, return_resids = False):
     """
     Makes a linear regression of dataset y in function of x. Returns the coefficient m and c: y = mx + c.
     """
@@ -1467,21 +1652,34 @@ def linear_regre(x, y, return_resids = False, fix_intercept = None):
     x = x[xord]
     y = y[xord]
 
-    if fix_intercept is not None:
-        c = fix_intercept
-        res = np.linalg.lstsq(x.T,(y-c))
-        m = res[0]
-        resid = res[1]
-    else:
-        A = np.vstack([x,np.ones(len(x))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
-        res = np.linalg.lstsq(A,y)
-        m,c = res[0]
-        resid = res[1]
+    A = np.vstack([x,np.ones(len(x))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
+    res = np.linalg.lstsq(A,y)
+    m,c = res[0]
+    resid = res[1]
 
     if return_resids:
         return m, c, resid
     else:
         return m, c
+
+
+def linear_regre_witherr(x, y):
+    """
+    Makes a linear regression of dataset y in function of x using numpy.polyfit. Returns the coefficient m and c: y = mx + c. And their estimated error.
+    """
+
+    xord = np.argsort(x)
+    x = x[xord]
+    y = y[xord]
+
+    res = np.polyfit(x, y, deg = 1, cov = True)
+    m,c = res[0]
+    covmat = res[1]
+
+    err_m = np.sqrt(covmat[0,0])
+    err_c = np.sqrt(covmat[1,1])
+
+    return m, c, err_m, err_c
 
 
 def cutline_fit(x, y, n_cut = 1, approx_cut = None):
@@ -2601,8 +2799,12 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     xi,yi = np.meshgrid(lon,lat)
 
     map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
+    if abs(clevels.max() - 152.8) < 0.1 and data.max() > 195:
+        print('ESPORTOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
+        pickle.dump([ax, map_plot], open('debug_contourf.p','w'))
+    nskip = len(clevels)/n_lines - 1
     if draw_contour_lines:
-        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
+        map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
     if clip_to_box:
         if isinstance(proj, ccrs.Orthographic):
@@ -2674,6 +2876,24 @@ def adjust_ax_scale(axes, sel_axis = 'both'):
 
     return
 
+
+def adjust_color_scale(color_maps):
+    """
+    Given a set of color_maps, uniformizes the color scales.
+    """
+
+    limits_min = []
+    limits_max = []
+    for co in color_maps:
+        limits_min.append(co.get_clim()[0])
+        limits_max.append(co.get_clim()[1])
+
+    maxlim = np.max(limits_max)
+    minlim = np.min(limits_min)
+    for co in color_maps:
+        co.set_clim((minlim,maxlim))
+
+    return
 
 
 def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
@@ -2947,7 +3167,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     else:
         diff = data1-data2
 
-    ax = plt.subplot(1, 3, 2, projection=proj)
+    ax = plt.subplot(1, 3, 3, projection=proj)
     map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title('Diff', fontsize = 25)
 
@@ -3122,7 +3342,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     return all_figures
 
 
-def plot_pdfpages(filename, figs):
+def plot_pdfpages(filename, figs, save_single_figs = True, fig_names = None):
     """
     Saves a list of figures to a pdf file.
     """
@@ -3132,6 +3352,16 @@ def plot_pdfpages(filename, figs):
     for fig in figs:
         pdf.savefig(fig)
     pdf.close()
+
+    if save_single_figs:
+        indp = filename.index('.')
+        cartnam = filename[:indp]+'_figures/'
+        if not os.path.exists(cartnam):
+            os.mkdir(cartnam)
+        if fig_names is None:
+            fig_names = ['pag_{}'.format(i+1) for i in range(len(figs))]
+        for fig,nam in zip(figs, fig_names):
+            fig.savefig(cartnam+nam+'.pdf')
 
     return
 
