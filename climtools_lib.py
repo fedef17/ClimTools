@@ -2895,6 +2895,29 @@ def adjust_color_scale(color_maps):
 
     return
 
+def def_projection(visualization, central_lat_lon):
+    """
+    Defines projection for the map plot.
+    """
+    if central_lat_lon is not None:
+        (clat, clon) = central_lat_lon
+    else:
+        clat = lat.min() + (lat.max()-lat.min())/2
+        clon = lon.min() + (lon.max()-lon.min())/2
+
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar':
+        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
+    elif visualization == 'Nstereo':
+        proj = ccrs.NorthPolarStereo()#central_longitude=clon)
+    elif visualization == 'Sstereo':
+        proj = ccrs.SouthPolarStereo()#central_longitude=clon)
+    else:
+        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+
+    return proj
+
 
 def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
     """
@@ -2918,17 +2941,16 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     #if filename is None:
         #plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
+
+    # Plotting figure
+    fig4 = plt.figure(figsize = figsize)
+    ax = plt.subplot(projection = proj)
+
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -2949,10 +2971,6 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
         cbar_range = (oko1, oko2)
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
-
-    # Plotting figure
-    fig4 = plt.figure(figsize = figsize)
-    ax = plt.subplot(projection = proj)
 
     map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
 
@@ -3006,17 +3024,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
-            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3052,10 +3060,18 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 2, 1, projection=proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
     map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 2, 2, projection=proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
     map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_2, fontsize = 25)
 
@@ -3109,17 +3125,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
-            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3155,10 +3161,18 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 3, 1, projection=proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
     map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 3, 2, projection=proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
     map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title(stitle_2, fontsize = 25)
 
@@ -3168,6 +3182,10 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         diff = data1-data2
 
     ax = plt.subplot(1, 3, 3, projection=proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
     map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
     ax.set_title('Diff', fontsize = 25)
 
@@ -3227,17 +3245,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
 
     """
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3292,6 +3300,10 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         for nens in range(numens_ok*i, numens_ok*(i+1)):
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
+            if visualization == 'Nstereo':
+                ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+            elif visualization == 'Sstereo':
+                ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
             map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
 
@@ -3461,17 +3473,7 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     if labels is None:
         labels = np.arange(len(maps))
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3496,6 +3498,10 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     # Plotting figure
     fig = plt.figure(figsize = figsize)
     ax = plt.subplot(projection = proj)
+    if visualization == 'Nstereo':
+        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
+    elif visualization == 'Sstereo':
+        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
     plt.title(title)
 

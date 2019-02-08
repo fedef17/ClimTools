@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import os
 from matplotlib import pyplot as plt
+import cartopy.crs as ccrs
 import pickle
 
 import climtools_lib as ctl
@@ -37,6 +38,27 @@ patnames_short['PNA'] = ['AR', 'PT', 'AL', 'AH']
 #
 #     pickle.dump([ERA_ref, base, stoc], open(cart_out+'out_WRtool_{}.p'.format(area), 'w'))
 
+# ERA_ref, base, stoc = pickle.load(open(cart_out+'out_WRtool_{}.p'.format('EAT'), 'r'))
+#
+# plt.ion()
+# fig4 = plt.figure()
+# ax = plt.axes(projection = ccrs.NorthPolarStereo(central_longitude = -90))
+# ax.set_global()
+# ax.set_extent((-180,180,60,90), crs = ccrs.PlateCarree())
+# ax.coastlines(linewidth = 2)
+#
+# # fig = plt.figure()
+# # ax = plt.axes(projection = ccrs.Orthographic())
+# # ax.set_global()
+# # ax.set_extent((-120,120,30,90), crs = ccrs.PlateCarree())
+# # ax.coastlines(linewidth = 2)
+#
+# data = base['cluspattern'][0]
+# yi = base['lat']
+# xi = base['lon']
+# map_plot = ax.contourf(xi, yi, data, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
+#
+# sys.exit()
 
 clatlo = dict()
 clatlo['EAT'] = (70, 0)

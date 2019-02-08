@@ -899,12 +899,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
 
         filename = cartout_mod+'Allclus_'+lab+'.pdf'
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'standard', central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = 'polar', central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'North-Atlantic weather regimes - {}'.format(tag), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
         all_figures += figs
         for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
             nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
             print(nunam)
-            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'standard', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True)
+            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True)
             all_figures.append(fig)
 
     if compare_models is not None:
@@ -918,7 +918,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
             for patuno, patuno_ref, pp, pps in zip(patt, patt2, patnames, patnames_short):
                 nunam = cart_out+'compare_clus_'+pps+'_'+coup[0]+'_vs_'+coup[1]+'.pdf'
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'standard', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = 'polar', central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True)
                 all_figures.append(fig)
 
     # Taylor plots
