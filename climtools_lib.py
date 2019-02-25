@@ -28,6 +28,9 @@ import ctp
 from datetime import datetime
 import pickle
 
+import iris
+from cf_units import Unit
+
 
 #######################################################
 #
@@ -41,6 +44,11 @@ def printsep(ofile = None):
     else:
         ofile.write('\n--------------------------------------------------------\n')
     return
+
+def datestamp():
+    tempo = datetime.now().isoformat()
+    tempo = tempo.split('.')[0]
+    return tempo
 
 def str_to_bool(s):
     if s == 'True' or s == 'T':
@@ -131,6 +139,20 @@ def read_inputs(nomefile, key_strings, n_lines = None, itype = None, defaults = 
                         cose = lines[num_0+1].rstrip().split(',')
                         coseok = [cos.strip() for cos in cose]
                         variables.append(coseok)
+                    elif typ == dict:
+                        # reads subsequent lines. Stops when finds empty line.
+                        iko = 1
+                        line = lines[num_0+iko]
+                        nuvar = dict()
+                        while len(line.strip()) > 0:
+                            dictkey = line.split(':')[0].strip()
+                            allvals = [cos.strip() for cos in line.split(':')[1].split(',')]
+                            # if len(allvals) == 1:
+                            #     allvals = allvals[0]
+                            nuvar[dictkey] = allvals
+                            iko += 1
+                            line = lines[num_0+iko]
+                        variables.append(nuvar)
                     elif nli == 1:
                         cose = lines[num_0+1].rstrip().split()
                         #print(key, cose)
@@ -202,6 +224,66 @@ def get_size(obj, seen=None):
 ###     Data reading/writing and pre-treatment
 #
 #######################################################
+
+def cdo_preproc(cart_in, cart_out, file_list = None, regrid = True, merge = False, interp_style = 'bil', grid_file = None, gridtag = None, sel_levels = None):
+    """
+    """
+    # for model_name in cart_ins.keys():
+    # cart_in = cart_ins[model_name]
+    # cart_out = cart_out_general + model_name + '/'
+    # if skip_existing:
+    #     if not os.path.exists(cart_out):
+    #         print('.... processing {}\n'.format(model_name))
+    #         os.mkdir(cart_out)
+    #     else:
+    #         print('{} already processed\n'.format(model_name))
+    #         continue
+
+    if file_list is None:
+        file_list = os.listdir(cart_in)
+        file_list = [fi for fi in file_list if fi[-3:] == '.nc']
+        file_list.sort()
+
+    if not os.path.exists(cart_out): os.mkdir(cart_out)
+
+    provname = cart_out+'mmm.nc'
+    if regrid:
+        file_in = cart_in + file_list[0]
+        if sel_levels is not None:
+            print('Selecting levels..\n')
+            command = 'cdo sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
+            print(command)
+            os.system(command)
+            file_in = provname
+        print('Calculating weights for interpolation....\n')
+        command = 'cdo gen{},{} {} {}remapweights.nc'.format(interp_style, grid_file, file_in, cart_out)
+        print(command)
+        os.system(command)
+        for filenam in file_list:
+            file_in = cart_in + filenam
+            indpo = filenam.index('.nc')
+            file_out = cart_out + filenam[:indpo] + '_remap{}.nc'.format(gridtag)
+            if sel_levels is not None:
+                print('Selecting levels..\n')
+                command = 'cdo sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
+                print(command)
+                os.system(command)
+                file_in = provname
+            command = 'cdo remap,{},{} {} {}'.format(grid_file, cart_out+'remapweights.nc', file_in, file_out)
+            print(command)
+            os.system(command)
+
+        if merge:
+            command = 'cdo mergetime {}*_remap{}.nc {}{}_allyears_remap{}.nc'.format(cart_out, gridtag, cart_out, model_name, gridtag)
+            print(command)
+            os.system(command)
+    else:
+        if merge:
+            command = 'cdo mergetime {}*_remap{}.nc {}{}_allyears_remap{}.nc'.format(cart_out, gridtag, cart_out, model_name, gridtag)
+            print(command)
+            os.system(command)
+
+    return
 
 
 def check_increasing_latlon(var, lat, lon):
@@ -474,6 +556,8 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
             print(obd)
             print('WARNING!!! Dates outside pandas range: 1677-2256\n')
             dates = adjust_outofbound_dates(dates)
+        except:
+            pass
 
         if time_cal == '365_day' or time_cal == 'noleap':
             dates = adjust_noleap_dates(dates)
@@ -865,6 +949,65 @@ def read_N_2Dfields(ifile):
     #print('\n'+txt)
 
     return var, var_units, lat, lon
+
+
+def create_iris_cube(data, varname, varunits, iris_coords_list, long_name = None):
+    """
+    Creates an iris.cube.Cube instance.
+
+    < iris_coords_list > : list of iris.coords.DimCoord objects (use routine create_iris_coord_list for standard coordinates).
+    """
+    # class iris.cube.Cube(data, standard_name=None, long_name=None, var_name=None, units=None, attributes=None, cell_methods=None, dim_coords_and_dims=None, aux_coords_and_dims=None, aux_factories=None)
+
+    allcoords = []
+    if not isinstance(coords_list[0], iris.coords.DimCoord):
+        raise ValueError('coords not in iris format')
+
+    allcoords = [(cor, i) for i, cor in enumerate(coords_list)]
+
+    cube = iris.cube.Cube(data, standard_name = varname, units = varunits, dim_coords_and_dims = allcoords, long_name = long_name)
+
+    return cube
+
+
+def create_iris_coord_list(coords_points, coords_names, time_units = None, time_calendar = None, level_units = None):
+    """
+    Creates a list of coords in iris format for standard (lat, lon, time, level) coordinates.
+    """
+
+    coords_list = []
+    for i, (cordpo, nam) in enumerate(zip(coords_points, coords_names)):
+        cal = None
+        circ = False
+        if nam in ['latitude', 'longitude', 'lat', 'lon']:
+            units = 'degrees'
+            if 'lon' in nam: circ = True
+        if nam == 'time':
+            units = Unit(time_units, calendar = time_calendar)
+        if nam in ['lev', 'level', 'plev']:
+            units = level_units
+
+        cord = create_iris_coord(cordpo, std_name = nam, units = units, circular = circ)
+        coords_list.append(cord)
+
+    return coords_list
+
+
+def create_iris_coord(points, std_name, long_name = None, units = None, circular = False, calendar = None):
+    """
+    Creates an iris.coords.DimCoord instance.
+    """
+    # class iris.coords.DimCoord(points, standard_name=None, long_name=None, var_name=None, units='1', bounds=None, attributes=None, coord_system=None, circular=False)
+
+    if std_name == 'longitude' or std_name == 'lon':
+        circular = True
+    if std_name == 'time' and (calendar is None or units is None):
+        raise ValueError('No calendar/units given for time!')
+        units = Unit(units, calendar = calendar)
+
+    coord = iris.coords.DimCoord(points, standard_name = std_name, long_name = long_name, units = units, circular = circular)
+
+    return coord
 
 
 def save2Dncfield(lats,lons,variab,varname,ofile):
@@ -1266,6 +1409,24 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
+def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
+    """
+    Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
+    """
+    dates_pdh = pd.to_datetime(dates)
+    climat_mean = []
+    dates_climate_mean = []
+    years = np.unique(dates_pdh.year)[::step_year]
+
+    for yea in years:
+        okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
+        clm, dtclm, _ = monthly_climatology(var[okye], dates[okye], refyear = yea)
+        climat_mean.append(clm)
+        dates_climate_mean.append(dtclm)
+
+    return climat_mean, dates_climate_mean
+
+
 def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     """
     Performs a monthly climatological mean of the dataset.
@@ -1318,6 +1479,31 @@ def sel_time_range(var, dates, dates_range):
     okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
 
     return var[okdates, ...], dates[okdates]
+
+
+def complete_time_range(var_season, dates_season, dates):
+    """
+    Completes a time series with missing dates, adding nan values.
+    """
+    vals, okinds, okinds_seas = np.intersect1d(dates, dates_season, assume_unique = True, return_indices = True)
+
+    var_all = np.empty(len(dates), dtype = var_season.dtype)
+
+    var_all[okinds] = var_season
+    var_all[~okinds] = np.nan
+
+    return var_all
+
+
+def date_series(init_dat, end_dat, freq = 'day', calendar = 'proleptic_gregorian'):
+    """
+    Creates a complete date_series between init_dat and end_dat.
+
+    < freq > : 'day' or 'mon'
+    """
+    dates = pd.date_range(init_dat, end_dat, freq = freq[0]).to_pydatetime()
+
+    return dates
 
 
 def check_daily(dates):
@@ -1407,6 +1593,30 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
     var_anom[mask, ...] = var[mask, ...] - climat_mean[okel, ...]
 
     return var_anom
+
+
+def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_years = 20, step_year = 5):
+    """
+    Calculates the monthly anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_monthly_climat().
+    """
+    dates_pdh = pd.to_datetime(dates)
+    if climat_mean is None or dates_climate_mean is None:
+        climat_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
+
+    var_anom_tot = []
+    year_steps = np.unique(dates_pdh.year)[::step_year]
+
+    for yea in np.unique(dates_pdh.year):
+        yearef = np.argmin(abs(year_steps - yea))
+        okye = dates_pdh.year == yea
+        var_anom = anomalies_monthly(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef])
+        var_anom_tot.append(var_anom)
+
+    var_anom_tot = np.concatenate(var_anom_tot)
+    if len(var_anom_tot) != len(var):
+        raise ValueError('{} and {} differ'.format(len(var_anom_tot), len(var)))
+
+    return var_anom_tot
 
 
 def anomalies_monthly(var, dates, climat_mean = None, dates_climate_mean = None):
@@ -1577,6 +1787,16 @@ def zonal_mean(field, mask = None):
 #
 #######################################################
 
+def first(condition):
+    """
+    Returns the first index for which condition is True. Works only for 1-dim arrays.
+    """
+    #ind = np.asarray(condition).nonzero()[0][0]
+    ind = np.where(condition.flatten())[0][0]
+
+    return ind
+
+
 def Rcorr(x,y):
     """
     Returns correlation coefficient between two array of arbitrary shape.
@@ -1593,7 +1813,7 @@ def distance(x, y):
 
 def E_rms(x,y):
     """
-    Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2).
+    Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
     """
     n = x.size
     #E = np.sqrt(1.0/n * np.sum((x.flatten()-y.flatten())**2))
@@ -2138,7 +2358,7 @@ def calc_RMS_and_patcor(clusters_1, clusters_2):
         cosin = cosine(c1,c2)
         patcor.append(cosin)
 
-    return et, patcor
+    return np.array(et), np.array(patcor)
 
 
 def find_cluster_minmax(PCs, centroids, labels):
@@ -2494,6 +2714,36 @@ def calc_pdf(data, bnd_width = None):
 
     return k
 
+def count_occurrences(data, num_range = None, convert_to_frequency = True):
+    """
+    Counts occurrences of each integer value inside data. num_range defaults to (min, max). If num_range is specified, the last count is the sum of all longer occurrences.
+    """
+    if num_range is None:
+        num_range = (np.min(data), np.max(data))
+
+    numarr = np.arange(num_range[0], num_range[1]+1)
+    unique, caun = np.unique(data, return_counts=True)
+    cosi = dict(zip(unique, caun))
+
+    counts = []
+    for el in numarr:
+        if el in cosi.keys():
+            counts.append(cosi[el])
+        else:
+            counts.append(0)
+
+    kiavi = np.array(cosi.keys())
+    pius_keys = kiavi[kiavi > num_range[1]]
+    vals_pius = np.sum(np.array([cosi[k] for k in pius_keys]))
+    counts.append(vals_pius)
+    numarr = np.append(numarr, num_range[1]+1)
+
+    counts = np.array(counts)
+    if convert_to_frequency:
+        counts = 1.0*counts/np.sum(counts)
+
+    return numarr, counts
+
 
 def compute_centroid_distance(PCs, centroids, labels):
     """
@@ -2759,7 +3009,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, clip_to_box = True):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -2799,28 +3049,25 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     xi,yi = np.meshgrid(lon,lat)
 
     map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
-    if abs(clevels.max() - 152.8) < 0.1 and data.max() > 195:
-        print('ESPORTOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
-        pickle.dump([ax, map_plot], open('debug_contourf.p','w'))
+    # if abs(clevels.max() - 152.8) < 0.1 and data.max() > 195:
+    #     print('ESPORTOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
+    #     pickle.dump([ax, map_plot], open('debug_contourf.p','w'))
     nskip = len(clevels)/n_lines - 1
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
-    if clip_to_box:
-        if isinstance(proj, ccrs.Orthographic):
-            print('WARNING: yet no clipping possible in Cartopy for Orthographic projection')
-            # Note: for the Orthographic projection yet no clipping is available... Only this stupid squared clipping with distances set in meters! So, better not.
-            # ax.set_extent([-4000000,4000000,-4000000,4000000], crs = ccrs.Orthographic())
-            # Check that the values provided are within the valid range (x_limits=[-6378073.21863, 6378073.21863], y_limits=[-6378073.21863, 6378073.21863]).
+    if isinstance(proj, ccrs.PlateCarree):
+        if cyclic:
+            lon_180 = lon
+            if np.any(lon > 180):
+                lon_180[lon > 180] = lon[lon > 180] - 360
+            latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
         else:
-            if cyclic:
-                lon_180 = lon
-                if np.any(lon > 180):
-                    lon_180[lon > 180] = lon[lon > 180] - 360
-                latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
-            else:
-                latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
-            ax.set_extent(latlonlim, crs = proj)
+            latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
+
+        map_set_extent(ax, proj, bnd_box = latlonlim)
+    else:
+        map_set_extent(ax, proj, bounding_lat = bounding_lat)
 
     return map_plot
 
@@ -2907,9 +3154,11 @@ def def_projection(visualization, central_lat_lon):
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    elif visualization == 'Nstereo':
+    elif visualization == 'polar' or visualization == 'Npolar':
+        proj = ccrs.Orthographic(central_longitude = clon, central_latitude = 90)
+    elif visualization == 'Spolar':
+        proj = ccrs.Orthographic(central_longitude = clon, central_latitude = -90)
+    elif visualization == 'Nstereo' or visualization == 'stereo':
         proj = ccrs.NorthPolarStereo()#central_longitude=clon)
     elif visualization == 'Sstereo':
         proj = ccrs.SouthPolarStereo()#central_longitude=clon)
@@ -2919,7 +3168,36 @@ def def_projection(visualization, central_lat_lon):
     return proj
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
+def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
+    """
+    Reduces ax to the required lat/lon box.
+
+    < bnd_box >: 4-element tuple or list. (Wlon, Elon, Slat, Nlat) for standard visualization.
+    < bounding_lat >: for polar plots, the equatorward boundary latitude.
+    """
+
+    if bnd_box is not None:
+        if isinstance(proj, ccrs.PlateCarree):
+            ax.set_extent(bnd_box, crs = ccrs.PlateCarree())
+
+    if bounding_lat is not None:
+        if (isinstance(proj, ccrs.Orthographic) or isinstance(proj, ccrs.Stereographic)):
+            if bounding_lat > 0:
+                ax.set_extent((-180, 180, bounding_lat, 90), crs = ccrs.PlateCarree())
+            else:
+                ax.set_extent((-180, 180, -90, bounding_lat), crs = ccrs.PlateCarree())
+
+    # theta = np.linspace(0, 2*np.pi, 100)
+    # center, radius = [0.5, 0.5], 0.2
+    # verts = np.vstack([np.sin(theta), np.cos(theta)]).T
+    # circle = mpath.Path(verts * radius + center)
+    #
+    # ax2.set_boundary(circle, transform=ax2.transAxes)
+
+    return
+
+
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30):
     """
     Plots a single map to a figure.
 
@@ -2927,7 +3205,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < lat, lon >: latitude and longitude
     < filename >: name of the file to save the figure to. If None, the figure is just shown.
 
-    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map, 'stereo' calls NorthPolarStereo. Also available Spolar and Sstereo.
     < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
     < cmap >: name of the color map.
     < cbar_range >: limits of the color bar.
@@ -2936,6 +3214,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < n_color_levels >: number of color levels.
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
+
 
     """
     #if filename is None:
@@ -2946,11 +3225,6 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     # Plotting figure
     fig4 = plt.figure(figsize = figsize)
     ax = plt.subplot(projection = proj)
-
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -2972,7 +3246,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -2998,7 +3272,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return fig4
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3060,19 +3334,13 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 2, 1, projection=proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 2, 2, projection=proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3099,7 +3367,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3161,19 +3429,13 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 3, 1, projection=proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 3, 2, projection=proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
     ax.set_title(stitle_2, fontsize = 25)
 
     if use_different_grids:
@@ -3182,11 +3444,8 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         diff = data1-data2
 
     ax = plt.subplot(1, 3, 3, projection=proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
-    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
     ax.set_title('Diff', fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3213,7 +3472,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12)):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3300,12 +3559,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         for nens in range(numens_ok*i, numens_ok*(i+1)):
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
-            if visualization == 'Nstereo':
-                ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-            elif visualization == 'Sstereo':
-                ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
 
             if number_subplots:
                 subtit = nens
@@ -3498,10 +3753,6 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     # Plotting figure
     fig = plt.figure(figsize = figsize)
     ax = plt.subplot(projection = proj)
-    if visualization == 'Nstereo':
-        ax.set_extent((-180,180,40,90), crs = ccrs.PlateCarree())
-    elif visualization == 'Sstereo':
-        ax.set_extent((-180,180,-90,-40), crs = ccrs.PlateCarree())
 
     plt.title(title)
 
@@ -3510,13 +3761,13 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
         lab = labels[num]
         mapa = maps[num]
 
-        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
         showdate.set_text('{}'.format(lab))
 
         return
 
     mapa = maps[0]
-    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
 
     showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight = 'bold', color = 'black', bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
 

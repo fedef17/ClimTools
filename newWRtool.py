@@ -11,17 +11,37 @@ import climtools_lib as ctl
 import climdiags as cd
 
 #######################################
+def std_outname(tag, inputs):
+    name_outputs = '{}_{}_{}_{}clus'.format(inputs['exp_name'], inputs['season'], inputs['area'], inputs['numclus'])
 
-# # open our log file
-# logname = 'log_WRtool.log'
-# logfile = open(logname,'w') #self.name, 'w', 0)
-#
-# # re-open stdout without buffering
-# sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-#
-# # redirect stdout and stderr to the log file opened above
-# os.dup2(logfile.fileno(), sys.stdout.fileno())
-# os.dup2(logfile.fileno(), sys.stderr.fileno())
+    if inputs['flag_perc']:
+        name_outputs += '_{}perc'.format(inputs['perc'])
+    else:
+        name_outputs += '_{}pcs'.format(inputs['numpcs'])
+
+    if inputs['year_range'] is not None:
+        name_outputs += '_{}-{}'.format(inputs['year_range'][0], inputs['year_range'][1])
+
+    if inputs['use_reference_eofs']:
+        name_outputs += '_refEOF'
+
+    if inputs['detrended_anom_for_clustering']:
+        name_outputs += '_dtr'
+
+    return name_outputs
+
+os.system('rm log_WRtool_*log')
+
+# open our log file
+logname = 'log_WRtool_{}.log'.format(ctl.datestamp())
+logfile = open(logname,'w') #self.name, 'w', 0)
+
+# re-open stdout without buffering
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
+# redirect stdout and stderr to the log file opened above
+os.dup2(logfile.fileno(), sys.stdout.fileno())
+os.dup2(logfile.fileno(), sys.stderr.fileno())
 
 print('*******************************************************')
 print('Running {0}'.format(sys.argv[0]))
@@ -32,9 +52,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out filenames model_names level season area numclus numpcs perc ERA_ref_orig ERA_ref_out run_sig_calc run_compare patnames patnames_short heavy_output'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, float, str, str, bool, bool, list, list, bool]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -43,36 +63,81 @@ itype = dict(zip(keys, itype))
 defaults = dict()
 defaults['numclus'] = 4 # 4 clusters
 defaults['perc'] = None
+defaults['flag_perc'] = False
 defaults['exp_name'] = 'WRtool'
 defaults['run_sig_calc'] = False
 defaults['run_compare'] = True
 defaults['heavy_output'] = False
+defaults['detrended_anom_for_clustering'] = True
+defaults['detrended_eof_calculation'] = True
+defaults['use_reference_eofs'] = False
+defaults['ERA_ref_folder'] = 'ERA_ref'
+defaults['obs_name'] = 'ERA'
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
 
+if inputs['cart_in'][-1] != '/': inputs['cart_in'] += '/'
+if inputs['cart_out_general'][-1] != '/': inputs['cart_out_general'] += '/'
+if inputs['ERA_ref_folder'][-1] != '/': inputs['ERA_ref_folder'] += '/'
+
+print(inputs['groups'])
+for k in inputs['group_symbols'].keys():
+    inputs['group_symbols'][k] = inputs['group_symbols'][k][0]
+print(inputs['group_symbols'])
+
+if not inputs['flag_perc']:
+    print('Considering fixed numpcs = {}\n'.format(inputs['numpcs']))
+    inputs['perc'] = None
+else:
+    print('Considering pcs to explain {}% of variance\n'.format(inputs['perc']))
+
+if inputs['groups'] is not None and inputs['reference_group'] is None:
+    print('Setting default reference group to: {}\n'.format(inputs['groups'].keys()[0]))
+    inputs['reference_group'] = inputs['groups'].keys()[0]
+
+if not os.path.exists(inputs['cart_out_general']): os.mkdir(inputs['cart_out_general'])
+inputs['cart_out'] = inputs['cart_out_general'] + inputs['exp_name'] + '/'
 if not os.path.exists(inputs['cart_out']): os.mkdir(inputs['cart_out'])
+
+if inputs['year_range'] is not None:
+    inputs['year_range'] = map(int, inputs['year_range'])
+# dictgrp = dict()
+# dictgrp['all'] = inputs['dictgroup']
+# inputs['dictgroup'] = dictgrp
 
 if inputs['area'] == 'EAT':
     if inputs['patnames'] is None:
-        patnames = ['NAO +', 'Sc. Blocking', 'Atl. Ridge', 'NAO -']
+        input['patnames'] = ['NAO +', 'Sc. Blocking', 'Atl. Ridge', 'NAO -']
     if inputs['patnames_short'] is None:
-        patnames_short = ['NP', 'BL', 'NN', 'AR']
+        input['patnames_short'] = ['NP', 'BL', 'AR', 'NN']
 elif inputs['area'] == 'PNA':
     if inputs['patnames'] is None:
-        patnames = ['Ala. Ridge', 'Pac. Trough', 'Arctic Low', 'Arctic High']
+        input['patnames'] = ['Ala. Ridge', 'Pac. Trough', 'Arctic Low', 'Arctic High']
     if inputs['patnames_short'] is None:
-        patnames_short = ['AR', 'PT', 'AL', 'AH']
+        input['patnames_short'] = ['AR', 'PT', 'AL', 'AH']
 
-if inputs['ERA_ref_out'] is None:
-    ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'])
+outname = 'out_' + std_outname(inputs['exp_name'], inputs) + '.p'
+nomeout = inputs['cart_out'] + outname
+
+ERA_ref_out = inputs['cart_out_general'] + inputs['ERA_ref_folder'] + 'out_' + std_outname(inputs['obs_name'], inputs) + '.p'
+if not os.path.exists(inputs['cart_out_general'] + inputs['ERA_ref_folder']):
+    os.mkdir(inputs['cart_out_general'] + inputs['ERA_ref_folder'])
+
+if not os.path.exists(nomeout):
+    if not os.path.exists(ERA_ref_out) is None:
+        ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
+        pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
+    else:
+        ERA_ref = pickle.load(open(ERA_ref_out, 'r'))
+
+    model_outs = dict()
+    for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
+        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+
+    pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
 else:
-    ERA_ref = pickle.load(open(inputs['ERA_ref_out'], 'r'))
+    [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
 
-model_outs = dict()
-for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
-    model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'])
-
-pickle.dump([model_outs, ERA_ref], open(inputs['cart_out']+'out_{}_{}.p'.format(inputs['exp_name'], inputs['area']), 'w'))
 
 clatlo = dict()
 clatlo['EAT'] = (70, 0)
@@ -80,6 +145,12 @@ clatlo['PNA'] = (70, -90)
 
 n_models = len(model_outs.keys())
 
-cd.plot_WRtool_results(inputs['cart_out'], '{}_{}'.format(inputs['exp_name'], inputs['area']), n_models, model_outs, ERA_ref, obs_name = 'ERA', patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
-print('define out netcdf')
+cart_out_nc = inputs['cart_out_general'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
+if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
+
+cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
+
+os.system('mv {} {}'.format(logname, inputs['cart_out']))
+os.system('cp {} {}'.format(file_input, inputs['cart_out']))
