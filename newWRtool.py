@@ -12,7 +12,7 @@ import climdiags as cd
 
 #######################################
 def std_outname(tag, inputs):
-    name_outputs = '{}_{}_{}_{}clus'.format(inputs['exp_name'], inputs['season'], inputs['area'], inputs['numclus'])
+    name_outputs = '{}_{}_{}_{}clus'.format(tag, inputs['season'], inputs['area'], inputs['numclus'])
 
     if inputs['flag_perc']:
         name_outputs += '_{}perc'.format(inputs['perc'])
@@ -30,7 +30,8 @@ def std_outname(tag, inputs):
 
     return name_outputs
 
-os.system('rm log_WRtool_*log')
+if np.any(['log_WRtool_' in cos for cos in os.listdir('.')]):
+    os.system('rm log_WRtool_*log')
 
 # open our log file
 logname = 'log_WRtool_{}.log'.format(ctl.datestamp())
@@ -44,7 +45,8 @@ os.dup2(logfile.fileno(), sys.stdout.fileno())
 os.dup2(logfile.fileno(), sys.stderr.fileno())
 
 print('*******************************************************')
-print('Running {0}'.format(sys.argv[0]))
+print('Running {0}\n'.format(sys.argv[0]))
+print(ctl.datestamp()+'\n')
 print('********************************************************')
 
 if len(sys.argv) > 1:
@@ -145,12 +147,19 @@ clatlo['PNA'] = (70, -90)
 
 n_models = len(model_outs.keys())
 
-cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+#cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
-cart_out_nc = inputs['cart_out_general'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
+cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
 if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
 
 cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
+
+file_res = inputs['cart_out'] + 'results_' + std_outname(inputs['exp_name'], inputs) + '.dat'
+cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
+
+print('Check results in directory: {}\n'.format(inputs['cart_out']))
+print(ctl.datestamp()+'\n')
+print('Ended successfully!\n')
 
 os.system('mv {} {}'.format(logname, inputs['cart_out']))
 os.system('cp {} {}'.format(file_input, inputs['cart_out']))

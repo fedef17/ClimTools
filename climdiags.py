@@ -10,6 +10,7 @@ import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
 from matplotlib.colors import LogNorm
 
+import iris
 import netCDF4 as nc
 import pandas as pd
 from datetime import datetime
@@ -745,9 +746,10 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     """
     Output in netcdf format.
     """
+    print('Saving netcdf output to {}\n'.format(cart_out))
     # Salvo EOFs, cluspattern_area, clus_pattern_global
     long_name = 'geopotential height anomaly at 500 hPa'
-    std_name = 'zg500'
+    std_name = 'geopotential_height_anomaly'
     units = 'm'
 
     for nam in ['eofs', 'cluspattern', 'cluspattern_area']:
@@ -758,7 +760,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         if nam == 'cluspattern':
             lat = obs['lat']
             lon = obs['lon']
-        index = ctl.create_iris_coord(np.arange(len(var)), 'index')
+        index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
         colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
         colist = [index] + colist
         cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
@@ -776,7 +778,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
             if nam == 'cluspattern':
                 lat = models[mod]['lat']
                 lon = models[mod]['lon']
-            index = ctl.create_iris_coord(np.arange(len(var)), 'index')
+            index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
             colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
             colist = [index] + colist
             cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
@@ -786,14 +788,14 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     # Salvo time series: labels, pcs, dist_centroid?
     outfil = cart_out + 'regime_index_ref.nc'
     long_name = 'cluster index (ranges from 0 to {})'.format(inputs['numclus']-1)
-    std_name = 'index'
+    std_name = None
     units = '1'
 
     var = obs['labels']
     dates_all = obs['dates_allyear']
     dates_season = obs['dates']
 
-    var_all = ctl.complete_time_range(var_season, dates_season, dates_all)
+    var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
 
     time = nc.date2num(dates_all, units = obs['time_units'], calendar = obs['time_cal'])
     time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
@@ -808,7 +810,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         dates_all = models[mod]['dates_allyear']
         dates_season = models[mod]['dates']
 
-        var_all = ctl.complete_time_range(var_season, dates_season, dates_all)
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
 
         time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
         time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
@@ -816,8 +818,159 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
         iris.save(cubo, outfil)
 
+    # monthly clus frequency
+    outfil = cart_out + 'clus_freq_monthly_ref.nc'
+    std_name = None
+    units = '1'
+
+    var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+
+    cubolis = []
+    for i, fre in enumerate(var):
+        long_name = 'clus {} frequency'.format(i)
+        var_all, datesall = ctl.complete_time_range(fre, datesmon)
+
+        time = nc.date2num(datesall, units = obs['time_units'], calendar = obs['time_cal'])
+        time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
+
+        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+        cubolis.append(cubo)
+
+    cubolis = iris.cube.CubeList(cubolis)
+    iris.save(cubolis, outfil)
+
+    for mod in models.keys():
+        outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
+        var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'])
+
+        cubolis = []
+        for i, fre in enumerate(var):
+            var_all, datesall = ctl.complete_time_range(fre, datesmon)
+
+            time = nc.date2num(datesall, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+            cubolis.append(cubo)
+
+        cubolis = iris.cube.CubeList(cubolis)
+        iris.save(cubolis, outfil)
+
+    # pcs
+    outfil = cart_out + 'pcs_timeseries_ref.nc'
+    std_name = None
+    units = 'm'
+
+    var = obs['pcs'].T
+    dates_all = obs['dates_allyear']
+    dates_season = obs['dates']
+
+    cubolis = []
+    for i, fre in enumerate(var):
+        long_name = 'pcs {}'.format(i)
+        var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+
+        time = nc.date2num(dates_all, units = obs['time_units'], calendar = obs['time_cal'])
+        time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
+
+        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+        cubolis.append(cubo)
+
+    cubolis = iris.cube.CubeList(cubolis)
+    iris.save(cubolis, outfil)
+
+    for mod in models.keys():
+        outfil = cart_out + 'pcs_timeseries_{}.nc'.format(mod)
+
+        var = models[mod]['pcs'].T
+        dates_all = models[mod]['dates_allyear']
+        dates_season = models[mod]['dates']
+
+        cubolis = []
+        for i, fre in enumerate(var):
+            var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+
+            time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+            cubolis.append(cubo)
+
+        cubolis = iris.cube.CubeList(cubolis)
+        iris.save(cubolis, outfil)
+
     return
 
+
+def out_WRtool_mainres(outfile, models, obs, inputs):
+    """
+    Output of results in synthetic text format.
+    """
+    print('Writing main results to {}\n'.format(outfile))
+
+    filos = open(outfile, 'w')
+    ctl.printsep(filos)
+    ctl.newline(filos)
+    filos.write('Results of WRtool - {}\n'.format(ctl.datestamp()))
+    filos.write('----> Area: {}, Season: {}, year_range: {}\n'.format(inputs['area'], inputs['season'], inputs['year_range']))
+    ctl.newline(filos)
+    ctl.printsep(filos)
+
+    models[inputs['obs_name']] = obs
+
+    for mod in [inputs['obs_name']] + inputs['model_names']:
+        if 'RMS' in models[mod].keys():
+            filos.write('----> model: {}\n'.format(mod))
+            ctl.newline(filos)
+            filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
+            stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*models[mod]['RMS']))
+            stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*models[mod]['patcor']))
+        else:
+            filos.write('----> observed: {}\n'.format(mod))
+
+        if 'significance' in models[mod].keys():
+            ctl.newline(filos)
+            filos.write('---- Sharpness of regime structure ----\n')
+            filos.write('{:8.3f}'.format(models[mod]['significance']))
+
+        ctl.newline(filos)
+        filos.write('---- Regimes frequencies ----\n')
+        stringa = inputs['numclus']*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*models[mod]['freq_clus']))
+
+        ctl.newline(filos)
+        filos.write('---- Transition matrix ----\n')
+        stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+        filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+        for i, cen in enumerate(models[mod]['trans_matrix']):
+            stringa = len(cen)*'{:11.2e}' + '\n'
+            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+        ctl.newline(filos)
+        filos.write('---- Centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(models[mod]['centroids']):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+        ctl.newline(filos)
+        oks = np.sqrt(models[mod]['eofs_eigenvalues'][:10])
+        filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:10.3e}'+'\n'
+        filos.write(stringa.format(*oks))
+
+        ctl.newline(filos)
+        oks = np.cumsum(models[mod]['eofs_varfrac'][:10])
+        filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*oks))
+        ctl.newline(filos)
+        ctl.printsep(filos)
+
+    filos.close()
+
+    return
 
 
 #############################################################################

@@ -45,6 +45,13 @@ def printsep(ofile = None):
         ofile.write('\n--------------------------------------------------------\n')
     return
 
+def newline(ofile = None):
+    if ofile is None:
+        print('\n\n')
+    else:
+        ofile.write('\n\n')
+    return
+
 def datestamp():
     tempo = datetime.now().isoformat()
     tempo = tempo.split('.')[0]
@@ -960,10 +967,10 @@ def create_iris_cube(data, varname, varunits, iris_coords_list, long_name = None
     # class iris.cube.Cube(data, standard_name=None, long_name=None, var_name=None, units=None, attributes=None, cell_methods=None, dim_coords_and_dims=None, aux_coords_and_dims=None, aux_factories=None)
 
     allcoords = []
-    if not isinstance(coords_list[0], iris.coords.DimCoord):
+    if not isinstance(iris_coords_list[0], iris.coords.DimCoord):
         raise ValueError('coords not in iris format')
 
-    allcoords = [(cor, i) for i, cor in enumerate(coords_list)]
+    allcoords = [(cor, i) for i, cor in enumerate(iris_coords_list)]
 
     cube = iris.cube.Cube(data, standard_name = varname, units = varunits, dim_coords_and_dims = allcoords, long_name = long_name)
 
@@ -1481,18 +1488,58 @@ def sel_time_range(var, dates, dates_range):
     return var[okdates, ...], dates[okdates]
 
 
-def complete_time_range(var_season, dates_season, dates):
+def range_dates_monthly(first, last, monday = 15):
     """
-    Completes a time series with missing dates, adding nan values.
+    Creates a sequence of monthly dates between first and last datetime objects.
     """
-    vals, okinds, okinds_seas = np.intersect1d(dates, dates_season, assume_unique = True, return_indices = True)
 
-    var_all = np.empty(len(dates), dtype = var_season.dtype)
+    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+    ye0 = first.year
+    mo0 = first.month
+    ye1 = last.year
+    mo1 = last.month
+
+    datesmon = []
+    for ye in range(ye0, ye1+1):
+        mouno = 1
+        modue = 13
+        if ye == ye0:
+            mouno = mo0
+        elif ye == ye1:
+            modue = mo1+1
+        for mo in range(mouno,modue):
+            datesmon.append(pd.Timestamp(strindata.format(ye,mo,monday)).to_pydatetime())
+
+    datesmon = np.array(datesmon)
+
+    return datesmon
+
+
+def complete_time_range(var_season, dates_season, dates_all = None):
+    """
+    Completes a time series with missing dates. Returns a masked numpy array.
+    """
+    if dates_all is None:
+        if check_daily(dates_season):
+            freq = 'D'
+            dates_all_pdh = pd.date_range(dates_season[0], dates_season[-1], freq = freq)
+            dates_all = np.array([da.to_pydatetime() for da in dates_all_pdh])
+        else:
+            freq = 'M'
+            dates_all = range_dates_monthly(dates_season[0], dates_season[-1])
+
+    vals, okinds, okinds_seas = np.intersect1d(dates_all, dates_season, assume_unique = True, return_indices = True)
+
+    # shapea = list(var_season.shape)
+    # shapea[0] = len(dates_all)
+    # np.tile(maska, (3, 7, 1)).T.shape
+    var_all = np.ma.empty(len(dates_all))
+    var_all.dtype = var_season.dtype
+    var_all.mask = ~okinds
 
     var_all[okinds] = var_season
-    var_all[~okinds] = np.nan
 
-    return var_all
+    return var_all, dates_all
 
 
 def date_series(init_dat, end_dat, freq = 'day', calendar = 'proleptic_gregorian'):
@@ -2225,7 +2272,33 @@ def calc_seasonal_clus_freq(labels, dates, nmonths_season = 3):
 
     freqs = np.stack(freqs)
 
-    return freqs
+    return freqs.T
+
+
+def calc_monthly_clus_freq(labels, dates):
+    """
+    Calculates monthly cluster frequency.
+    """
+    numclus = int(np.max(labels)+1)
+
+    dates_pdh = pd.to_datetime(dates)
+    years = dates_pdh.year
+    months = dates_pdh.month
+    yemon = np.unique([(ye,mo) for ye,mo in zip(years, months)], axis = 0)
+
+    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+
+    freqs = []
+    datesmon = []
+    for (ye, mo) in yemon:
+        dateok = (dates_pdh.year == ye) & (dates_pdh.month == mo)
+        freqs.append(calc_clus_freq(labels[dateok], numclus = numclus))
+        datesmon.append(pd.Timestamp(strindata.format(ye,mo,15)).to_pydatetime())
+
+    freqs = np.stack(freqs)
+    datesmon = np.stack(datesmon)
+
+    return freqs.T, datesmon
 
 
 def change_clus_order(centroids, labels, new_ord):
