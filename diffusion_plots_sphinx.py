@@ -38,7 +38,7 @@ namefi = '{}_mon_{}_{}.nc'
 # Calculates radiation balances
 rad_file = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/radiation_balance/radclim_yearly.p'
 cloud_file = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/cloud_cover/cloudcover_yearly.p'
-tas_file = '/data/fabiano/SPHINX/tas_mon/global_tasmean_yearly.p'
+tas_file = '/data-hobbes/fabiano/SPHINX/tas_mon/global_tasmean_yearly.p'
 
 radclim = pickle.load(open(rad_file, 'r'))
 cloudclim = pickle.load(open(cloud_file, 'r'))
@@ -47,7 +47,7 @@ globalme, zonalme = pickle.load(open(tas_file, 'r'))
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/diffusion_plots/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
-cart_in = '/data/fabiano/SPHINX/radiation/'
+cart_in = '/data-hobbes/fabiano/SPHINX/radiation/'
 varniuu, lat, lon, dates, time_units, var_units = ctl.read3Dncfield(cart_in+namefi.format('lcb0',1988,'rsut'))
 del varniuu
 

@@ -48,13 +48,16 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = None, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, **kwargs):
     """
     Wrapper for inputing a filename.
 
     < ifile > : str or list. The input netCDF file (if more input files are given, these are concatenated one after the other.)
 
-    < extract_level_4D > : float or None. Level to be extracted from a multi-level nc file.
+    < extract_level_hPa > : float or None. Level to be extracted from a multi-level nc file: units are hPa.
+
+    < sel_yr_range > : tuple, (start_year, end_year). Selects the given range of years.
+    < regrid_to_reference_cube > : iris.cube.Cube instance. The data read from ifile are regridded to this resolution.
 
     < season > : string, can be any group of months identified by the first letter (e.g. DJF, JJAS, ..) or a three-letter single month name (Mar, Jun, ..)
 
@@ -63,9 +66,13 @@ def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = N
 
     print('Running precompute\n')
     if type(ifile) is not list:
-        var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_4D)
-        print(type(var))
-        print(var.shape)
+        # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+        # print(type(var))
+        # print(var.shape)
+        var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+        lat = coords['lat']
+        lon = coords['lon']
+        dates = coords['dates']
 
         var_season, dates_season = ctl.sel_season(var, dates, season)
     else:
@@ -74,7 +81,12 @@ def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = N
         dates_sel = []
         dates_full = []
         for fil in ifile:
-            var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_4D)
+            # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
+            var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
+
             dates_full.append(dates)
 
             var_season, dates_season = ctl.sel_season(var, dates, season)
@@ -85,21 +97,21 @@ def WRtool_from_file(ifile, season, area, sel_range = None, extract_level_4D = N
         dates_season = np.concatenate(dates_sel)
         dates = np.concatenate(dates_full)
 
-    if sel_range is not None:
-        print('Selecting date range {}\n'.format(sel_range))
+    if sel_yr_range is not None:
+        print('Selecting date range {}\n'.format(sel_yr_range))
         dates_season_pdh = pd.to_datetime(dates_season)
-        okdat = (dates_season_pdh.year >= sel_range[0]) & (dates_season_pdh.year <= sel_range[1])
+        okdat = (dates_season_pdh.year >= sel_yr_range[0]) & (dates_season_pdh.year <= sel_yr_range[1])
         var_season = var_season[okdat, ...]
         dates_season = dates_season[okdat]
 
         dates_pdh = pd.to_datetime(dates)
-        okdat = (dates_pdh.year >= sel_range[0]) & (dates_pdh.year <= sel_range[1])
+        okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
         dates = dates[okdat]
 
     results = WRtool_core(var_season, lat, lon, dates_season, area, **kwargs)
     results['dates_allyear'] = dates
-    results['time_cal'] = time_cal
-    results['time_units'] = time_units
+    results['time_cal'] = aux_info['time_calendar']
+    results['time_units'] = aux_info['time_units']
 
     return results
 

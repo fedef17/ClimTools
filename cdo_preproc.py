@@ -15,19 +15,19 @@ skip_existing = False
 interp_style = 'bil' # 'con'
 
 cart_ins = dict()
-cart_ins['HadGEM3-GC31-HM'] = '/data/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/stream1/PRIMAVERA/HighResMIP/MOHC/HadGEM3-GC31-HM/hist-1950/r1i1p1f1/Primday/zg23/gn/v20180730/'
-cart_ins['HadGEM3-GC31-MM'] = '/data/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/stream1/PRIMAVERA/HighResMIP/MOHC/HadGEM3-GC31-MM/hist-1950/r1i1p1f1/Primday/zg23/gn/v20170928/'
-cart_ins['CMCC-CM2-HR4'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CMCC/CMCC-CM2-HR4/hist-1950/r1i1p1f1/day/zg/gn/v20190105/'
-cart_ins['CMCC-CM2-VHR4'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CMCC/CMCC-CM2-VHR4/hist-1950/r1i1p1f1/day/zg/gn/v20180705/'
-cart_ins['CNRM-CM6-1'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CNRM-CERFACS/CNRM-CM6-1/hist-1950/r2i1p1f2/day/zg/gr/v20181004/'
-cart_ins['ECMWF-IFS-HR'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/ECMWF/ECMWF-IFS-HR/hist-1950/r1i1p1f1/day/zg/gr/v20170915/'
-cart_ins['ECMWF-IFS-LR'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/ECMWF/ECMWF-IFS-LR/hist-1950/r1i1p1f1/day/zg/gr/v20180221/'
-cart_ins['MPI-ESM1-2-HR'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/MPI-M/MPI-ESM1-2-HR/hist-1950/r1i1p1f1/day/zg/gn/v20180606/'
-cart_ins['MPI-ESM1-2-XR'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera5/stream1/CMIP6/HighResMIP/MPI-M/MPI-ESM1-2-XR/hist-1950/r1i1p1f1/day/zg/gn/v20180606/'
-cart_ins['EC-Earth-3-HR'] = '/data/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera2/upload/EC-Earth-Consortium/EC-Earth-3-HR/incoming/s2hh/day/zg/'
-cart_ins['EC-Earth-3-LR'] = '/data/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/upload/EC-Earth-Consortium/EC-Earth-3-LR/incoming/v20180510_144558/CMIP/EC-Earth-Consortium/EC-Earth3-LR/historical/r1i1p1f1/day/zg/gr/v20180501/'
+cart_ins['HadGEM3-GC31-HM'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/stream1/PRIMAVERA/HighResMIP/MOHC/HadGEM3-GC31-HM/hist-1950/r1i1p1f1/Primday/zg23/gn/v20180730/'
+cart_ins['HadGEM3-GC31-MM'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/stream1/PRIMAVERA/HighResMIP/MOHC/HadGEM3-GC31-MM/hist-1950/r1i1p1f1/Primday/zg23/gn/v20170928/'
+cart_ins['CMCC-CM2-HR4'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CMCC/CMCC-CM2-HR4/hist-1950/r1i1p1f1/day/zg/gn/v20190105/'
+cart_ins['CMCC-CM2-VHR4'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CMCC/CMCC-CM2-VHR4/hist-1950/r1i1p1f1/day/zg/gn/v20180705/'
+cart_ins['CNRM-CM6-1'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/CNRM-CERFACS/CNRM-CM6-1/hist-1950/r2i1p1f2/day/zg/gr/v20181004/'
+cart_ins['ECMWF-IFS-HR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/ECMWF/ECMWF-IFS-HR/hist-1950/r1i1p1f1/day/zg/gr/v20170915/'
+cart_ins['ECMWF-IFS-LR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/ECMWF/ECMWF-IFS-LR/hist-1950/r1i1p1f1/day/zg/gr/v20180221/'
+cart_ins['MPI-ESM1-2-HR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera4/stream1/CMIP6/HighResMIP/MPI-M/MPI-ESM1-2-HR/hist-1950/r1i1p1f1/day/zg/gn/v20180606/'
+cart_ins['MPI-ESM1-2-XR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera5/stream1/CMIP6/HighResMIP/MPI-M/MPI-ESM1-2-XR/hist-1950/r1i1p1f1/day/zg/gn/v20180606/'
+cart_ins['EC-Earth-3-HR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/group_workspaces/jasmin2/primavera2/upload/EC-Earth-Consortium/EC-Earth-3-HR/incoming/s2hh/day/zg/'
+cart_ins['EC-Earth-3-LR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/gws/nopw/j04/primavera4/upload/EC-Earth-Consortium/EC-Earth-3-LR/incoming/v20180510_144558/CMIP/EC-Earth-Consortium/EC-Earth3-LR/historical/r1i1p1f1/day/zg/gr/v20180501/'
 
-cart_out_general = '/data/fabiano/PRIMAVERA/hist_1950/'
+cart_out_general = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/'
 
 for model_name in cart_ins.keys():
     cart_in = cart_ins[model_name]

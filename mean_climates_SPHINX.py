@@ -38,8 +38,8 @@ logging.basicConfig()
 KtoC = 273.15
 tommday = 86400
 
-cart_in = '/data/fabiano/SPHINX/tas_pr_mon/'
-cart_in_3d = '/data/fabiano/SPHINX/va_ua_ta_mon/'
+cart_in = '/data-hobbes/fabiano/SPHINX/tas_pr_mon/'
+cart_in_3d = '/data-hobbes/fabiano/SPHINX/va_ua_ta_mon/'
 
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/mean_climates/'
 

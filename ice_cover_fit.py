@@ -23,7 +23,7 @@ from copy import deepcopy as cp
 import iris
 ###############################################
 
-cart_in = '/data/fabiano/SPHINX/ice_cover/'
+cart_in = '/data-hobbes/fabiano/SPHINX/ice_cover/'
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/ice_cover_virna/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 

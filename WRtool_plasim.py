@@ -13,7 +13,7 @@ import climdiags as cd
 
 #######################################
 
-cart_in = '/data/fabiano/plasim_lembo/'
+cart_in = '/data-hobbes/fabiano/plasim_lembo/'
 cart_out = '/home/fabiano/Research/lavori/plasim_lembo/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 

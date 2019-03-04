@@ -24,7 +24,7 @@ from copy import deepcopy as cp
 
 
 # Calculates radiation balances
-cart_in = '/data/fabiano/SPHINX/radiation/'
+cart_in = '/data-hobbes/fabiano/SPHINX/radiation/'
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/radiation_balance/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 

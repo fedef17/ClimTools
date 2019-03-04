@@ -10,6 +10,7 @@ import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
+import matplotlib as mpl
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
@@ -31,12 +32,17 @@ import pickle
 import iris
 from cf_units import Unit
 
+mpl.rcParams['hatch.linewidth'] = 0.1
+#mpl.rcParams['hatch.color'] = 'black'
 
 #######################################################
 #
 ###     INPUTs reading
 #
 #######################################################
+
+def isclose(a, b, rtol = 1.e-9, atol = 0.0):
+    return np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=False)
 
 def printsep(ofile = None):
     if ofile is None:
@@ -232,66 +238,6 @@ def get_size(obj, seen=None):
 #
 #######################################################
 
-def cdo_preproc(cart_in, cart_out, file_list = None, regrid = True, merge = False, interp_style = 'bil', grid_file = None, gridtag = None, sel_levels = None):
-    """
-    """
-    # for model_name in cart_ins.keys():
-    # cart_in = cart_ins[model_name]
-    # cart_out = cart_out_general + model_name + '/'
-    # if skip_existing:
-    #     if not os.path.exists(cart_out):
-    #         print('.... processing {}\n'.format(model_name))
-    #         os.mkdir(cart_out)
-    #     else:
-    #         print('{} already processed\n'.format(model_name))
-    #         continue
-
-    if file_list is None:
-        file_list = os.listdir(cart_in)
-        file_list = [fi for fi in file_list if fi[-3:] == '.nc']
-        file_list.sort()
-
-    if not os.path.exists(cart_out): os.mkdir(cart_out)
-
-    provname = cart_out+'mmm.nc'
-    if regrid:
-        file_in = cart_in + file_list[0]
-        if sel_levels is not None:
-            print('Selecting levels..\n')
-            command = 'cdo sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
-            print(command)
-            os.system(command)
-            file_in = provname
-        print('Calculating weights for interpolation....\n')
-        command = 'cdo gen{},{} {} {}remapweights.nc'.format(interp_style, grid_file, file_in, cart_out)
-        print(command)
-        os.system(command)
-        for filenam in file_list:
-            file_in = cart_in + filenam
-            indpo = filenam.index('.nc')
-            file_out = cart_out + filenam[:indpo] + '_remap{}.nc'.format(gridtag)
-            if sel_levels is not None:
-                print('Selecting levels..\n')
-                command = 'cdo sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
-                print(command)
-                os.system(command)
-                file_in = provname
-            command = 'cdo remap,{},{} {} {}'.format(grid_file, cart_out+'remapweights.nc', file_in, file_out)
-            print(command)
-            os.system(command)
-
-        if merge:
-            command = 'cdo mergetime {}*_remap{}.nc {}{}_allyears_remap{}.nc'.format(cart_out, gridtag, cart_out, model_name, gridtag)
-            print(command)
-            os.system(command)
-    else:
-        if merge:
-            command = 'cdo mergetime {}*_remap{}.nc {}{}_allyears_remap{}.nc'.format(cart_out, gridtag, cart_out, model_name, gridtag)
-            print(command)
-            os.system(command)
-
-    return
-
 
 def check_increasing_latlon(var, lat, lon):
     """
@@ -326,172 +272,162 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def read_iris_nc(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
+def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
+    """
+    Regrids cube according to ref_cube grid. Default scheme is linear (cdo remapbil). Other scheme available: nearest and conservative (cdo remapcon).
+    """
+    if regrid_scheme == 'linear':
+        schema = iris.analysis.Linear()
+    elif regrid_scheme == 'conservative':
+        schema = iris.analysis.AreaWeighted()
+    elif regrid_scheme == 'nearest':
+        schema = iris.analysis.Nearest()
+
+    (nlat, nlon) = (len(cube.coord('latitude').points), len(cube.coord('longitude').points))
+    (nlat_ref, nlon_ref) = (len(ref_cube.coord('latitude').points), len(ref_cube.coord('longitude').points))
+
+    if nlat*nlon < nlat_ref*nlon_ref:
+        raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
+
+    nucube = cube.regrid(ref_cube, schema)
+
+    return nucube
+
+
+def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = None, extract_level_hPa = None, regrid_scheme = 'linear', adjust_nonstd_dates = True):
+    """
+    Transforms an iris cube in a variable and a set of coordinates.
+    Optionally selects a level (given in hPa).
+    TODO: cube regridding to a given lat/lon grid.
+
+    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
+    < force_level_units > : str. Sometimes level units are not set inside the netcdf file. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
+    """
+    ndim = cube.ndim
+    datacoords = dict()
+    aux_info = dict()
+    ax_coord = dict()
+
+    if regrid_to_reference is not None:
+        cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
+
+    if convert_units_to:
+        if cube.units.name != convert_units_to:
+            print('Converting data from {} to {}\n'.format(cube.units.name, convert_units_to))
+            if cube.units.name == 'm**2 s**-2' and convert_units_to == 'm':
+                cu = cu/9.80665
+                cube.units = 'm'
+            else:
+                cube.convert_units(convert_units_to)
+
+    data = cube.data
+    aux_info['var_units'] = cube.units.name
+
+    coord_names = [cord.name() for cord in cube.coords()]
+
+    allco = ['lat', 'lon', 'level']
+    allconames = dict()
+    allconames['lat'] = np.array(['latitude', 'lat'])
+    allconames['lon'] = np.array(['longitude', 'lon'])
+    allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
+
+    for i, nam in enumerate(coord_names):
+        found = False
+        if nam == 'time': continue
+        for std_nam in allconames.keys():
+            if nam in allconames[std_nam]:
+                coor = cube.coord(nam)
+                if std_nam == 'level':
+                    coor.convert_units('hPa')
+                datacoords[std_nam] = coor.points
+                ax_coord[std_nam] = i
+                found = True
+        if not found:
+            print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
+
+    if 'level' in datacoords.keys() and extract_level_hPa is not None:
+        okind = datacoords['level'] == extract_level_hPa
+        if np.any(okind):
+            datacoords['level'] = datacoords['level'][okind]
+            data = data.take(first(okind), axis = ax_coord['level'])
+        elif len(datacoords['level']) == 1:
+            data = data.squeeze()
+        else:
+            raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+
+    if 'time' in coord_names:
+        time = cube.coord('time').points
+        time_units = cube.coord('time').units
+        dates = time_units.num2date(time) # this is a set of cftime._cftime.real_datetime objects
+        time_cal = time_units.calendar
+
+        if adjust_nonstd_dates:
+            try:
+                dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
+            except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
+                print(obd)
+                print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+                dates = adjust_outofbound_dates(dates)
+
+
+            if time_cal == '365_day' or time_cal == 'noleap':
+                dates = adjust_noleap_dates(dates)
+            elif time_cal == '360_day':
+                dates = adjust_360day_dates(dates)
+
+        datacoords['dates'] = dates
+        aux_info['time_units'] = time_units.name
+        aux_info['time_calendar'] = time_cal
+
+    data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
+    datacoords['lat'] = lat
+    datacoords['lon'] = lon
+
+    return data, datacoords, aux_info
+
+
+def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True):
     """
     Read a netCDF file using the iris library.
 
-    < extract_level > : float. If set, only the corresponding level is extracted.
+    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
     < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
 
-    < pressure_in_Pa > : bool. If True (default) pressure levels are converted to Pa.
-    < force_level_units > : str. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
-    < keep_only_Ndim_vars > : keeps only variables with correct size (excludes variables like time_bnds, lat_bnds, ..)
+    < keep_only_maxdim_vars > : keeps only variables with maximum size (excludes variables like time_bnds, lat_bnds, ..)
     """
 
     print('Reading {}\n'.format(ifile))
 
-    fh = iris.load(file)
+    fh = iris.load(ifile)
 
-    dimensions = [cord.name() for cord in fh[0].coords()]
+    cudimax = np.argmax([cu.ndim for cu in fh])
+    ndim = np.max([cu.ndim for cu in fh])
+
+    dimensions = [cord.name() for cord in fh[cudimax].coords()]
 
     if verbose: print('Dimensions: {}\n'.format(dimensions))
-    ndim = len(dimensions)
 
-    variab_names = [cos.var_name for cos in fh]
+    if keep_only_maxdim_vars:
+        fh = [cu for cu in fh if cu.ndim == ndim]
+
+    variab_names = [cu.name() for cu in fh]
     if verbose: print('Variables: {}\n'.format(variab_names))
     nvars = len(variab_names)
     print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, variab_names))
 
-    try:
-        lat_o         = fh[0]['lat'].points
-        lon_o         = fh[0]['lon'][:]
-    except KeyError as ke:
-        #print(repr(ke))
-        lat_o         = fh.variables['latitude'][:]
-        lon_o         = fh.variables['longitude'][:]
-    true_dim = 2
+    all_vars = dict()
+    for cu in fh:
+        all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
 
-    vars = dict()
-    if select_var is None:
-        for varna in variab_names:
-            var = fh.variables[varna][:]
-            var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
-            vars[varna] = var
+    if select_var is not None:
+        print('Read variable: {}\n'.format(select_var))
+        return all_vars[select_var]
+    elif len(all_vars.keys()) == 1:
+        print('Read variable: {}\n'.format(all_vars.keys()[0]))
+        return all_vars.values()[0]
     else:
-        print('Extracting {}\n'.format(select_var))
-        for varna in variab_names:
-            if varna in select_var:
-                var = fh.variables[varna][:]
-                var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
-                vars[varna] = var
-        if len(vars.keys()) == 0:
-            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variab_names))
-
-
-    if 'time' in all_variabs:
-        true_dim += 1
-        time        = fh.variables['time'][:]
-        time_units  = fh.variables['time'].units
-        time_cal    = fh.variables['time'].calendar
-
-        time = list(time)
-        dates = nc.num2date(time,time_units,time_cal)
-
-        try:
-            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
-        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
-            print(obd)
-            print('WARNING!!! Dates outside pandas range: 1677-2256\n')
-            dates = adjust_outofbound_dates(dates)
-
-        if time_cal == '365_day' or time_cal == 'noleap':
-            dates = adjust_noleap_dates(dates)
-        elif time_cal == '360_day':
-            dates = adjust_360day_dates(dates)
-
-        print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
-
-    if true_dim == 3 and ndim > 3:
-        lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
-        found = False
-        for levna in lev_names:
-            if levna in all_variabs:
-                oklevname = levna
-                level = fh.variables[levna][:]
-                try:
-                    nlevs = len(level)
-                    found = True
-                except:
-                    found = False
-                break
-
-        if not found:
-            print('Level name not found among: {}\n'.format(lev_names))
-            print('Does the variable have levels?')
-        else:
-            true_dim += 1
-            try:
-                level_units = fh.variables[oklevname].units
-            except AttributeError as atara:
-                print('level units not found in file {}\n'.format(ifile))
-                if force_level_units is not None:
-                    level_units = force_level_units
-                    print('setting level units to {}\n'.format(force_level_units))
-                    print('levels are {}\n'.format(level))
-                else:
-                    raise atara
-
-            print('level units are {}\n'.format(level_units))
-            if pressure_in_Pa:
-                if level_units in ['millibar', 'millibars','hPa']:
-                    level = 100.*level
-                    level_units = 'Pa'
-                    print('Converting level units from hPa to Pa\n')
-
-    print('Dimension of variables is {}\n'.format(true_dim))
-    if keep_only_Ndim_vars:
-        for varna in vars.keys():
-            if len(vars[varna].shape) < true_dim:
-                print('Erasing variable {}\n'.format(varna))
-                vars.pop(varna)
-
-    if true_dim == 4:
-        if extract_level is not None:
-            lvel = extract_level
-            if nlevs > 1:
-                if level_units=='millibar' or level_units=='hPa':
-                    l_sel=int(np.where(level==lvel)[0])
-                    print('Selecting level {0} millibar'.format(lvel))
-                elif level_units=='Pa':
-                    l_sel=int(np.where(level==lvel*100)[0])
-                    print('Selecting level {0} Pa'.format(lvel*100))
-                level = lvel
-            else:
-                level = level[0]
-                l_sel = 0
-
-            for varna in vars.keys():
-                vars[varna] = vars[varna][:,l_sel, ...].squeeze()
-            true_dim = true_dim - 1
-        else:
-            levord = level.argsort()
-            level = level[levord]
-            for varna in vars.keys():
-                vars[varna] = vars[varna][:, levord, ...]
-
-    var_units = dict()
-    for varna in vars.keys():
-        try:
-            var_units[varna] = fh.variables[varna].units
-        except:
-            var_units[varna] = None
-
-        if var_units[varna] == 'm**2 s**-2':
-            print('From geopotential (m**2 s**-2) to geopotential height (m)')   # g0=9.80665 m/s2
-            vars[varna] = vars[varna]/9.80665
-            var_units[varna] = 'm'
-
-    print('Returned variables are: {}'.format(vars.keys()))
-    if len(vars.keys()) == 1:
-        vars = vars.values()[0]
-        var_units = var_units.values()[0]
-
-    if true_dim == 2:
-        return vars, lat, lon, var_units
-    elif true_dim == 3:
-        return vars, lat, lon, dates, time_units, var_units, time_cal
-    elif true_dim == 4:
-        return vars, level, lat, lon, dates, time_units, var_units, time_cal
+        print('Read all variables: {}\n'.format(all_vars.keys()))
+        return all_vars
 
 
 def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
@@ -3082,7 +3018,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, add_hatching = None, hatch_styles = ['', '', '...']):
     """
     Plots field contours on the axis of a figure.
 
@@ -3097,6 +3033,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
 
+    < add_hatching > : bool mask. Where True the map is hatched.
     """
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
@@ -3112,19 +3049,20 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         cyclic = True
         #lon = np.append(lon, 360)
         #data = np.c_[data,data[:,0]]
+        lon_o = lon
         data, lon = cutil.add_cyclic_point(data, coord = lon)
 
-        # if np.min(lat) >= 0:
-        #     latpiu = np.sort(-1.0*lat[lat > 0])
-        #     lat = np.concatenate([latpiu, lat])
-        #     data = np.concatenate([np.zeros((len(latpiu), len(lon))), data])
+        if add_hatching is not None:
+            add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
 
     xi,yi = np.meshgrid(lon,lat)
 
     map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
-    # if abs(clevels.max() - 152.8) < 0.1 and data.max() > 195:
-    #     print('ESPORTOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
-    #     pickle.dump([ax, map_plot], open('debug_contourf.p','w'))
+    if add_hatching is not None:
+        print('adding hatching')
+        #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','w'))
+        hatch = ax.contourf(xi, yi, add_hatching, len(hatch_styles)-1, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
+
     nskip = len(clevels)/n_lines - 1
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)

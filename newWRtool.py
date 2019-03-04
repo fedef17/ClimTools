@@ -21,6 +21,8 @@ def std_outname(tag, inputs):
 
     if inputs['year_range'] is not None:
         name_outputs += '_{}-{}'.format(inputs['year_range'][0], inputs['year_range'][1])
+    else:
+        name_outputs += '_allyrs'
 
     if inputs['use_reference_eofs']:
         name_outputs += '_refEOF'
@@ -127,14 +129,14 @@ if not os.path.exists(inputs['cart_out_general'] + inputs['ERA_ref_folder']):
 
 if not os.path.exists(nomeout):
     if not os.path.exists(ERA_ref_out) is None:
-        ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
+        ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
         pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
     else:
         ERA_ref = pickle.load(open(ERA_ref_out, 'r'))
 
     model_outs = dict()
     for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
-        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], inputs['area'], extract_level_4D = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], inputs['area'], extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
 else:
@@ -147,7 +149,7 @@ clatlo['PNA'] = (70, -90)
 
 n_models = len(model_outs.keys())
 
-#cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
 cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
 if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
