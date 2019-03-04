@@ -1,0 +1,30 @@
+name: cdms2up
+channels:
+- uvcdat
+- scitools
+- conda-forge
+- defaults
+dependencies:
+- netcdf4
+- backports_abc
+- cartopy
+- eofs
+- gst-plugins-base
+- gstreamer
+- matplotlib
+- numpy
+- pandas
+- pyqt
+- python=2.7
+- ipython
+- python-dateutil
+- qt
+- scikit-learn
+- scipy
+- setuptools
+- tk
+- libgcc
+- libgfortran
+- pickleshare=0.7.4=py27h09770e1_0
+- spyder
+- iris
