@@ -362,13 +362,9 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         time_cal = time_units.calendar
 
         if adjust_nonstd_dates:
-            try:
-                dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
-            except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
-                print(obd)
+            if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
                 dates = adjust_outofbound_dates(dates)
-
 
             if time_cal == '365_day' or time_cal == 'noleap':
                 dates = adjust_noleap_dates(dates)
@@ -493,14 +489,9 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
         time = list(time)
         dates = nc.num2date(time,time_units,time_cal)
 
-        try:
-            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
-        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
-            print(obd)
+        if dates[0].year < 1677 or dates[-1].year > 2256:
             print('WARNING!!! Dates outside pandas range: 1677-2256\n')
             dates = adjust_outofbound_dates(dates)
-        except:
-            pass
 
         if time_cal == '365_day' or time_cal == 'noleap':
             dates = adjust_noleap_dates(dates)

@@ -104,8 +104,9 @@ print('filenames: ', inputs['filenames'])
 print('model names: ', inputs['model_names'])
 
 print(inputs['groups'])
-for k in inputs['group_symbols'].keys():
-    inputs['group_symbols'][k] = inputs['group_symbols'][k][0]
+if inputs['group_symbols'] is not None:
+    for k in inputs['group_symbols'].keys():
+        inputs['group_symbols'][k] = inputs['group_symbols'][k][0]
 print(inputs['group_symbols'])
 
 if not inputs['flag_perc']:
@@ -128,12 +129,12 @@ if inputs['year_range'] is not None:
 # dictgrp['all'] = inputs['dictgroup']
 # inputs['dictgroup'] = dictgrp
 
-if inputs['area'] == 'EAT':
+if inputs['area'] == 'EAT' and inputs['numclus'] == 4:
     if inputs['patnames'] is None:
         input['patnames'] = ['NAO +', 'Sc. Blocking', 'Atl. Ridge', 'NAO -']
     if inputs['patnames_short'] is None:
         input['patnames_short'] = ['NP', 'BL', 'AR', 'NN']
-elif inputs['area'] == 'PNA':
+elif inputs['area'] == 'PNA' and inputs['numclus'] == 4:
     if inputs['patnames'] is None:
         input['patnames'] = ['Ala. Ridge', 'Pac. Trough', 'Arctic Low', 'Arctic High']
     if inputs['patnames_short'] is None:
@@ -168,8 +169,6 @@ clatlo['PNA'] = (70, -90)
 
 n_models = len(model_outs.keys())
 
-cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
-
 cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
 if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
 
@@ -177,6 +176,8 @@ cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
 
 file_res = inputs['cart_out'] + 'results_' + std_outname(inputs['exp_name'], inputs) + '.dat'
 cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
+
+cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
 print('Check results in directory: {}\n'.format(inputs['cart_out']))
 print(ctl.datestamp()+'\n')
