@@ -1,0 +1,138 @@
+Template input file for newWRtool.py.
+
+IMPORTANT NOTE: the value of the keys has to be written in the line that immediately follows the [key] label. If you don't want to set a key, comment it with a '#': #[key]. Commented lines are not considered.
+
+##################################################################
+##################### REQUIRED INPUT PATHS/NAMES (have to be set!) #################
+
+# Name of the run
+[exp_name]
+test
+
+# Directory of input files
+[cart_in]
+/data-hobbes/fabiano/PRIMAVERA/hist_1950/
+
+# Output data directory. (for each run, a subfolder /exp_name/ is created inside cart_out_general/)
+[cart_out_general]
+/home/fabiano/Research/lavori/WeatherRegimes/
+
+# INPUT FILES: specify either a filelist or enter the filenames directly. One amongst filelist and filenames has to be commented.
+
+# Absolute path to the file that contains list of input files, one per line, with their relative path from cart_in/.
+[filelist]
+/home/fabiano/Research/lavori/WeatherRegimes/listafi
+
+# List of input files. If more than one file, list them in the same line, separated by commas.
+#[filenames]
+CMCC-CM2-HR4/CMCC-CM2-HR4_allyears_remap25.nc, CMCC-CM2-VHR4/CMCC-CM2-VHR4_allyears_remap25.nc, CNRM-CM6-1/CNRM-CM6-1_allyears_remap25.nc, EC-Earth-3-HR/EC-Earth-3-HR_allyears_remap25.nc, EC-Earth-3-LR/EC-Earth-3-LR_allyears_remap25.nc, ECMWF-IFS-HR/ECMWF-IFS-HR_allyears_remap25.nc, ECMWF-IFS-LR/ECMWF-IFS-LR_allyears_remap25.nc, HadGEM3-GC31-HM/HadGEM3-GC31-HM_allyears_remap25.nc,  HadGEM3-GC31-MM/HadGEM3-GC31-MM_allyears_remap25.nc, MPI-ESM1-2-HR/MPI-ESM1-2-HR_allyears_remap25.nc, MPI-ESM1-2-XR/MPI-ESM1-2-XR_allyears_remap25.nc
+
+# Name of the dataset. A name for each file is expected. If commented, automatic naming is applied: ens_1, ens_2, ...
+#[model_names]
+CMCC-CM2-HR4, CMCC-CM2-VHR4, CNRM-CM6-1, EC-Earth-3-HR, EC-Earth-3-LR, ECMWF-IFS-HR, ECMWF-IFS-LR, HadGEM3-GC31-HM,  HadGEM3-GC31-MM, MPI-ESM1-2-HR, MPI-ESM1-2-XR
+
+# Select year range (two values separated by comma)
+[year_range]
+1957, 2014
+
+###################
+#### Group options. For meaningful visualization
+########
+
+# Define a dictionary to group models in different categories. A comparison between the two groups will be done.
+[groups]
+HR : CMCC-CM2-VHR4, EC-Earth-3-HR, ECMWF-IFS-HR, HadGEM3-GC31-HM, MPI-ESM1-2-XR
+LR : CMCC-CM2-HR4, EC-Earth-3-LR, ECMWF-IFS-LR, HadGEM3-GC31-MM, MPI-ESM1-2-HR
+
+# How should I compare groups? Possibilities: 'mean': visually groups the groups and computes the mean and stddev of the group, '1vs1' compares each element of a group with the corresponding elements of the other groups, 'both' does both comparisons.
+[group_compare_style]
+both
+
+# Specify group symbols (for scatter plots).
+[group_symbols]
+HR: $H$
+LR: $L$
+
+# Specify reference group (differences are shown wrt this group):
+[reference_group]
+LR
+
+
+##########################################################################
+##############  observations (reference)  ################
+
+# Compare with ERA?
+[run_compare]
+True
+
+# Use reference EOF space for all models?
+[use_reference_eofs]
+False
+
+# Name to be assigned to the observations.
+[obs_name]
+ERA
+
+# Name of the file with the observed fields
+[ERA_ref_orig]
+/data-hobbes/fabiano/OBS/ERA/ERA40+Int_daily_1957-2018_zg500_remap25_meters.nc
+
+# Name of the subfolder of cart_out_general for the observations. The program checks for existing EOF solver and clusters in cart_out_general/ERA_ref_folder.
+[ERA_ref_folder]
+ERA_ref_remap25
+
+##########################################################################
+##############  options for EOFs/CLUSTERING  ################
+
+# Number of EOFs to be used in the decomposition:
+# (if flag_perc is True, this value is ignored)
+[numpcs]
+4
+
+# Consider a number of pcs to explain some fraction of the total variance (perc)? (if this is set to True, numpcs is ignored. otherwise perc is ignored)
+[flag_perc]
+False
+
+# Percentage of variance explained by the EOFs (0-100):
+# (if flag_perc is False, this value is ignored)
+[perc]
+80
+
+# Number of clusters to be used:
+[numclus]
+4
+
+# Calculate significance of clustering (run cluster_sig)
+[run_sig_calc]
+False
+
+# Save heavy output? (global anomalies, transitions, solver, ...)
+[heavy_output]
+False
+
+##########################################################################
+##############  options for PRECOMPUTE -- preprocessing  ################
+
+# Atmospheric level at which the variable is extracted (if more levels are present)
+[level]
+500
+
+# Season to be selected (options: JJA, DJF, DJFM, NDJFM)
+[season]
+DJF
+
+# Regional average ('EAT': Euro-Atlantic, 'PNA': Pacific North American, 'NH': Northern Hemisphere)
+# Area to be selected (options: EAT, PNA, NH)
+[area]
+EAT
+
+##########################################################################
+###################  other options  ###################
+
+# Pattern NAMES
+[patnames]
+NAO +, Sc. Blocking, Atl. Ridge, NAO -
+
+# Pattern tags
+[patnames_short]
+NP, BL, AR, NN
