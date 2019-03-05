@@ -15,6 +15,39 @@ import climdiags as cd
 
 #######################################
 
+# IPCC color palettes
+
+temp_palette = ((103, 0, 31), (178, 24, 43), (214, 96, 77), (244, 165, 130), (253, 219, 199), (247, 247, 247), (209, 229, 240), (146, 197, 222), (67, 147, 195), (33, 102, 172), (5, 48, 97))
+
+prec_palette = ((84, 48, 5), (140, 81, 10), (191, 129, 45), (223, 194, 125), (246, 232, 195), (245, 245, 245), (199, 234, 229), (128, 205, 193), (53, 151, 143), (1, 102, 94), (0, 60, 48))
+
+temp_palette_ex = []
+prec_palette_ex = []
+
+for col in temp_palette:
+    print(col)
+    colnam = '#'
+    for pio in col:
+        coso = hex(pio)
+        if len(coso) == 4:
+            colnam += coso[-2:]
+        elif len(coso) == 3:
+            colnam += ('0'+coso[-1])
+    print(colnam)
+    temp_palette_ex.append(colnam)
+
+for col in prec_palette:
+    colnam = '#'
+    for pio in col:
+        coso = hex(pio)
+        if len(coso) == 4:
+            colnam += coso[-2:]
+        elif len(coso) == 3:
+            colnam += ('0'+coso[-1])
+    prec_palette_ex.append(colnam)
+
+temp_palette_ex = [temp_palette_ex[i] for i in np.arange(len(temp_palette_ex))[::-1]]
+
 # read data/models: tas, pr and mslp
 cart_in = '/data-hobbes/fabiano/CMIP6/'
 cart_out = '/home/fabiano/Research/lavori/IPCC_AR6/'
@@ -92,8 +125,16 @@ cblabels['tas'] = 'Temperature anomaly (K)'
 cblabels['pr'] = 'Precipitation anomaly (mm/day)'
 
 cbar_ranges = dict()
-cbar_ranges['tas'] = (-5, 5)
-cbar_ranges['pr'] = (-5, 5)
+cbar_ranges['tas'] = (-3, 3)
+cbar_ranges['pr'] = (-3, 3)
+
+paletta = dict()
+paletta['tas'] = temp_palette_ex
+paletta['pr'] = prec_palette_ex
+
+proj = ccrs.Robinson()
+#cmappa = cm.get_cmap('RdBu_r')
+cmappa = None
 
 for var in ['tas', 'pr']:
     mod_anoms, varmean, varstd = all_res[var]
@@ -101,31 +142,28 @@ for var in ['tas', 'pr']:
     for ke in varmean.keys():
         stpl_mask[ke] = varmean[ke] > varstd[ke]
 
-    proj = ccrs.Robinson()
-    cmappa = cm.get_cmap('RdBu_r')
-
     fig = plt.figure(figsize = (16, 12))
 
     seas = 'JJA'
     ax = fig.add_subplot(221, projection = proj)
     data = varmean[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = 21, add_hatching = stpl_mask[seas])
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var])
     ax.set_title('Delta {}'.format(seas))
 
     ax = fig.add_subplot(222, projection = proj)
     data = varstd[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = 21)
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, colors = paletta[var])
     ax.set_title('Std. dev {}'.format(seas))
 
     seas = 'DJF'
     ax = fig.add_subplot(223, projection = proj)
     data = varmean[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = 21, add_hatching = stpl_mask[seas])
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var])
     ax.set_title('Delta {}'.format(seas))
 
     ax = fig.add_subplot(224, projection = proj)
     data = varstd[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = 21)
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, colors = paletta[var])
     ax.set_title('Std. dev {}'.format(seas))
 
     cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal

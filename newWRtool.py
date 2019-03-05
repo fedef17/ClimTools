@@ -56,9 +56,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -83,6 +83,25 @@ inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaul
 if inputs['cart_in'][-1] != '/': inputs['cart_in'] += '/'
 if inputs['cart_out_general'][-1] != '/': inputs['cart_out_general'] += '/'
 if inputs['ERA_ref_folder'][-1] != '/': inputs['ERA_ref_folder'] += '/'
+
+if inputs['filenames'] is None:
+    if inputs['filelist'] is None:
+        raise ValueError('Set either [filenames] or [filelist]')
+    else:
+        filo = open(inputs['filelist'], 'r')
+        allfi = [fi.strip() for fi in filo.readlines()]
+        filo.close()
+        inputs['filenames'] = allfi
+
+if len(inputs['filenames']) == 0:
+    raise ValueError('No filenames specified. Set either [filenames] or [filelist].')
+
+if inputs['model_names'] is None:
+    n_mod = len(inputs['filenames'])
+    inputs['model_names'] = ['ens_{}'.format(i) for i in range(n_mod)]
+
+print('filenames: ', inputs['filenames'])
+print('model names: ', inputs['model_names'])
 
 print(inputs['groups'])
 for k in inputs['group_symbols'].keys():

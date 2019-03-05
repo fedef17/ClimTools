@@ -3018,7 +3018,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, add_hatching = None, hatch_styles = ['', '', '...']):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, add_hatching = None, hatch_styles = ['', '', '...'], colors = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -3057,7 +3057,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     xi,yi = np.meshgrid(lon,lat)
 
-    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors)
     if add_hatching is not None:
         print('adding hatching')
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','w'))
