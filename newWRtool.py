@@ -148,6 +148,7 @@ if not os.path.exists(inputs['cart_out_general'] + inputs['ERA_ref_folder']):
     os.mkdir(inputs['cart_out_general'] + inputs['ERA_ref_folder'])
 
 if not os.path.exists(nomeout):
+    print('{} not found, this is the first run. Setting up the computation..\n'.format(nomeout))
     if not os.path.exists(ERA_ref_out) is None:
         ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
         pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
@@ -160,6 +161,7 @@ if not os.path.exists(nomeout):
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
 else:
+    print('Computation already performed. Reading output from {}\n'.format(nomeout))
     [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
 
 
@@ -169,15 +171,14 @@ clatlo['PNA'] = (70, -90)
 
 n_models = len(model_outs.keys())
 
-cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
-if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
-
-cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
-
 file_res = inputs['cart_out'] + 'results_' + std_outname(inputs['exp_name'], inputs) + '.dat'
 cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
 
 cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+
+cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
+if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
+cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
 
 print('Check results in directory: {}\n'.format(inputs['cart_out']))
 print(ctl.datestamp()+'\n')

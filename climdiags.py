@@ -762,7 +762,7 @@ def calc_index_climatology(clim_psl, index_name):
     < index_name > : can be one among 'NAM', 'SAM', 'PDO', 'AMV'.
     """
 
-    
+
 
 
     return
@@ -924,6 +924,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubolis = []
         for i, fre in enumerate(var):
             var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            print(len(var_all), len(dates_all), len(fre), len(dates_season))
 
             time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
             time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
@@ -951,6 +952,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
     ctl.newline(filos)
     ctl.printsep(filos)
 
+    nsqr = np.sqrt(obs['cluspattern_area'].size)
+
     models[inputs['obs_name']] = obs
 
     for mod in [inputs['obs_name']] + inputs['model_names']:
@@ -959,7 +962,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             ctl.newline(filos)
             filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
             stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
-            filos.write(stringa.format(*models[mod]['RMS']))
+            filos.write(stringa.format(*(models[mod]['RMS']/nsqr)))
             stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
             filos.write(stringa.format(*models[mod]['patcor']))
         else:
@@ -1000,6 +1003,68 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
         stringa = len(oks)*'{:8.2f}'+'\n'
         filos.write(stringa.format(*oks))
+        ctl.newline(filos)
+        ctl.printsep(filos)
+
+    ctl.newline(filos)
+    ctl.printsep(filos)
+    for gru in inputs['groups']:
+        if 'RMS' in models.values()[0].keys():
+            filos.write('----> group: {}\n'.format(gru))
+            ctl.newline(filos)
+            filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
+            stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
+            coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
+            filos.write(stringa.format(*coso))
+            stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
+            coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+            filos.write(stringa.format(*coso))
+
+        if 'significance' in models.values()[0].keys():
+            ctl.newline(filos)
+            filos.write('---- Sharpness of regime structure ----\n')
+            sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
+            std = np.std([models[mod]['significance'] for mod in inputs['groups'][gru]])
+            filos.write('{:8.3f} +/- {:8.3f}'.format(sig, std))
+
+        ctl.newline(filos)
+        filos.write('---- Regimes frequencies ----\n')
+        stringa = '    '+inputs['numclus']*'{:8.2f}'+'\n'
+        coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+        std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+        filos.write(stringa.format(*coso))
+        stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*std))
+
+        ctl.newline(filos)
+        filos.write('---- Transition matrix ----\n')
+        stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+        filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+
+        coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+        std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+        for i, cen in enumerate(coso):
+            stringa = len(cen)*'{:11.2e}' + '\n'
+            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+        filos.write('---- Std dev of transition matrix ----\n')
+        for i, cen in enumerate(std):
+            stringa = len(cen)*'{:11.2e}' + '\n'
+            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+        ctl.newline(filos)
+        coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+        std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+        filos.write('---- Centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(coso):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+        filos.write('---- Std dev of centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(std):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
         ctl.newline(filos)
         ctl.printsep(filos)
 
@@ -1253,7 +1318,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             ax.set_xticks([])
             #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
             #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('RMS')
+            ax.set_ylabel('RMS (m)')
             fig.savefig(cart_out+'RMS_groups_{}.pdf'.format(tag))
             all_figures.append(fig)
 
@@ -1286,6 +1351,95 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             fig.savefig(cart_out+'RMS_1vs1_{}.pdf'.format(tag))
             all_figures.append(fig)
 
+    if 'patcor' in result_models.values()[0].keys():
+        if group_compare_style in ['group', 'both']:
+            wi = 0.6
+            fig = plt.figure()
+            ax = plt.subplot(111)
+            i = 0
+            for k in groups.keys():
+                for mod in groups[k]:
+                    col = color_dict[mod]
+                    #rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
+                    rms = np.mean(result_models[mod]['patcor'])
+                    ax.bar(i, rms, width = wi, color = col, label = mod)
+                    i+=0.7
+                i+=0.5
+
+            if len(labels) > 4:
+                # Shrink current axis by 20%
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+                # Put a legend to the right of the current axis
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            else:
+                ax.legend(fontsize = 'small', loc = 4)
+            ax.set_title('Pattern correlation with observations')
+            ax.set_xticks([])
+            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+            #ax.set_xticklabels(labels+[obs_name], size='small')
+            ax.set_ylabel('Correlation')
+            fig.savefig(cart_out+'patcor_all_{}.pdf'.format(tag))
+            all_figures.append(fig)
+
+            wi = 0.6
+            fig = plt.figure()
+            ax = plt.subplot(111)
+            i = 0
+            for k in groups.keys():
+                rmss = [np.mean(np.array(result_models[mod]['patcor'])) for mod in groups[k]]
+                sig = np.mean(rmss)
+                stddev = np.std(rmss)
+                # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
+                # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
+                col = color_dict[k]
+                ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
+                i+=1.2
+
+            if len(groups.keys()) > 4:
+                # Shrink current axis by 20%
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+                # Put a legend to the right of the current axis
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            else:
+                ax.legend(fontsize = 'small', loc = 4)
+            ax.set_title('Pattern correlation with observations')
+            ax.set_xticks([])
+            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+            #ax.set_xticklabels(labels+[obs_name], size='small')
+            ax.set_ylabel('Correlation')
+            fig.savefig(cart_out+'patcor_groups_{}.pdf'.format(tag))
+            all_figures.append(fig)
+
+        if group_compare_style in ['1vs1', 'both']:
+            wi = 0.6
+            fig = plt.figure()
+            ax = plt.subplot(111)
+            i = 0
+            for ll in range(len(groups.values()[0])):
+                for k in groups.keys():
+                    mod = groups[k][ll]
+                    col = color_dict[mod]
+                    rms = np.mean(np.array(result_models[mod]['patcor']))
+                    ax.bar(i, rms, width = wi, color = col, label = mod)
+                    i+=0.7
+                i+=0.5
+            if len(labels) > 4:
+                # Shrink current axis by 20%
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+                # Put a legend to the right of the current axis
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            else:
+                ax.legend(fontsize = 'small', loc = 4)
+            ax.set_title('Pattern correlation with observations')
+            ax.set_xticks([])
+            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+            #ax.set_xticklabels(labels+[obs_name], size='small')
+            ax.set_ylabel('Correlation')
+            fig.savefig(cart_out+'patcor_1vs1_{}.pdf'.format(tag))
+            all_figures.append(fig)
 
     patt_ref = result_obs['cluspattern']
     lat = result_obs['lat']
