@@ -148,6 +148,9 @@ if inputs['patnames'] is None:
 if inputs['patnames_short'] is None:
     inputs['patnames_short'] = ['c{}'.format(i) for i in range(inputs['numclus'])]
 
+print('patnames', inputs['patnames'])
+print('patnames_short', inputs['patnames_short'])
+
 if inputs['plot_margins'] is not None:
     inputs['plot_margins'] = map(float, inputs['plot_margins'])
 
