@@ -56,9 +56,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -77,6 +77,9 @@ defaults['detrended_eof_calculation'] = True
 defaults['use_reference_eofs'] = False
 defaults['ERA_ref_folder'] = 'ERA_ref'
 defaults['obs_name'] = 'ERA'
+defaults['visualization'] = 'Nstereo'
+defaults['bounding_lat'] = 30.
+defaults['plot_margins'] = None
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
 
@@ -140,6 +143,14 @@ elif inputs['area'] == 'PNA' and inputs['numclus'] == 4:
     if inputs['patnames_short'] is None:
         input['patnames_short'] = ['AR', 'PT', 'AL', 'AH']
 
+if inputs['patnames'] is None:
+    inputs['patnames'] = ['clus_{}'.format(i) for i in range(inputs['numclus'])]
+if inputs['patnames_short'] is None:
+    inputs['patnames_short'] = ['c{}'.format(i) for i in range(inputs['numclus'])]
+
+if inputs['plot_margins'] is not None:
+    inputs['plot_margins'] = map(float, inputs['plot_margins'])
+
 outname = 'out_' + std_outname(inputs['exp_name'], inputs) + '.p'
 nomeout = inputs['cart_out'] + outname
 
@@ -164,17 +175,16 @@ else:
     print('Computation already performed. Reading output from {}\n'.format(nomeout))
     [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
 
-
-clatlo = dict()
-clatlo['EAT'] = (70, 0)
-clatlo['PNA'] = (70, -90)
+latc = np.mean(ERA_ref['lat_area'])
+lonc = np.mean(ERA_ref['lon_area'])
+clatlo = (latc, lonc)
 
 n_models = len(model_outs.keys())
 
 file_res = inputs['cart_out'] + 'results_' + std_outname(inputs['exp_name'], inputs) + '.dat'
 cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
 
-cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo[inputs['area']], groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
 cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
 if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)

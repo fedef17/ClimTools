@@ -924,7 +924,6 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubolis = []
         for i, fre in enumerate(var):
             var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
-            print(len(var_all), len(dates_all), len(fre), len(dates_season))
 
             time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
             time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
@@ -954,9 +953,50 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
     nsqr = np.sqrt(obs['cluspattern_area'].size)
 
-    models[inputs['obs_name']] = obs
+    # OUT for the observations
+    filos.write('----> observed: {}\n'.format(inputs['obs_name']))
 
-    for mod in [inputs['obs_name']] + inputs['model_names']:
+    if 'significance' in obs.keys():
+        ctl.newline(filos)
+        filos.write('---- Sharpness of regime structure ----\n')
+        filos.write('{:8.3f}'.format(obs['significance']))
+
+    ctl.newline(filos)
+    filos.write('---- Regimes frequencies ----\n')
+    stringa = inputs['numclus']*'{:8.2f}'+'\n'
+    filos.write(stringa.format(*obs['freq_clus']))
+
+    ctl.newline(filos)
+    filos.write('---- Transition matrix ----\n')
+    stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+    filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+    for i, cen in enumerate(obs['trans_matrix']):
+        stringa = len(cen)*'{:11.2e}' + '\n'
+        filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+    ctl.newline(filos)
+    filos.write('---- Centroids coordinates (in pc space) ----\n')
+    for i, cen in enumerate(obs['centroids']):
+        stringa = len(cen)*'{:10.2f}' + '\n'
+        filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+    ctl.newline(filos)
+    oks = np.sqrt(obs['eofs_eigenvalues'][:10])
+    filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+    stringa = len(oks)*'{:10.3e}'+'\n'
+    filos.write(stringa.format(*oks))
+
+    ctl.newline(filos)
+    oks = np.cumsum(obs['eofs_varfrac'][:10])
+    filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+    stringa = len(oks)*'{:8.2f}'+'\n'
+    filos.write(stringa.format(*oks))
+    ctl.newline(filos)
+    ctl.printsep(filos)
+
+    # NOw for each model
+
+    for mod in inputs['model_names']:
         if 'RMS' in models[mod].keys():
             filos.write('----> model: {}\n'.format(mod))
             ctl.newline(filos)
@@ -1006,67 +1046,68 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         ctl.newline(filos)
         ctl.printsep(filos)
 
-    ctl.newline(filos)
-    ctl.printsep(filos)
-    for gru in inputs['groups']:
-        if 'RMS' in models.values()[0].keys():
-            filos.write('----> group: {}\n'.format(gru))
-            ctl.newline(filos)
-            filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
-            stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
-            coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
-            filos.write(stringa.format(*coso))
-            stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
-            coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
-            filos.write(stringa.format(*coso))
-
-        if 'significance' in models.values()[0].keys():
-            ctl.newline(filos)
-            filos.write('---- Sharpness of regime structure ----\n')
-            sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
-            std = np.std([models[mod]['significance'] for mod in inputs['groups'][gru]])
-            filos.write('{:8.3f} +/- {:8.3f}'.format(sig, std))
-
-        ctl.newline(filos)
-        filos.write('---- Regimes frequencies ----\n')
-        stringa = '    '+inputs['numclus']*'{:8.2f}'+'\n'
-        coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
-        std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
-        filos.write(stringa.format(*coso))
-        stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
-        filos.write(stringa.format(*std))
-
-        ctl.newline(filos)
-        filos.write('---- Transition matrix ----\n')
-        stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
-        filos.write(stringa.format(*(['']+inputs['patnames_short'])))
-
-        coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
-        std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
-        for i, cen in enumerate(coso):
-            stringa = len(cen)*'{:11.2e}' + '\n'
-            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
-
-        filos.write('---- Std dev of transition matrix ----\n')
-        for i, cen in enumerate(std):
-            stringa = len(cen)*'{:11.2e}' + '\n'
-            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
-
-        ctl.newline(filos)
-        coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
-        std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
-        filos.write('---- Centroids coordinates (in pc space) ----\n')
-        for i, cen in enumerate(coso):
-            stringa = len(cen)*'{:10.2f}' + '\n'
-            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
-
-        filos.write('---- Std dev of centroids coordinates (in pc space) ----\n')
-        for i, cen in enumerate(std):
-            stringa = len(cen)*'{:10.2f}' + '\n'
-            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
-
+    if inputs['groups'] is not None:
         ctl.newline(filos)
         ctl.printsep(filos)
+        for gru in inputs['groups']:
+            if 'RMS' in models.values()[0].keys():
+                filos.write('----> group: {}\n'.format(gru))
+                ctl.newline(filos)
+                filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
+                stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
+                coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
+                filos.write(stringa.format(*coso))
+                stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
+                coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+                filos.write(stringa.format(*coso))
+
+            if 'significance' in models.values()[0].keys():
+                ctl.newline(filos)
+                filos.write('---- Sharpness of regime structure ----\n')
+                sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
+                std = np.std([models[mod]['significance'] for mod in inputs['groups'][gru]])
+                filos.write('{:8.3f} +/- {:8.3f}'.format(sig, std))
+
+            ctl.newline(filos)
+            filos.write('---- Regimes frequencies ----\n')
+            stringa = '    '+inputs['numclus']*'{:8.2f}'+'\n'
+            coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+            std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+            filos.write(stringa.format(*coso))
+            stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*std))
+
+            ctl.newline(filos)
+            filos.write('---- Transition matrix ----\n')
+            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+
+            coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+            std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+            for i, cen in enumerate(coso):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+            filos.write('---- Std dev of transition matrix ----\n')
+            for i, cen in enumerate(std):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+            ctl.newline(filos)
+            coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+            std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+            filos.write('---- Centroids coordinates (in pc space) ----\n')
+            for i, cen in enumerate(coso):
+                stringa = len(cen)*'{:10.2f}' + '\n'
+                filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+            filos.write('---- Std dev of centroids coordinates (in pc space) ----\n')
+            for i, cen in enumerate(std):
+                stringa = len(cen)*'{:10.2f}' + '\n'
+                filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+            ctl.newline(filos)
+            ctl.printsep(filos)
 
     filos.close()
 
@@ -1081,7 +1122,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_compare_style = 'both', group_symbols = None, reference_group = None):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_compare_style = 'both', group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None):
     """
     Plot the results of WRtool.
 
@@ -1107,7 +1148,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     if obs_name is None:
         obs_name = 'Obs'
 
-    if n_ens == 1:
+    if n_ens == 1 and len(result_models.keys()) > 1:
+        print('entro', result_models.keys())
         resultooo = copy(result_models)
         result_models = dict()
         result_models[model_name] = resultooo
@@ -1736,12 +1778,13 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     patt = result_obs['cluspattern']
     filename = cart_out+'Allclus_OBSERVED.pdf'
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
     all_figures += figs
     figs[0].savefig(filename)
 
     # PLOTTIN the cluster patterns
     for lab in labels:
+        print(lab)
         patt = result_models[lab]['cluspattern']
         if np.any(np.isnan(patt)):
             print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
@@ -1750,12 +1793,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
 
         filename = cartout_mod+'Allclus_'+lab+'.pdf'
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
         all_figures += figs
         for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
             nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
             print(nunam)
-            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True)
+            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins)
             all_figures.append(fig)
 
     if compare_models is not None:
@@ -1771,7 +1814,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
             for patuno, patuno_ref, pp, pps in zip(patt, patt2, patnames, patnames_short):
                 nunam = cart_out+'compare_clus_'+pps+'_'+coup[0]+'_vs_'+coup[1]+'.pdf'
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins)
                 all_figures.append(fig)
 
 

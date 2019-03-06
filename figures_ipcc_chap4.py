@@ -55,11 +55,11 @@ listafils = os.listdir(cart_in)
 print(listafils)
 model_names = ['MRI-ESM2-0', 'IPSL-CM6A-LR']
 
-scen = 'ssp245'
+scens = ['ssp126', 'ssp245', 'ssp370', 'ssp585']
 hist = 'historical'
 miptab = 'Amon'
 
-seasons = ['JJA', 'DJF']
+seasons = ['JJA', 'DJF', 'MAM', 'SON']
 futperiod = (2021, 2040)
 refperiod = (1990, 2014)
 
@@ -69,7 +69,7 @@ ref_cube = iris.load('/data-hobbes/fabiano/OBS/ERA/ERAInterim/zg500/zg500_Aday_E
 models = dict()
 for var in ['tas', 'pr', 'psl']:
     for mod in model_names:
-        for sc in [scen, hist]:
+        for sc in scens + [hist]:
             filnams = [fi for fi in listafils if (miptab in fi.split('_') and sc in fi.split('_') and mod in fi.split('_') and var in fi.split('_'))]
             if len(filnams) == 1:
                 filok = filnams[0]
@@ -82,38 +82,49 @@ convunits = dict()
 convunits['tas'] = None
 convunits['pr'] = 'kg m-2 day-1'
 
-# all_res = dict()
-# for var in ['tas', 'pr']:
-#     # Calc model mean
-#     mod_anoms = dict()
-#     varmean = dict()
-#     varstd = dict()
-#     stpl_mask = dict()
-#
-#     for seas in seasons:
-#         mod_anoms[seas] = []
-#
-#     for mod in model_names:
-#         varfut, cordfut, _ = ctl.transform_iris_cube(models[(var, mod, scen)], regrid_to_reference = ref_cube, convert_units_to = convunits[var])
-#         varhist, cordhist, _ = ctl.transform_iris_cube(models[(var, mod, hist)], regrid_to_reference = ref_cube, convert_units_to = convunits[var])
-#
-#         yr_fut, dtan, _ = ctl.monthly_climatology(varfut, cordfut['dates'], dates_range = ctl.range_years(*futperiod))
-#         yr_hist, dtan, _ = ctl.monthly_climatology(varhist, cordhist['dates'], dates_range = ctl.range_years(*refperiod))
-#         yr_anom = yr_fut - yr_hist
-#         for seas in seasons:
-#             seas_anom, _ = ctl.sel_season(yr_anom, dtan, seas, cut = False)
-#             mod_anoms[seas].append(np.mean(seas_anom, axis = 0))
-#
-#     for seas in seasons:
-#         mod_anoms[seas] = np.stack(mod_anoms[seas])
-#         varmean[seas] = np.mean(mod_anoms[seas], axis = 0)
-#         varstd[seas] = np.std(mod_anoms[seas], axis = 0)
-#         stpl_mask[seas] = varmean[seas] < varstd[seas]
-#
-#
-#     all_res[var] = [mod_anoms, varmean, varstd]
-#
-# pickle.dump(all_res, open(cart_out + 'all_res_map.p', 'w'))
+all_res = dict()
+for scen in scens:
+    for var in ['tas', 'pr']:
+        # Calc model mean
+        mod_anoms = dict()
+        mod_mean_state = dict()
+        mod_stddev = dict()
+        varanom = dict()
+        varmeanstate = dict()
+        varstd = dict()
+        stpl_mask = dict()
+
+        for seas in seasons:
+            mod_anoms[seas] = []
+            mod_mean_state[seas] = []
+            mod_stddev[seas] = []
+
+        for mod in model_names:
+            varfut, cordfut, _ = ctl.transform_iris_cube(models[(var, mod, scen)], regrid_to_reference = ref_cube, convert_units_to = convunits[var])
+            varhist, cordhist, _ = ctl.transform_iris_cube(models[(var, mod, hist)], regrid_to_reference = ref_cube, convert_units_to = convunits[var])
+
+            for seas in seasons:
+                yr_fut, yr_fut_std = ctl.seasonal_climatology(varfut, cordfut['dates'], seas, dates_range = ctl.range_years(*futperiod))
+                yr_hist, yr_hist_std = ctl.seasonal_climatology(varhist, cordhist['dates'], seas, dates_range = ctl.range_years(*refperiod))
+
+                yr_anom = yr_fut - yr_hist
+
+                mod_anoms[seas].append(yr_anom)
+                mod_mean_state[seas].append(yr_hist)
+                mod_stddev[seas].append(yr_hist_std)
+
+        for seas in seasons:
+            mod_anoms[seas] = np.stack(mod_anoms[seas])
+            mod_mean_state[seas] = np.stack(mod_mean_state[seas])
+            mod_stddev[seas] = np.stack(mod_stddev[seas])
+            varanom[seas] = np.mean(mod_anoms[seas], axis = 0)
+            #varstd[seas] = np.std(mod_anoms[seas], axis = 0)
+            varstd[seas] = np.mean(mod_stddev[seas], axis = 0)
+            varmeanstate[seas] = np.mean(mod_mean_state[seas], axis = 0)
+
+        all_res[(var, scen)] = [mod_anoms, mod_mean_state, mod_stddev, varanom, varstd, varmeanstate]
+
+pickle.dump(all_res, open(cart_out + 'all_res_map.p', 'w'))
 all_res = pickle.load(open(cart_out + 'all_res_map.p'))
 
 eracub, cords, _ = ctl.transform_iris_cube(ref_cube)
@@ -122,11 +133,11 @@ lon = cords['lon']
 
 cblabels = dict()
 cblabels['tas'] = 'Temperature anomaly (K)'
-cblabels['pr'] = 'Precipitation anomaly (mm/day)'
+cblabels['pr'] = 'Precipitation anomaly (%)'
 
 cbar_ranges = dict()
 cbar_ranges['tas'] = (-3, 3)
-cbar_ranges['pr'] = (-3, 3)
+cbar_ranges['pr'] = (-50, 50)
 
 paletta = dict()
 paletta['tas'] = temp_palette_ex
@@ -136,35 +147,42 @@ proj = ccrs.Robinson()
 #cmappa = cm.get_cmap('RdBu_r')
 cmappa = None
 
-for var in ['tas', 'pr']:
-    mod_anoms, varmean, varstd = all_res[var]
+for scen in scens:
+    var = 'tas'
+    mod_anoms, mod_mean_state, mod_stddev, varanom, varstd, varmeanstate = all_res[(var, scen)]
+    #mod_anoms, varmean, varstd = all_res[var]
     stpl_mask = dict()
-    for ke in varmean.keys():
-        stpl_mask[ke] = varmean[ke] > varstd[ke]
+    for ke in varanom.keys():
+        stpl_mask[ke] = np.zeros(varanom[ke].shape)
+        oksig = abs(varanom[ke]) > 2*varstd[ke]
+        stpl_mask[ke][oksig] = 1
+
+        oksig = abs(varanom[ke]) < varstd[ke]
+        stpl_mask[ke][oksig] = -1
 
     fig = plt.figure(figsize = (16, 12))
 
     seas = 'JJA'
     ax = fig.add_subplot(221, projection = proj)
-    data = varmean[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var])
-    ax.set_title('Delta {}'.format(seas))
+    data = varanom[seas]
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], hatch_styles = ['///', '', '...'], hatch_levels = [-1.5, -0.5, 0.5, 1.5], colors = paletta[var])
+    ax.set_title(r'$\Delta$ Temperature {}'.format(seas))
 
     ax = fig.add_subplot(222, projection = proj)
     data = varstd[seas]
     map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, colors = paletta[var])
-    ax.set_title('Std. dev {}'.format(seas))
+    ax.set_title(r'$\sigma$ Temperature {}'.format(seas))
 
     seas = 'DJF'
     ax = fig.add_subplot(223, projection = proj)
-    data = varmean[seas]
-    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var])
-    ax.set_title('Delta {}'.format(seas))
+    data = varanom[seas]
+    map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var], hatch_styles = ['///', '', '...'], hatch_levels = [-1.5, -0.5, 0.5, 1.5])
+    ax.set_title(r'$\Delta$ Temperature {}'.format(seas))
 
     ax = fig.add_subplot(224, projection = proj)
     data = varstd[seas]
     map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, colors = paletta[var])
-    ax.set_title('Std. dev {}'.format(seas))
+    ax.set_title(r'$\sigma$ Temperature {}'.format(seas))
 
     cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
     cb = plt.colorbar(map_plot, cax = cax, orientation='horizontal')
@@ -172,10 +190,47 @@ for var in ['tas', 'pr']:
     cb.set_label(cblabels[var], fontsize=20)
 
     plt.subplots_adjust(left=0.02, bottom=0.2, right=0.98, top=0.88, wspace=0.05, hspace=0.2)
-    plt.suptitle('Title {}'.format(var))
+    plt.suptitle('Seasonal mean temperature change (2 models, {}, 2021-2040 vs 1990-2014)'.format(scen))
 
-    fig.savefig(cart_out+'fig_map_{}.pdf'.format(var))
+    fig.savefig(cart_out+'fig_map_{}_{}.pdf'.format(var, scen))
 
+
+    var = 'pr'
+    mod_anoms, mod_mean_state, mod_stddev, varanom, varstd, varmeanstate = all_res[(var, scen)]
+    stpl_mask = dict()
+    var_perc = dict()
+    std_perc = dict()
+    for ke in varanom.keys():
+        allvp = np.array([modan/modme for modan, modme in zip(mod_anoms[ke], mod_mean_state[ke])])
+        var_perc[ke] = 100*np.mean(allvp, axis = 0)
+        allvst = np.array([mostd/modme for mostd, modme in zip(mod_stddev[ke], mod_mean_state[ke])])
+        std_perc[ke] = 100*np.mean(allvst, axis = 0)
+        stpl_mask[ke] = np.zeros(varanom[ke].shape)
+        oksig = abs(var_perc[ke]) > 2*std_perc[ke]
+        stpl_mask[ke][oksig] = 1
+
+        oksig = abs(var_perc[ke]) < std_perc[ke]
+        stpl_mask[ke][oksig] = -1
+
+    fig = plt.figure(figsize = (16, 12))
+
+    for i, seas in enumerate(['DJF', 'MAM', 'JJA', 'SON']):
+        ax = fig.add_subplot(2, 2, i+1, projection = proj)
+        data = var_perc[seas]
+        #data = 100*np.mean([modan/modme for modan, modme in zip(mod_anoms[seas], mod_mean_state[seas])], axis = 0)
+        #data = 100*varanom[seas]/varmeanstate[seas]
+        map_plot = ctl.plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_ranges[var], n_color_levels = len(paletta[var])-1, add_hatching = stpl_mask[seas], colors = paletta[var], hatch_styles = ['///', '', '...'], hatch_levels = [-1.5, -0.5, 0.5, 1.5])
+        ax.set_title(r'$\Delta$ Precipitation {}'.format(seas))
+
+    cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+    cb = plt.colorbar(map_plot, cax = cax, orientation='horizontal')
+    cb.ax.tick_params(labelsize=18)
+    cb.set_label(cblabels[var], fontsize=20)
+
+    plt.subplots_adjust(left=0.02, bottom=0.2, right=0.98, top=0.88, wspace=0.05, hspace=0.2)
+    plt.suptitle('Seasonal mean precipitation change (2 models, {}, 2021-2040 vs 1990-2014)'.format(scen))
+
+    fig.savefig(cart_out+'fig_map_{}_{}.pdf'.format(var, scen))
 
 # Calc indexes: NAM, SAM, PDO, AMV ...
 

@@ -1399,6 +1399,34 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     return filt_mean, dates_ok, filt_std
 
 
+def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
+    """
+    Performs a seasonal climatological mean of the dataset.
+    Works both on monthly and daily datasets.
+
+    Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    """
+
+    if dates_range is not None:
+        var, dates = sel_time_range(var, dates, dates_range)
+
+    if len(var) <= len(season):
+        cut = False
+
+    dates_pdh = pd.to_datetime(dates)
+
+    var_season, dates_season = sel_season(var, dates, season, cut = cut)
+
+    n_seas = len(var_season)/len(season)
+    seas_mean = np.mean(var_season, axis = 0)
+    all_seas = [np.mean(var_season[len(season)*i:len(season)*(i+1)], axis = 0) for i in range(n_seas)]
+    seas_std = np.std(all_seas, axis = 0)
+
+    return seas_mean, seas_std
+
+
 def range_years(year1, year2):
     data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
     data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
@@ -1461,9 +1489,7 @@ def complete_time_range(var_season, dates_season, dates_all = None):
     # shapea[0] = len(dates_all)
     # np.tile(maska, (3, 7, 1)).T.shape
     var_all = np.ma.empty(len(dates_all))
-    var_all.dtype = var_season.dtype
     var_all.mask = ~okinds
-
     var_all[okinds] = var_season
 
     return var_all, dates_all
@@ -3009,7 +3035,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, add_hatching = None, hatch_styles = ['', '', '...'], colors = None):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -3052,22 +3078,15 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if add_hatching is not None:
         print('adding hatching')
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','w'))
-        hatch = ax.contourf(xi, yi, add_hatching, len(hatch_styles)-1, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
+        hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
 
     nskip = len(clevels)/n_lines - 1
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
     if isinstance(proj, ccrs.PlateCarree):
-        if cyclic:
-            lon_180 = lon
-            if np.any(lon > 180):
-                lon_180[lon > 180] = lon[lon > 180] - 360
-            latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
-        else:
-            latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
-
-        map_set_extent(ax, proj, bnd_box = latlonlim)
+        if plot_margins is not None:
+            map_set_extent(ax, proj, bnd_box = plot_margins)
     else:
         map_set_extent(ax, proj, bounding_lat = bounding_lat)
 
@@ -3151,8 +3170,7 @@ def def_projection(visualization, central_lat_lon):
     if central_lat_lon is not None:
         (clat, clon) = central_lat_lon
     else:
-        clat = lat.min() + (lat.max()-lat.min())/2
-        clon = lon.min() + (lon.max()-lon.min())/2
+        clon = 0.
 
     if visualization == 'standard':
         proj = ccrs.PlateCarree()
@@ -3165,7 +3183,7 @@ def def_projection(visualization, central_lat_lon):
     elif visualization == 'Sstereo':
         proj = ccrs.SouthPolarStereo()#central_longitude=clon)
     else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+        raise ValueError('visualization {} not recognised. Only standard, Npolar (or polar), Spolar, Nstereo (or stereo), Sstereo accepted'.format(visualization))
 
     return proj
 
@@ -3180,6 +3198,7 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
 
     if bnd_box is not None:
         if isinstance(proj, ccrs.PlateCarree):
+            print(bnd_box)
             ax.set_extent(bnd_box, crs = ccrs.PlateCarree())
 
     if bounding_lat is not None:
@@ -3199,7 +3218,7 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None):
     """
     Plots a single map to a figure.
 
@@ -3248,7 +3267,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -3274,7 +3293,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return fig4
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3337,12 +3356,12 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 2, 1, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 2, 2, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3369,7 +3388,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30):
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3432,12 +3451,12 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 3, 1, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 3, 2, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_2, fontsize = 25)
 
     if use_different_grids:
@@ -3447,7 +3466,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 3, 3, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title('Diff', fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3474,7 +3493,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3562,7 +3581,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
             if number_subplots:
                 subtit = nens
@@ -3763,13 +3782,13 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
         lab = labels[num]
         mapa = maps[num]
 
-        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
         showdate.set_text('{}'.format(lab))
 
         return
 
     mapa = maps[0]
-    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat)
+    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
     showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight = 'bold', color = 'black', bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
 
