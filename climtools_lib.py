@@ -1176,8 +1176,8 @@ def sel_area(lat,lon,var,area):
             var_roll=var
             lon_new=lon
     elif (type(area) == list) or (type(area) == tuple) and len(area) == 4:
-        latS, latN, lonW, lonE = area
-        printarea='custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE)
+        lonW, lonE, latS, latN = area
+        print('custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE))
         if lon.min() >= 0:
             lon_new=lon-180
             var_roll=np.roll(var,int(len(lon)/2),axis=-1)
@@ -1190,7 +1190,10 @@ def sel_area(lat,lon,var,area):
     latidx = (lat >= latS) & (lat <= latN)
     lonidx = (lon_new >= lonW) & (lon_new <= lonE)
 
-    print(var_roll.shape, len(latidx), len(lonidx))
+    print('Area: ', lonW, lonE, latS, latN)
+    # print(lat, lon_new)
+    # print(latidx, lonidx)
+    # print(var_roll.shape, len(latidx), len(lonidx))
     if var.ndim == 3:
         var_area = var_roll[:, latidx][..., lonidx]
     elif var.ndim == 2:
@@ -1409,6 +1412,23 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
     """
 
+    all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+
+    all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+    seas_mean = np.mean(all_seas, axis = 0)
+    seas_std = np.std(all_seas, axis = 0)
+
+    return seas_mean, seas_std
+
+
+def seasonal_set(var, dates, season, dates_range = None, cut = True):
+    """
+    Cuts var and dates, creating a list of variables relative to each season and a list of dates.
+    Works both on monthly and daily datasets.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    """
+
     if dates_range is not None:
         var, dates = sel_time_range(var, dates, dates_range)
 
@@ -1419,12 +1439,22 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
 
     var_season, dates_season = sel_season(var, dates, season, cut = cut)
 
-    n_seas = len(var_season)/len(season)
-    seas_mean = np.mean(var_season, axis = 0)
-    all_seas = [np.mean(var_season[len(season)*i:len(season)*(i+1)], axis = 0) for i in range(n_seas)]
-    seas_std = np.std(all_seas, axis = 0)
+    if check_daily(dates):
+        dates_diff = dates_season[1:] - dates_season[:-1]
+        jump = dates_diff > pd.Timedelta('2 days')
+        okju = np.where(jump)[0] + 1
+        okju = np.append([0], okju)
+        okju = np.append(okju, [len(dates_season)])
+        n_seas = len(okju) - 1
 
-    return seas_mean, seas_std
+        all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+        all_var_seas = [var_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+    else:
+        n_seas = len(var_season)/len(season)
+        all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
+        all_var_seas = [var_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
+
+    return np.array(all_var_seas), np.array(all_dates_seas)
 
 
 def range_years(year1, year2):
@@ -2150,7 +2180,7 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     dates = pd.to_datetime(dates)
     deltas = dates[1:]-dates[:-1]
     deltauno = dates[1]-dates[0]
-    ndis = np.sum(deltas > 3*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
+    ndis = np.sum(abs(deltas) > 2*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
 
     print('check: number of seasons = {}\n'.format(ndis+1))
 

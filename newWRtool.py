@@ -56,9 +56,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list, list]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -82,6 +82,15 @@ defaults['bounding_lat'] = 30.
 defaults['plot_margins'] = None
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
+
+if inputs['area'] == 'custom':
+    if inputs['custom_area'] is None:
+        raise ValueError('Set custom_area or specify a default area')
+    else:
+        inputs['custom_area'] = map(float, inputs['custom_area'])
+        area = inputs['custom_area']
+else:
+    area = inputs['area']
 
 if inputs['cart_in'][-1] != '/': inputs['cart_in'] += '/'
 if inputs['cart_out_general'][-1] != '/': inputs['cart_out_general'] += '/'
@@ -134,14 +143,14 @@ if inputs['year_range'] is not None:
 
 if inputs['area'] == 'EAT' and inputs['numclus'] == 4:
     if inputs['patnames'] is None:
-        input['patnames'] = ['NAO +', 'Sc. Blocking', 'Atl. Ridge', 'NAO -']
+        inputs['patnames'] = ['NAO +', 'Sc. Blocking', 'Atl. Ridge', 'NAO -']
     if inputs['patnames_short'] is None:
-        input['patnames_short'] = ['NP', 'BL', 'AR', 'NN']
+        inputs['patnames_short'] = ['NP', 'BL', 'AR', 'NN']
 elif inputs['area'] == 'PNA' and inputs['numclus'] == 4:
     if inputs['patnames'] is None:
-        input['patnames'] = ['Ala. Ridge', 'Pac. Trough', 'Arctic Low', 'Arctic High']
+        inputs['patnames'] = ['Ala. Ridge', 'Pac. Trough', 'Arctic Low', 'Arctic High']
     if inputs['patnames_short'] is None:
-        input['patnames_short'] = ['AR', 'PT', 'AL', 'AH']
+        inputs['patnames_short'] = ['AR', 'PT', 'AL', 'AH']
 
 if inputs['patnames'] is None:
     inputs['patnames'] = ['clus_{}'.format(i) for i in range(inputs['numclus'])]
@@ -164,14 +173,14 @@ if not os.path.exists(inputs['cart_out_general'] + inputs['ERA_ref_folder']):
 if not os.path.exists(nomeout):
     print('{} not found, this is the first run. Setting up the computation..\n'.format(nomeout))
     if not os.path.exists(ERA_ref_out) is None:
-        ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], inputs['area'], extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
+        ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
         pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
     else:
         ERA_ref = pickle.load(open(ERA_ref_out, 'r'))
 
     model_outs = dict()
     for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
-        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], inputs['area'], extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
 else:
