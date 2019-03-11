@@ -1056,10 +1056,16 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                 filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
                 stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
                 coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
+                cosoerr = np.std([models[mod]['RMS'] for mod in inputs['groups'][gru]], axis = 0)/nsqr
                 filos.write(stringa.format(*coso))
+                stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
+                filos.write(stringa.format(*cosoerr))
                 stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
                 coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+                cosoerr = np.std([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
                 filos.write(stringa.format(*coso))
+                stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
+                filos.write(stringa.format(*cosoerr))
 
             if 'significance' in models.values()[0].keys():
                 ctl.newline(filos)

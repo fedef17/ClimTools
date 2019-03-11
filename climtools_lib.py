@@ -1412,9 +1412,12 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
     """
 
-    all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+    if season != 'year':
+        all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+        all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+    else:
+        all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
 
-    all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
     seas_mean = np.mean(all_seas, axis = 0)
     seas_std = np.std(all_seas, axis = 0)
 
@@ -1727,10 +1730,12 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
     return extreme_ens_anomalies, extreme_ensemble_mean
 
 
-def yearly_average(var, dates):
+def yearly_average(var, dates, dates_range = None, cut = True):
     """
     Averages year per year.
     """
+    if dates_range is not None:
+        var, dates = sel_time_range(var, dates, dates_range)
 
     dates_pdh = pd.to_datetime(dates)
 
@@ -1739,6 +1744,8 @@ def yearly_average(var, dates):
     for year in np.unique(dates_pdh.year):
         data = pd.to_datetime('{}0101'.format(year), format='%Y%m%d')
         okdates = (dates_pdh.year == year)
+        if cut and len(np.unique(dates_pdh[okdates].month)) < 12:
+            continue
         nuvar.append(np.mean(var[okdates, ...], axis = 0))
         nudates.append(data)
 
@@ -3065,7 +3072,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -3083,7 +3090,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     < add_hatching > : bool mask. Where True the map is hatched.
     """
 
-    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    if clevels is None:
+        clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
     print(clevels)
     print(np.min(data), np.max(data))
 
@@ -4004,6 +4012,45 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     return
 
 
+def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 18):
+    """
+    Produces a plot with ellipse patches indicating error bars.
+
+    If polar set to True, x is the polar axis (angle in radians) and y is the radial axis.
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(8,6))
+        ax = fig.add_subplot(111, polar = polar)
+    else:
+        filename = None
+
+    if colors is None:
+        colors = color_set(len(x))
+
+    all_artists = []
+    for i, (xu, yu, errxu, erryu) in enumerate(zip(x, y, errx, erry)):
+        ell = mpl.patches.Ellipse(xy = (xu, yu), width = 2*errxu, height = 2*erryu, angle = 0.0)
+        ax.add_artist(ell)
+        ell.set_clip_box(ax.bbox)
+        ell.set_alpha(alpha)
+        ell.set_facecolor(colors[i])
+        if labels is not None:
+            ell.set_label(labels[i])
+        all_artists.append(ell)
+
+    if not polar:
+        ax.set_xlim(min(x)-min(errx), max(x)+max(errx))
+        ax.set_ylim(min(y)-min(erry), max(y)+max(erry))
+
+    if labels is not None:
+        ax.legend(handles = all_artists, fontsize = legendfontsize)
+
+    if filename is not None:
+        fig.savefig(filename)
+
+    return
+
+
 def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True):
     """
     Produces two figures:
@@ -4135,31 +4182,31 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     m,c = np.linalg.lstsq(A,y)[0]
     xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
 
-    fig = pl.figure(figsize=(8, 6), dpi=150)
+    fig = plt.figure(figsize=(8, 6), dpi=150)
     ax = fig.add_subplot(111)
-    pl.xlabel(xlabel)
-    pl.ylabel(ylabel)
-    pl.grid()
-    pl.scatter(x, y, label='Data', color='blue', s=4, zorder=3)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid()
+    plt.scatter(x, y, label='Data', color='blue', s=4, zorder=3)
     if xlim is not None:
         if np.isnan(xlim[1]):
-            pl.xlim(xlim[0],pl.xlim()[1])
+            plt.xlim(xlim[0],plt.xlim()[1])
         elif np.isnan(xlim[0]):
-            pl.xlim(pl.xlim()[0],xlim[1])
+            plt.xlim(plt.xlim()[0],xlim[1])
         else:
-            pl.xlim(xlim[0],xlim[1])
+            plt.xlim(xlim[0],xlim[1])
     if ylim is not None:
         if np.isnan(ylim[1]):
-            pl.ylim(ylim[0],pl.ylim()[1])
+            plt.ylim(ylim[0],plt.ylim()[1])
         elif np.isnan(ylim[0]):
-            pl.ylim(pl.ylim()[0],ylim[1])
+            plt.ylim(plt.ylim()[0],ylim[1])
         else:
-            pl.ylim(ylim[0],ylim[1])
-    pl.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
-    pl.title("Pearson's R = {:5.2f}".format(pearR))
-    pl.legend(loc=4,fancybox =1)
+            plt.ylim(ylim[0],ylim[1])
+    plt.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
+    plt.title("Pearson's R = {:5.2f}".format(pearR))
+    plt.legend(loc=4,fancybox =1)
     fig.savefig(filename, format=format, dpi=150)
-    pl.close()
+    plt.close()
 
     return
 
