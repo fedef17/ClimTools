@@ -1784,7 +1784,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     patt = result_obs['cluspattern']
     filename = cart_out+'Allclus_OBSERVED.pdf'
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -1799,7 +1799,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
 
         filename = cartout_mod+'Allclus_'+lab+'.pdf'
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,2), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
         all_figures += figs
         for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
             nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
@@ -1849,9 +1849,13 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70)
         all_figures += figs
 
+    numens_ok = int(np.ceil(n_clus))
+    side1 = int(np.ceil(np.sqrt(numens_ok)))
+    side2 = int(np.ceil(numens_ok/float(side1)))
+
     fig = plt.figure(figsize=(16,12))
     for num, patt in enumerate(patnames):
-        ax = plt.subplot(2, 2, num+1, polar = True)
+        ax = plt.subplot(side1, side2, num+1, polar = True)
 
         obs = result_obs['cluspattern_area'][num, ...]
         modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]

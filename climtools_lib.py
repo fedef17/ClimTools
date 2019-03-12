@@ -3616,6 +3616,9 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     for i in range(num_figs):
         fig = plt.figure(figsize = figsize)#(24,14)
         for nens in range(numens_ok*i, numens_ok*(i+1)):
+            if nens >= numens:
+                print('no more panels here')
+                break
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
