@@ -1335,10 +1335,22 @@ def check_daily(dates):
 
 def running_mean(var, wnd):
     """
-    Performs a running mean.
+    Performs a running mean (if multidim, the mean is done on the first axis).
+
+    < wnd > : is the window length.
     """
-    tempser = pd.Series(var)
-    rollpi_temp = tempser.rolling(wnd, center = True).mean()
+    if var.ndim == 1:
+        tempser = pd.Series(var)
+        rollpi_temp = tempser.rolling(wnd, center = True).mean()
+    else:
+        rollpi_temp = []
+        for i in range(len(var)):
+            if i-wnd/2 < 0 or i + wnd/2 > len(var)-1:
+                rollpi_temp.append(np.nan*np.ones(var[0].shape))
+            else:
+                rollpi_temp.append(np.mean(var[i-wnd/2:i+wnd/2+1, ...], axis = 0))
+
+        rollpi_temp = np.stack(rollpi_temp)
 
     return rollpi_temp
 
