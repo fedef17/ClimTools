@@ -26,8 +26,8 @@ L = 2501000.0
 Rearth = 6371.0e3
 ##
 
-cart_in = '/data/fabiano/SPHINX/heat_flux/fluxes_row/'
-cart_in_ref = '/data/fabiano/OBS/ERA/ERAInterim/'
+cart_in = '/data-hobbes/fabiano/SPHINX/heat_flux/fluxes_row/'
+cart_in_ref = '/data-hobbes/fabiano/OBS/ERA/ERAInterim/'
 
 file_list = cart_in_ref+'ERAInterim_6hrs_1988_vatazgq.nc'
 file_ps = cart_in_ref+'ERAInterim_mon_1988_ps.nc'

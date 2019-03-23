@@ -18,7 +18,7 @@ from matplotlib.animation import ImageMagickFileWriter
 #cart = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/'
 cart = '/home/fedefab/Scrivania/Research/Post-doc/SPHINX/'
 
-cart_data = '/data/fabiano/SPHINX/tas_mon/'
+cart_data = '/data-hobbes/fabiano/SPHINX/tas_mon/'
 
 ensmem = ['lcb0','lcb1','lcb2','lcs0','lcs1','lcs2']
 

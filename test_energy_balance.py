@@ -35,12 +35,12 @@ KtoC = 273.15
 # ###############################################################################
 
 # Calculates radiation balances
-cart_in = '/data/fabiano/SPHINX/radiation/'
+cart_in = '/data-hobbes/fabiano/SPHINX/radiation/'
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/radiation_balance/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
 # read masks
-filo = '/data/fabiano/SPHINX/masks.nc'
+filo = '/data-hobbes/fabiano/SPHINX/masks.nc'
 fh = nc.Dataset(filo)
 land_mask = fh.variables['RnfO.msk'][:]
 ocean_mask = fh.variables['RnfA.msk'][:]
@@ -129,7 +129,7 @@ radclim = pickle.load(open(cart_out+'radclim_yearly.p'))
 varniuu, lat, lon, dates, time_units, var_units = ctl.read3Dncfield(cart_in+namefi.format('lcb0',1988,'rsut'))
 del varniuu
 
-carttemp = '/data/fabiano/SPHINX/tas_mon/'
+carttemp = '/data-hobbes/fabiano/SPHINX/tas_mon/'
 # globalme = dict()
 # zonalme = dict()
 # varna = 'tas'

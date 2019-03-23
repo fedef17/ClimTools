@@ -15,7 +15,7 @@ sys.path.insert(0,'/home/fabiano/Research/git/WRtool/CLUS_tool/WRtool/')
 from readsavencfield import read4Dncfield, save3Dncfield
 
 
-cart = '/data/fabiano/Medscope/seasonal_forecasts_1d5/'
+cart = '/data-hobbes/fabiano/Medscope/seasonal_forecasts_1d5/'
 #cart = '/home/federico/work/MARS_data/MEDSCOPE_seasonal/'
 
 # Open nc file

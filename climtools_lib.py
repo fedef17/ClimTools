@@ -10,6 +10,7 @@ import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
+import matplotlib as mpl
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
@@ -28,6 +29,11 @@ import ctp
 from datetime import datetime
 import pickle
 
+import iris
+from cf_units import Unit
+
+mpl.rcParams['hatch.linewidth'] = 0.1
+#mpl.rcParams['hatch.color'] = 'black'
 
 #######################################################
 #
@@ -35,12 +41,27 @@ import pickle
 #
 #######################################################
 
+def isclose(a, b, rtol = 1.e-9, atol = 0.0):
+    return np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=False)
+
 def printsep(ofile = None):
     if ofile is None:
         print('\n--------------------------------------------------------\n')
     else:
         ofile.write('\n--------------------------------------------------------\n')
     return
+
+def newline(ofile = None):
+    if ofile is None:
+        print('\n\n')
+    else:
+        ofile.write('\n\n')
+    return
+
+def datestamp():
+    tempo = datetime.now().isoformat()
+    tempo = tempo.split('.')[0]
+    return tempo
 
 def str_to_bool(s):
     if s == 'True' or s == 'T':
@@ -131,6 +152,20 @@ def read_inputs(nomefile, key_strings, n_lines = None, itype = None, defaults = 
                         cose = lines[num_0+1].rstrip().split(',')
                         coseok = [cos.strip() for cos in cose]
                         variables.append(coseok)
+                    elif typ == dict:
+                        # reads subsequent lines. Stops when finds empty line.
+                        iko = 1
+                        line = lines[num_0+iko]
+                        nuvar = dict()
+                        while len(line.strip()) > 0:
+                            dictkey = line.split(':')[0].strip()
+                            allvals = [cos.strip() for cos in line.split(':')[1].split(',')]
+                            # if len(allvals) == 1:
+                            #     allvals = allvals[0]
+                            nuvar[dictkey] = allvals
+                            iko += 1
+                            line = lines[num_0+iko]
+                        variables.append(nuvar)
                     elif nli == 1:
                         cose = lines[num_0+1].rstrip().split()
                         #print(key, cose)
@@ -237,172 +272,171 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def read_iris_nc(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
+def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
+    """
+    Regrids cube according to ref_cube grid. Default scheme is linear (cdo remapbil). Other scheme available: nearest and conservative (cdo remapcon).
+    """
+    if regrid_scheme == 'linear':
+        schema = iris.analysis.Linear()
+    elif regrid_scheme == 'conservative':
+        schema = iris.analysis.AreaWeighted()
+    elif regrid_scheme == 'nearest':
+        schema = iris.analysis.Nearest()
+
+    (nlat, nlon) = (len(cube.coord('latitude').points), len(cube.coord('longitude').points))
+    (nlat_ref, nlon_ref) = (len(ref_cube.coord('latitude').points), len(ref_cube.coord('longitude').points))
+
+    if nlat*nlon < nlat_ref*nlon_ref:
+        raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
+
+    nucube = cube.regrid(ref_cube, schema)
+
+    return nucube
+
+
+def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = None, extract_level_hPa = None, regrid_scheme = 'linear', adjust_nonstd_dates = True):
+    """
+    Transforms an iris cube in a variable and a set of coordinates.
+    Optionally selects a level (given in hPa).
+    TODO: cube regridding to a given lat/lon grid.
+
+    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
+    < force_level_units > : str. Sometimes level units are not set inside the netcdf file. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
+    """
+    print('INIZIO')
+    ndim = cube.ndim
+    datacoords = dict()
+    aux_info = dict()
+    ax_coord = dict()
+
+    print(datetime.now())
+
+    if regrid_to_reference is not None:
+        cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
+
+    print(datetime.now())
+
+    if convert_units_to:
+        if cube.units.name != convert_units_to:
+            print('Converting data from {} to {}\n'.format(cube.units.name, convert_units_to))
+            if cube.units.name == 'm**2 s**-2' and convert_units_to == 'm':
+                cu = cu/9.80665
+                cube.units = 'm'
+            else:
+                cube.convert_units(convert_units_to)
+
+    print(datetime.now())
+    data = cube.data
+    print(datetime.now())
+    aux_info['var_units'] = cube.units.name
+
+    coord_names = [cord.name() for cord in cube.coords()]
+
+    allco = ['lat', 'lon', 'level']
+    allconames = dict()
+    allconames['lat'] = np.array(['latitude', 'lat'])
+    allconames['lon'] = np.array(['longitude', 'lon'])
+    allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
+
+    print(datetime.now())
+
+    for i, nam in enumerate(coord_names):
+        found = False
+        if nam == 'time': continue
+        for std_nam in allconames.keys():
+            if nam in allconames[std_nam]:
+                coor = cube.coord(nam)
+                if std_nam == 'level':
+                    coor.convert_units('hPa')
+                datacoords[std_nam] = coor.points
+                ax_coord[std_nam] = i
+                found = True
+        if not found:
+            print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
+
+    print(datetime.now())
+    if 'level' in datacoords.keys() and extract_level_hPa is not None:
+        okind = datacoords['level'] == extract_level_hPa
+        if np.any(okind):
+            datacoords['level'] = datacoords['level'][okind]
+            data = data.take(first(okind), axis = ax_coord['level'])
+        elif len(datacoords['level']) == 1:
+            data = data.squeeze()
+        else:
+            raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+
+    print(datetime.now())
+    if 'time' in coord_names:
+        time = cube.coord('time').points
+        time_units = cube.coord('time').units
+        dates = time_units.num2date(time) # this is a set of cftime._cftime.real_datetime objects
+        time_cal = time_units.calendar
+
+        if adjust_nonstd_dates:
+            if dates[0].year < 1677 or dates[-1].year > 2256:
+                print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+                dates = adjust_outofbound_dates(dates)
+
+            if time_cal == '365_day' or time_cal == 'noleap':
+                dates = adjust_noleap_dates(dates)
+            elif time_cal == '360_day':
+                dates = adjust_360day_dates(dates)
+
+        datacoords['dates'] = dates
+        aux_info['time_units'] = time_units.name
+        aux_info['time_calendar'] = time_cal
+
+    print(datetime.now())
+    data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
+    datacoords['lat'] = lat
+    datacoords['lon'] = lon
+    print('FINE')
+
+    return data, datacoords, aux_info
+
+
+def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True):
     """
     Read a netCDF file using the iris library.
 
-    < extract_level > : float. If set, only the corresponding level is extracted.
+    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
     < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
 
-    < pressure_in_Pa > : bool. If True (default) pressure levels are converted to Pa.
-    < force_level_units > : str. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
-    < keep_only_Ndim_vars > : keeps only variables with correct size (excludes variables like time_bnds, lat_bnds, ..)
+    < keep_only_maxdim_vars > : keeps only variables with maximum size (excludes variables like time_bnds, lat_bnds, ..)
     """
 
     print('Reading {}\n'.format(ifile))
 
-    fh = iris.load(file)
+    fh = iris.load(ifile)
 
-    dimensions = [cord.name() for cord in fh[0].coords()]
+    cudimax = np.argmax([cu.ndim for cu in fh])
+    ndim = np.max([cu.ndim for cu in fh])
+
+    dimensions = [cord.name() for cord in fh[cudimax].coords()]
 
     if verbose: print('Dimensions: {}\n'.format(dimensions))
-    ndim = len(dimensions)
 
-    variab_names = [cos.var_name for cos in fh]
+    if keep_only_maxdim_vars:
+        fh = [cu for cu in fh if cu.ndim == ndim]
+
+    variab_names = [cu.name() for cu in fh]
     if verbose: print('Variables: {}\n'.format(variab_names))
     nvars = len(variab_names)
     print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, variab_names))
 
-    try:
-        lat_o         = fh[0]['lat'].points
-        lon_o         = fh[0]['lon'][:]
-    except KeyError as ke:
-        #print(repr(ke))
-        lat_o         = fh.variables['latitude'][:]
-        lon_o         = fh.variables['longitude'][:]
-    true_dim = 2
+    all_vars = dict()
+    for cu in fh:
+        all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
 
-    vars = dict()
-    if select_var is None:
-        for varna in variab_names:
-            var = fh.variables[varna][:]
-            var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
-            vars[varna] = var
+    if select_var is not None:
+        print('Read variable: {}\n'.format(select_var))
+        return all_vars[select_var]
+    elif len(all_vars.keys()) == 1:
+        print('Read variable: {}\n'.format(all_vars.keys()[0]))
+        return all_vars.values()[0]
     else:
-        print('Extracting {}\n'.format(select_var))
-        for varna in variab_names:
-            if varna in select_var:
-                var = fh.variables[varna][:]
-                var, lat, lon = check_increasing_latlon(var, lat_o, lon_o)
-                vars[varna] = var
-        if len(vars.keys()) == 0:
-            raise KeyError('No variable corresponds to names: {}. All variabs: {}'.format(select_var, variab_names))
-
-
-    if 'time' in all_variabs:
-        true_dim += 1
-        time        = fh.variables['time'][:]
-        time_units  = fh.variables['time'].units
-        time_cal    = fh.variables['time'].calendar
-
-        time = list(time)
-        dates = nc.num2date(time,time_units,time_cal)
-
-        try:
-            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
-        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
-            print(obd)
-            print('WARNING!!! Dates outside pandas range: 1677-2256\n')
-            dates = adjust_outofbound_dates(dates)
-
-        if time_cal == '365_day' or time_cal == 'noleap':
-            dates = adjust_noleap_dates(dates)
-        elif time_cal == '360_day':
-            dates = adjust_360day_dates(dates)
-
-        print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
-
-    if true_dim == 3 and ndim > 3:
-        lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
-        found = False
-        for levna in lev_names:
-            if levna in all_variabs:
-                oklevname = levna
-                level = fh.variables[levna][:]
-                try:
-                    nlevs = len(level)
-                    found = True
-                except:
-                    found = False
-                break
-
-        if not found:
-            print('Level name not found among: {}\n'.format(lev_names))
-            print('Does the variable have levels?')
-        else:
-            true_dim += 1
-            try:
-                level_units = fh.variables[oklevname].units
-            except AttributeError as atara:
-                print('level units not found in file {}\n'.format(ifile))
-                if force_level_units is not None:
-                    level_units = force_level_units
-                    print('setting level units to {}\n'.format(force_level_units))
-                    print('levels are {}\n'.format(level))
-                else:
-                    raise atara
-
-            print('level units are {}\n'.format(level_units))
-            if pressure_in_Pa:
-                if level_units in ['millibar', 'millibars','hPa']:
-                    level = 100.*level
-                    level_units = 'Pa'
-                    print('Converting level units from hPa to Pa\n')
-
-    print('Dimension of variables is {}\n'.format(true_dim))
-    if keep_only_Ndim_vars:
-        for varna in vars.keys():
-            if len(vars[varna].shape) < true_dim:
-                print('Erasing variable {}\n'.format(varna))
-                vars.pop(varna)
-
-    if true_dim == 4:
-        if extract_level is not None:
-            lvel = extract_level
-            if nlevs > 1:
-                if level_units=='millibar' or level_units=='hPa':
-                    l_sel=int(np.where(level==lvel)[0])
-                    print('Selecting level {0} millibar'.format(lvel))
-                elif level_units=='Pa':
-                    l_sel=int(np.where(level==lvel*100)[0])
-                    print('Selecting level {0} Pa'.format(lvel*100))
-                level = lvel
-            else:
-                level = level[0]
-                l_sel = 0
-
-            for varna in vars.keys():
-                vars[varna] = vars[varna][:,l_sel, ...].squeeze()
-            true_dim = true_dim - 1
-        else:
-            levord = level.argsort()
-            level = level[levord]
-            for varna in vars.keys():
-                vars[varna] = vars[varna][:, levord, ...]
-
-    var_units = dict()
-    for varna in vars.keys():
-        try:
-            var_units[varna] = fh.variables[varna].units
-        except:
-            var_units[varna] = None
-
-        if var_units[varna] == 'm**2 s**-2':
-            print('From geopotential (m**2 s**-2) to geopotential height (m)')   # g0=9.80665 m/s2
-            vars[varna] = vars[varna]/9.80665
-            var_units[varna] = 'm'
-
-    print('Returned variables are: {}'.format(vars.keys()))
-    if len(vars.keys()) == 1:
-        vars = vars.values()[0]
-        var_units = var_units.values()[0]
-
-    if true_dim == 2:
-        return vars, lat, lon, var_units
-    elif true_dim == 3:
-        return vars, lat, lon, dates, time_units, var_units, time_cal
-    elif true_dim == 4:
-        return vars, level, lat, lon, dates, time_units, var_units, time_cal
+        print('Read all variables: {}\n'.format(all_vars.keys()))
+        return all_vars
 
 
 def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
@@ -468,10 +502,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
         time = list(time)
         dates = nc.num2date(time,time_units,time_cal)
 
-        try:
-            dates_pdh = pd.to_datetime(np.concatenate([dates[:10], dates[-10:]]))
-        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime as obd:
-            print(obd)
+        if dates[0].year < 1677 or dates[-1].year > 2256:
             print('WARNING!!! Dates outside pandas range: 1677-2256\n')
             dates = adjust_outofbound_dates(dates)
 
@@ -867,6 +898,65 @@ def read_N_2Dfields(ifile):
     return var, var_units, lat, lon
 
 
+def create_iris_cube(data, varname, varunits, iris_coords_list, long_name = None):
+    """
+    Creates an iris.cube.Cube instance.
+
+    < iris_coords_list > : list of iris.coords.DimCoord objects (use routine create_iris_coord_list for standard coordinates).
+    """
+    # class iris.cube.Cube(data, standard_name=None, long_name=None, var_name=None, units=None, attributes=None, cell_methods=None, dim_coords_and_dims=None, aux_coords_and_dims=None, aux_factories=None)
+
+    allcoords = []
+    if not isinstance(iris_coords_list[0], iris.coords.DimCoord):
+        raise ValueError('coords not in iris format')
+
+    allcoords = [(cor, i) for i, cor in enumerate(iris_coords_list)]
+
+    cube = iris.cube.Cube(data, standard_name = varname, units = varunits, dim_coords_and_dims = allcoords, long_name = long_name)
+
+    return cube
+
+
+def create_iris_coord_list(coords_points, coords_names, time_units = None, time_calendar = None, level_units = None):
+    """
+    Creates a list of coords in iris format for standard (lat, lon, time, level) coordinates.
+    """
+
+    coords_list = []
+    for i, (cordpo, nam) in enumerate(zip(coords_points, coords_names)):
+        cal = None
+        circ = False
+        if nam in ['latitude', 'longitude', 'lat', 'lon']:
+            units = 'degrees'
+            if 'lon' in nam: circ = True
+        if nam == 'time':
+            units = Unit(time_units, calendar = time_calendar)
+        if nam in ['lev', 'level', 'plev']:
+            units = level_units
+
+        cord = create_iris_coord(cordpo, std_name = nam, units = units, circular = circ)
+        coords_list.append(cord)
+
+    return coords_list
+
+
+def create_iris_coord(points, std_name, long_name = None, units = None, circular = False, calendar = None):
+    """
+    Creates an iris.coords.DimCoord instance.
+    """
+    # class iris.coords.DimCoord(points, standard_name=None, long_name=None, var_name=None, units='1', bounds=None, attributes=None, coord_system=None, circular=False)
+
+    if std_name == 'longitude' or std_name == 'lon':
+        circular = True
+    if std_name == 'time' and (calendar is None or units is None):
+        raise ValueError('No calendar/units given for time!')
+        units = Unit(units, calendar = calendar)
+
+    coord = iris.coords.DimCoord(points, standard_name = std_name, long_name = long_name, units = units, circular = circular)
+
+    return coord
+
+
 def save2Dncfield(lats,lons,variab,varname,ofile):
     '''
     GOAL
@@ -1099,8 +1189,8 @@ def sel_area(lat,lon,var,area):
             var_roll=var
             lon_new=lon
     elif (type(area) == list) or (type(area) == tuple) and len(area) == 4:
-        latS, latN, lonW, lonE = area
-        printarea='custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE)
+        lonW, lonE, latS, latN = area
+        print('custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE))
         if lon.min() >= 0:
             lon_new=lon-180
             var_roll=np.roll(var,int(len(lon)/2),axis=-1)
@@ -1113,7 +1203,10 @@ def sel_area(lat,lon,var,area):
     latidx = (lat >= latS) & (lat <= latN)
     lonidx = (lon_new >= lonW) & (lon_new <= lonE)
 
-    print(var_roll.shape, len(latidx), len(lonidx))
+    print('Area: ', lonW, lonE, latS, latN)
+    # print(lat, lon_new)
+    # print(latidx, lonidx)
+    # print(var_roll.shape, len(latidx), len(lonidx))
     if var.ndim == 3:
         var_area = var_roll[:, latidx][..., lonidx]
     elif var.ndim == 2:
@@ -1266,6 +1359,24 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
+def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
+    """
+    Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
+    """
+    dates_pdh = pd.to_datetime(dates)
+    climat_mean = []
+    dates_climate_mean = []
+    years = np.unique(dates_pdh.year)[::step_year]
+
+    for yea in years:
+        okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
+        clm, dtclm, _ = monthly_climatology(var[okye], dates[okye], refyear = yea)
+        climat_mean.append(clm)
+        dates_climate_mean.append(dtclm)
+
+    return climat_mean, dates_climate_mean
+
+
 def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     """
     Performs a monthly climatological mean of the dataset.
@@ -1304,20 +1415,146 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     return filt_mean, dates_ok, filt_std
 
 
+def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
+    """
+    Performs a seasonal climatological mean of the dataset.
+    Works both on monthly and daily datasets.
+
+    Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    """
+
+    if season != 'year':
+        all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+        all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+    else:
+        all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
+
+    seas_mean = np.mean(all_seas, axis = 0)
+    seas_std = np.std(all_seas, axis = 0)
+
+    return seas_mean, seas_std
+
+
+def seasonal_set(var, dates, season, dates_range = None, cut = True):
+    """
+    Cuts var and dates, creating a list of variables relative to each season and a list of dates.
+    Works both on monthly and daily datasets.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    """
+
+    if dates_range is not None:
+        var, dates = sel_time_range(var, dates, dates_range)
+
+    if len(var) <= len(season):
+        cut = False
+
+    dates_pdh = pd.to_datetime(dates)
+
+    var_season, dates_season = sel_season(var, dates, season, cut = cut)
+
+    if check_daily(dates):
+        dates_diff = dates_season[1:] - dates_season[:-1]
+        jump = dates_diff > pd.Timedelta('2 days')
+        okju = np.where(jump)[0] + 1
+        okju = np.append([0], okju)
+        okju = np.append(okju, [len(dates_season)])
+        n_seas = len(okju) - 1
+
+        all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+        all_var_seas = [var_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+    else:
+        n_seas = len(var_season)/len(season)
+        all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
+        all_var_seas = [var_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
+
+    return np.array(all_var_seas), np.array(all_dates_seas)
+
+
 def range_years(year1, year2):
     data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
     data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
     return data1, data2
 
 
-def sel_time_range(var, dates, dates_range):
+def sel_time_range(var, dates, dates_range, ignore_HHMM = True):
     """
     Extracts a subset in time.
+    < ignore_HHMM > : if True, considers only day, mon and year.
     """
-    dates_pdh = pd.to_datetime(dates)
-    okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
+
+    if ignore_HHMM:
+        okdates = np.array([(da.date() >= dates_range[0].date()) & (da.date() <= dates_range[1].date()) for da in dates])
+    else:
+        dates_pdh = pd.to_datetime(dates)
+        okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
 
     return var[okdates, ...], dates[okdates]
+
+
+def range_dates_monthly(first, last, monday = 15):
+    """
+    Creates a sequence of monthly dates between first and last datetime objects.
+    """
+
+    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+    ye0 = first.year
+    mo0 = first.month
+    ye1 = last.year
+    mo1 = last.month
+
+    datesmon = []
+    for ye in range(ye0, ye1+1):
+        mouno = 1
+        modue = 13
+        if ye == ye0:
+            mouno = mo0
+        elif ye == ye1:
+            modue = mo1+1
+        for mo in range(mouno,modue):
+            datesmon.append(pd.Timestamp(strindata.format(ye,mo,monday)).to_pydatetime())
+
+    datesmon = np.array(datesmon)
+
+    return datesmon
+
+
+def complete_time_range(var_season, dates_season, dates_all = None):
+    """
+    Completes a time series with missing dates. Returns a masked numpy array.
+    """
+    if dates_all is None:
+        if check_daily(dates_season):
+            freq = 'D'
+            dates_all_pdh = pd.date_range(dates_season[0], dates_season[-1], freq = freq)
+            dates_all = np.array([da.to_pydatetime() for da in dates_all_pdh])
+        else:
+            freq = 'M'
+            dates_all = range_dates_monthly(dates_season[0], dates_season[-1])
+
+    vals, okinds, okinds_seas = np.intersect1d(dates_all, dates_season, assume_unique = True, return_indices = True)
+
+    # shapea = list(var_season.shape)
+    # shapea[0] = len(dates_all)
+    # np.tile(maska, (3, 7, 1)).T.shape
+    var_all = np.ma.empty(len(dates_all))
+    var_all.mask = ~okinds
+    var_all[okinds] = var_season
+
+    return var_all, dates_all
+
+
+def date_series(init_dat, end_dat, freq = 'day', calendar = 'proleptic_gregorian'):
+    """
+    Creates a complete date_series between init_dat and end_dat.
+
+    < freq > : 'day' or 'mon'
+    """
+    dates = pd.date_range(init_dat, end_dat, freq = freq[0]).to_pydatetime()
+
+    return dates
 
 
 def check_daily(dates):
@@ -1421,6 +1658,30 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
     return var_anom
 
 
+def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_years = 20, step_year = 5):
+    """
+    Calculates the monthly anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_monthly_climat().
+    """
+    dates_pdh = pd.to_datetime(dates)
+    if climat_mean is None or dates_climate_mean is None:
+        climat_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
+
+    var_anom_tot = []
+    year_steps = np.unique(dates_pdh.year)[::step_year]
+
+    for yea in np.unique(dates_pdh.year):
+        yearef = np.argmin(abs(year_steps - yea))
+        okye = dates_pdh.year == yea
+        var_anom = anomalies_monthly(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef])
+        var_anom_tot.append(var_anom)
+
+    var_anom_tot = np.concatenate(var_anom_tot)
+    if len(var_anom_tot) != len(var):
+        raise ValueError('{} and {} differ'.format(len(var_anom_tot), len(var)))
+
+    return var_anom_tot
+
+
 def anomalies_monthly(var, dates, climat_mean = None, dates_climate_mean = None):
     """
     Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a monthly climatology on var.
@@ -1499,10 +1760,12 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
     return extreme_ens_anomalies, extreme_ensemble_mean
 
 
-def yearly_average(var, dates):
+def yearly_average(var, dates, dates_range = None, cut = True):
     """
     Averages year per year.
     """
+    if dates_range is not None:
+        var, dates = sel_time_range(var, dates, dates_range)
 
     dates_pdh = pd.to_datetime(dates)
 
@@ -1511,6 +1774,8 @@ def yearly_average(var, dates):
     for year in np.unique(dates_pdh.year):
         data = pd.to_datetime('{}0101'.format(year), format='%Y%m%d')
         okdates = (dates_pdh.year == year)
+        if cut and len(np.unique(dates_pdh[okdates].month)) < 12:
+            continue
         nuvar.append(np.mean(var[okdates, ...], axis = 0))
         nudates.append(data)
 
@@ -1589,6 +1854,16 @@ def zonal_mean(field, mask = None):
 #
 #######################################################
 
+def first(condition):
+    """
+    Returns the first index for which condition is True. Works only for 1-dim arrays.
+    """
+    #ind = np.asarray(condition).nonzero()[0][0]
+    ind = np.where(condition.flatten())[0][0]
+
+    return ind
+
+
 def Rcorr(x,y):
     """
     Returns correlation coefficient between two array of arbitrary shape.
@@ -1605,7 +1880,7 @@ def distance(x, y):
 
 def E_rms(x,y):
     """
-    Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2).
+    Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
     """
     n = x.size
     #E = np.sqrt(1.0/n * np.sum((x.flatten()-y.flatten())**2))
@@ -1942,7 +2217,7 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     dates = pd.to_datetime(dates)
     deltas = dates[1:]-dates[:-1]
     deltauno = dates[1]-dates[0]
-    ndis = np.sum(deltas > 3*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
+    ndis = np.sum(abs(deltas) > 2*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
 
     print('check: number of seasons = {}\n'.format(ndis+1))
 
@@ -2017,7 +2292,33 @@ def calc_seasonal_clus_freq(labels, dates, nmonths_season = 3):
 
     freqs = np.stack(freqs)
 
-    return freqs
+    return freqs.T
+
+
+def calc_monthly_clus_freq(labels, dates):
+    """
+    Calculates monthly cluster frequency.
+    """
+    numclus = int(np.max(labels)+1)
+
+    dates_pdh = pd.to_datetime(dates)
+    years = dates_pdh.year
+    months = dates_pdh.month
+    yemon = np.unique([(ye,mo) for ye,mo in zip(years, months)], axis = 0)
+
+    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+
+    freqs = []
+    datesmon = []
+    for (ye, mo) in yemon:
+        dateok = (dates_pdh.year == ye) & (dates_pdh.month == mo)
+        freqs.append(calc_clus_freq(labels[dateok], numclus = numclus))
+        datesmon.append(pd.Timestamp(strindata.format(ye,mo,15)).to_pydatetime())
+
+    freqs = np.stack(freqs)
+    datesmon = np.stack(datesmon)
+
+    return freqs.T, datesmon
 
 
 def change_clus_order(centroids, labels, new_ord):
@@ -2150,7 +2451,7 @@ def calc_RMS_and_patcor(clusters_1, clusters_2):
         cosin = cosine(c1,c2)
         patcor.append(cosin)
 
-    return et, patcor
+    return np.array(et), np.array(patcor)
 
 
 def find_cluster_minmax(PCs, centroids, labels):
@@ -2294,6 +2595,39 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
         return np.array(resid_times), np.array(regime_dates), np.array(regime_nums)
 
 
+def calc_days_event(labels, resid_times, regime_nums):
+    """
+    Returns two quantities. For each point, the number of days from the beginning of the cluster event (first day, second day, ...) and the total number of days of the event the point belongs to.
+    """
+    days_event = np.zeros(len(labels))
+    length_event = np.zeros(len(labels))
+
+    numclus = len(resid_times)
+
+    for clu in range(numclus):
+        ok_nums = regime_nums[clu]
+        ok_times = resid_times[clu]
+
+        okclu = labels == clu
+        indici = np.arange(len(labels))[okclu]
+        for ind in indici:
+            imi1 = np.argmin(abs(ok_nums[:,0]-ind))
+            val1 = abs(ok_nums[imi1,0]-ind)
+            imi2 = np.argmin(abs(ok_nums[:,1]-ind))
+            val2 = abs(ok_nums[imi2,1]-ind)
+            if val1 <= val2:
+                imi = imi1
+            else:
+                imi = imi2
+            print('p', ind, ok_nums[imi, :])
+            if ok_nums[imi,0] <= ind and ok_nums[imi,1] > ind:
+                print(ok_nums[imi,0], ind, ok_nums[imi,1])
+                days_event[ind] = ind-ok_nums[imi,0]+1
+                length_event[ind] = ok_times[imi]
+
+    return days_event, length_event
+
+
 def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
     """
     This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. Works with multimember ensemble.
@@ -2350,7 +2684,7 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, fix_length = 2, 
         max_days_between = fix_length-1
 
     for ens in range(n_ens):
-        print('ens member {}\n'.format(ens))
+        # print('ens member {}\n'.format(ens))
         trans_matrix_ens, trans_matrix_nums_ens = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
         if ens == 0:
             trans_matrix = np.empty(trans_matrix_ens.shape, dtype=object)
@@ -2361,11 +2695,11 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, fix_length = 2, 
 
         for i in range(numclus):
             for j in range(numclus):
-                if i == j and skip_persistence:
-                    print((i,j), '--> skipping..')
-                    continue
-                else:
-                    print((i,j))
+                # if i == j and skip_persistence:
+                #     print((i,j), '--> skipping..')
+                #     continue
+                # else:
+                #     print((i,j))
                 numsok = trans_matrix_nums_ens[i,j]
                 for (okin, okou) in numsok:
                     while okou-okin+1 < fix_length:
@@ -2505,6 +2839,36 @@ def calc_pdf(data, bnd_width = None):
     k = stats.kde.gaussian_kde(data, bw_method = bnd_width)
 
     return k
+
+def count_occurrences(data, num_range = None, convert_to_frequency = True):
+    """
+    Counts occurrences of each integer value inside data. num_range defaults to (min, max). If num_range is specified, the last count is the sum of all longer occurrences.
+    """
+    if num_range is None:
+        num_range = (np.min(data), np.max(data))
+
+    numarr = np.arange(num_range[0], num_range[1]+1)
+    unique, caun = np.unique(data, return_counts=True)
+    cosi = dict(zip(unique, caun))
+
+    counts = []
+    for el in numarr:
+        if el in cosi.keys():
+            counts.append(cosi[el])
+        else:
+            counts.append(0)
+
+    kiavi = np.array(cosi.keys())
+    pius_keys = kiavi[kiavi > num_range[1]]
+    vals_pius = np.sum(np.array([cosi[k] for k in pius_keys]))
+    counts.append(vals_pius)
+    numarr = np.append(numarr, num_range[1]+1)
+
+    counts = np.array(counts)
+    if convert_to_frequency:
+        counts = 1.0*counts/np.sum(counts)
+
+    return numarr, counts
 
 
 def compute_centroid_distance(PCs, centroids, labels):
@@ -2771,7 +3135,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, clip_to_box = True):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -2786,9 +3150,11 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
 
+    < add_hatching > : bool mask. Where True the map is hatched.
     """
 
-    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    if clevels is None:
+        clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
     print(clevels)
     print(np.min(data), np.max(data))
 
@@ -2801,38 +3167,29 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         cyclic = True
         #lon = np.append(lon, 360)
         #data = np.c_[data,data[:,0]]
+        lon_o = lon
         data, lon = cutil.add_cyclic_point(data, coord = lon)
 
-        # if np.min(lat) >= 0:
-        #     latpiu = np.sort(-1.0*lat[lat > 0])
-        #     lat = np.concatenate([latpiu, lat])
-        #     data = np.concatenate([np.zeros((len(latpiu), len(lon))), data])
+        if add_hatching is not None:
+            add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
 
     xi,yi = np.meshgrid(lon,lat)
 
-    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False)
-    if abs(clevels.max() - 152.8) < 0.1 and data.max() > 195:
-        print('ESPORTOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
-        pickle.dump([ax, map_plot], open('debug_contourf.p','w'))
+    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors)
+    if add_hatching is not None:
+        print('adding hatching')
+        #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','w'))
+        hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
+
     nskip = len(clevels)/n_lines - 1
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
-    if clip_to_box:
-        if isinstance(proj, ccrs.Orthographic):
-            print('WARNING: yet no clipping possible in Cartopy for Orthographic projection')
-            # Note: for the Orthographic projection yet no clipping is available... Only this stupid squared clipping with distances set in meters! So, better not.
-            # ax.set_extent([-4000000,4000000,-4000000,4000000], crs = ccrs.Orthographic())
-            # Check that the values provided are within the valid range (x_limits=[-6378073.21863, 6378073.21863], y_limits=[-6378073.21863, 6378073.21863]).
-        else:
-            if cyclic:
-                lon_180 = lon
-                if np.any(lon > 180):
-                    lon_180[lon > 180] = lon[lon > 180] - 360
-                latlonlim = [lon_180.min(), lon_180.max(), lat.min(), lat.max()]
-            else:
-                latlonlim = [lon.min(), lon.max(), lat.min(), lat.max()]
-            ax.set_extent(latlonlim, crs = proj)
+    if isinstance(proj, ccrs.PlateCarree):
+        if plot_margins is not None:
+            map_set_extent(ax, proj, bnd_box = plot_margins)
+    else:
+        map_set_extent(ax, proj, bounding_lat = bounding_lat)
 
     return map_plot
 
@@ -2907,8 +3264,62 @@ def adjust_color_scale(color_maps):
 
     return
 
+def def_projection(visualization, central_lat_lon):
+    """
+    Defines projection for the map plot.
+    """
+    if central_lat_lon is not None:
+        (clat, clon) = central_lat_lon
+    else:
+        clon = 0.
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6)):
+    if visualization == 'standard':
+        proj = ccrs.PlateCarree()
+    elif visualization == 'polar' or visualization == 'Npolar':
+        proj = ccrs.Orthographic(central_longitude = clon, central_latitude = 90)
+    elif visualization == 'Spolar':
+        proj = ccrs.Orthographic(central_longitude = clon, central_latitude = -90)
+    elif visualization == 'Nstereo' or visualization == 'stereo':
+        proj = ccrs.NorthPolarStereo()#central_longitude=clon)
+    elif visualization == 'Sstereo':
+        proj = ccrs.SouthPolarStereo()#central_longitude=clon)
+    else:
+        raise ValueError('visualization {} not recognised. Only standard, Npolar (or polar), Spolar, Nstereo (or stereo), Sstereo accepted'.format(visualization))
+
+    return proj
+
+
+def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
+    """
+    Reduces ax to the required lat/lon box.
+
+    < bnd_box >: 4-element tuple or list. (Wlon, Elon, Slat, Nlat) for standard visualization.
+    < bounding_lat >: for polar plots, the equatorward boundary latitude.
+    """
+
+    if bnd_box is not None:
+        if isinstance(proj, ccrs.PlateCarree):
+            print(bnd_box)
+            ax.set_extent(bnd_box, crs = ccrs.PlateCarree())
+
+    if bounding_lat is not None:
+        if (isinstance(proj, ccrs.Orthographic) or isinstance(proj, ccrs.Stereographic)):
+            if bounding_lat > 0:
+                ax.set_extent((-180, 180, bounding_lat, 90), crs = ccrs.PlateCarree())
+            else:
+                ax.set_extent((-180, 180, -90, bounding_lat), crs = ccrs.PlateCarree())
+
+    # theta = np.linspace(0, 2*np.pi, 100)
+    # center, radius = [0.5, 0.5], 0.2
+    # verts = np.vstack([np.sin(theta), np.cos(theta)]).T
+    # circle = mpath.Path(verts * radius + center)
+    #
+    # ax2.set_boundary(circle, transform=ax2.transAxes)
+
+    return
+
+
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None):
     """
     Plots a single map to a figure.
 
@@ -2916,7 +3327,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < lat, lon >: latitude and longitude
     < filename >: name of the file to save the figure to. If None, the figure is just shown.
 
-    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map.
+    < visualization >: 'standard' calls PlateCarree cartopy map, 'polar' calls Orthographic map, 'stereo' calls NorthPolarStereo. Also available Spolar and Sstereo.
     < central_lat_lon >: Tuple, (clat, clon). Is needed only for Orthographic plots. If not given, the mean lat and lon are taken.
     < cmap >: name of the color map.
     < cbar_range >: limits of the color bar.
@@ -2926,21 +3337,16 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
 
+
     """
     #if filename is None:
         #plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
+
+    # Plotting figure
+    fig4 = plt.figure(figsize = figsize)
+    ax = plt.subplot(projection = proj)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -2962,11 +3368,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    # Plotting figure
-    fig4 = plt.figure(figsize = figsize)
-    ax = plt.subplot(projection = proj)
-
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -2992,7 +3394,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return fig4
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3018,17 +3420,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
-            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3064,11 +3456,13 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 2, 1, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 2, 2, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3095,7 +3489,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False):
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3121,17 +3515,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = np.min(lat) + (np.max(lat)-np.min(lat))/2
-            clat = np.min(lon) + (np.max(lon)-np.min(lon))/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3167,11 +3551,13 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         lon2 = lon
 
     ax = plt.subplot(1, 3, 1, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 3, 2, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title(stitle_2, fontsize = 25)
 
     if use_different_grids:
@@ -3180,7 +3566,8 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
         diff = data1-data2
 
     ax = plt.subplot(1, 3, 3, projection=proj)
-    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+
+    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
     ax.set_title('Diff', fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3207,7 +3594,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12)):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3239,17 +3626,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
 
     """
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3302,10 +3679,13 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     for i in range(num_figs):
         fig = plt.figure(figsize = figsize)#(24,14)
         for nens in range(numens_ok*i, numens_ok*(i+1)):
+            if nens >= numens:
+                print('no more panels here')
+                break
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
             if number_subplots:
                 subtit = nens
@@ -3473,17 +3853,7 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     if labels is None:
         labels = np.arange(len(maps))
 
-    if visualization == 'standard':
-        proj = ccrs.PlateCarree()
-    elif visualization == 'polar':
-        if central_lat_lon is not None:
-            (clat, clon) = central_lat_lon
-        else:
-            clat = lat.min() + (lat.max()-lat.min())/2
-            clon = lon.min() + (lon.max()-lon.min())/2
-        proj = ccrs.Orthographic(central_longitude=clon, central_latitude=clat)
-    else:
-        raise ValueError('visualization {} not recognised. Only "standard" or "polar" accepted'.format(visualization))
+    proj = def_projection(visualization, central_lat_lon)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3516,13 +3886,13 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
         lab = labels[num]
         mapa = maps[num]
 
-        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
         showdate.set_text('{}'.format(lab))
 
         return
 
     mapa = maps[0]
-    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines)
+    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
 
     showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight = 'bold', color = 'black', bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
 
@@ -3708,6 +4078,45 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     return
 
 
+def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 18):
+    """
+    Produces a plot with ellipse patches indicating error bars.
+
+    If polar set to True, x is the polar axis (angle in radians) and y is the radial axis.
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(8,6))
+        ax = fig.add_subplot(111, polar = polar)
+    else:
+        filename = None
+
+    if colors is None:
+        colors = color_set(len(x))
+
+    all_artists = []
+    for i, (xu, yu, errxu, erryu) in enumerate(zip(x, y, errx, erry)):
+        ell = mpl.patches.Ellipse(xy = (xu, yu), width = 2*errxu, height = 2*erryu, angle = 0.0)
+        ax.add_artist(ell)
+        ell.set_clip_box(ax.bbox)
+        ell.set_alpha(alpha)
+        ell.set_facecolor(colors[i])
+        if labels is not None:
+            ell.set_label(labels[i])
+        all_artists.append(ell)
+
+    if not polar:
+        ax.set_xlim(min(x)-min(errx), max(x)+max(errx))
+        ax.set_ylim(min(y)-min(erry), max(y)+max(erry))
+
+    if labels is not None:
+        ax.legend(handles = all_artists, fontsize = legendfontsize)
+
+    if filename is not None:
+        fig.savefig(filename)
+
+    return
+
+
 def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True):
     """
     Produces two figures:
@@ -3839,31 +4248,31 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     m,c = np.linalg.lstsq(A,y)[0]
     xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
 
-    fig = pl.figure(figsize=(8, 6), dpi=150)
+    fig = plt.figure(figsize=(8, 6), dpi=150)
     ax = fig.add_subplot(111)
-    pl.xlabel(xlabel)
-    pl.ylabel(ylabel)
-    pl.grid()
-    pl.scatter(x, y, label='Data', color='blue', s=4, zorder=3)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid()
+    plt.scatter(x, y, label='Data', color='blue', s=4, zorder=3)
     if xlim is not None:
         if np.isnan(xlim[1]):
-            pl.xlim(xlim[0],pl.xlim()[1])
+            plt.xlim(xlim[0],plt.xlim()[1])
         elif np.isnan(xlim[0]):
-            pl.xlim(pl.xlim()[0],xlim[1])
+            plt.xlim(plt.xlim()[0],xlim[1])
         else:
-            pl.xlim(xlim[0],xlim[1])
+            plt.xlim(xlim[0],xlim[1])
     if ylim is not None:
         if np.isnan(ylim[1]):
-            pl.ylim(ylim[0],pl.ylim()[1])
+            plt.ylim(ylim[0],plt.ylim()[1])
         elif np.isnan(ylim[0]):
-            pl.ylim(pl.ylim()[0],ylim[1])
+            plt.ylim(plt.ylim()[0],ylim[1])
         else:
-            pl.ylim(ylim[0],ylim[1])
-    pl.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
-    pl.title("Pearson's R = {:5.2f}".format(pearR))
-    pl.legend(loc=4,fancybox =1)
+            plt.ylim(ylim[0],ylim[1])
+    plt.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
+    plt.title("Pearson's R = {:5.2f}".format(pearR))
+    plt.legend(loc=4,fancybox =1)
     fig.savefig(filename, format=format, dpi=150)
-    pl.close()
+    plt.close()
 
     return
 

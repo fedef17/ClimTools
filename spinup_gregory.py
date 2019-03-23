@@ -23,14 +23,14 @@ from copy import deepcopy as cp
 import iris
 ###############################################
 
-cart_in = '/data/fabiano/SPHINX/SPINUP/'
+cart_in = '/data-hobbes/fabiano/SPHINX/SPINUP/'
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/spinup_gregory/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
 ctl.openlog(cart_out, redirect_stderr = False)
 
-file_stoc = '/data/fabiano/SPHINX/SPINUP/sss0/atmosphere/sss0_1850_2169_time-series_atmo.nc'
-file_base = '/data/fabiano/SPHINX/SPINUP/ssb0/atmosphere/ssb0_1850_2169_time-series_atmo.nc'
+file_stoc = '/data-hobbes/fabiano/SPHINX/SPINUP/sss0/atmosphere/sss0_1850_2169_time-series_atmo.nc'
+file_base = '/data-hobbes/fabiano/SPHINX/SPINUP/ssb0/atmosphere/ssb0_1850_2169_time-series_atmo.nc'
 
 data = dict()
 data['stoc'] = iris.load(file_stoc)
