@@ -41,9 +41,10 @@ tommday = 86400
 cart_in = '/data-hobbes/fabiano/SPHINX/tas_pr_mon/'
 cart_in_3d = '/data-hobbes/fabiano/SPHINX/va_ua_ta_mon/'
 
-cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/mean_climates/'
+cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/mean_climates_v2/'
+if not os.path.exists(cart_out): os.mkdir(cart_out)
 
-varss = ['tas', 'pr', 'tasmax', 'tasmin']
+varss = ['tas', 'pr']#, 'tasmax', 'tasmin']
 varss3d = ['va', 'ta', 'ua']
 
 cblabels = dict()
@@ -54,8 +55,10 @@ cblabels['ua'] = 'u (m/s)'
 cblabels['va'] = 'v (m/s)'
 cblabels['pr'] = 'pr (mm/day)'
 
-ann = np.arange(1960,2101,20)
-annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+# ann = np.arange(1960,2101,20)
+# annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+ann = np.array([1957, 2005])
+annme = [1990]
 
 ensmem = ['lcb0','lcb1','lcb2','lcs0','lcs1','lcs2']
 
@@ -67,11 +70,11 @@ var, lat, lon, dates, time_units, var_units = ctl.read3Dncfield(cart_in+filena)
 filena = '{}_mon_{}_{}.nc'.format('lcb0', 1988, 'ta')
 varuna, level, lat, lon, datesuna, time_units, var_units, time_cal = ctl.read4Dncfield(cart_in_3d+filena)
 
-# climat = dict()
-# zonal = dict()
-# cross3d = dict()
-# globalme = dict()
-#
+climat = dict()
+zonal = dict()
+cross3d = dict()
+globalme = dict()
+
 # for ens in ensmem:
 #     # carico MM di tutti gli ensmems
 #     for varna in varss:
@@ -170,8 +173,8 @@ varuna, level, lat, lon, datesuna, time_units, var_units, time_cal = ctl.read4Dn
 #     if 'ta' in key:
 #         cross3d[key] = cross3d[key]-KtoC
 #
-# pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX.p','w'))
-globalme, zonal, climat, cross3d = pickle.load(open(cart_out+'out_meanclim_SPHINX.p','r'))
+# pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX_v2.p','w'))
+globalme, zonal, climat, cross3d = pickle.load(open(cart_out+'out_meanclim_SPHINX_v2.p','r'))
 
 figures = []
 #varlabels = ['tas (K)', 'pr ()']
@@ -271,13 +274,13 @@ for coso in ['base', 'stoc']:
                 print(coso,varna,seas,ann)
                 fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i], lat, lon, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo), cb_label = cblabels[varna])
                 figure_maps.append(fig)
-            fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i]-climat[(coso, varna, seas)][0], lat, lon, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), cb_label = cblabels[varna], plot_anomalies = True)
-            figure_maps_diff.append(fig)
+            # fig = ctl.plot_map_contour(climat[(coso, varna, seas)][i]-climat[(coso, varna, seas)][0], lat, lon, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), cb_label = cblabels[varna], plot_anomalies = True)
+            # figure_maps_diff.append(fig)
 
     figure_file = cart_out + '{}_maps.pdf'.format(coso)
     ctl.plot_pdfpages(figure_file, figure_maps)
-    figure_file = cart_out + '{}_maps_futdiff.pdf'.format(coso)
-    ctl.plot_pdfpages(figure_file, figure_maps_diff)
+    # figure_file = cart_out + '{}_maps_futdiff.pdf'.format(coso)
+    # ctl.plot_pdfpages(figure_file, figure_maps_diff)
     plt.close('all')
 
     figure_cross = []
@@ -294,13 +297,13 @@ for coso in ['base', 'stoc']:
                 print(coso,varna,seas,ann)
                 fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i], lat, level, title = coso+' {} {}: {}-{}'.format(varna, seas, ann-10, ann+10), cbar_range = (mino, maxo), cb_label = cblabels[varna], set_logscale_levels = True)
                 figure_cross.append(fig)
-            fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i]-cross3d[(coso, varna, seas)][0], lat, level, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), plot_anomalies = True, cb_label = cblabels[varna], set_logscale_levels = True)
-            figure_cross_diff.append(fig)
+            # fig = ctl.plot_lat_crosssection(cross3d[(coso, varna, seas)][i]-cross3d[(coso, varna, seas)][0], lat, level, title = coso+' {} {}: 2100 vs 1960 diff'.format(varna, seas), plot_anomalies = True, cb_label = cblabels[varna], set_logscale_levels = True)
+            # figure_cross_diff.append(fig)
 
     figure_file = cart_out + '{}_cross.pdf'.format(coso)
     ctl.plot_pdfpages(figure_file, figure_cross)
-    figure_file = cart_out + '{}_cross_futdiff.pdf'.format(coso)
-    ctl.plot_pdfpages(figure_file, figure_cross_diff)
+    # figure_file = cart_out + '{}_cross_futdiff.pdf'.format(coso)
+    # ctl.plot_pdfpages(figure_file, figure_cross_diff)
     plt.close('all')
 
 # faccio mean climates (prec e temp e tasmax e tasmin) ogni:

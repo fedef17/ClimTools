@@ -60,9 +60,9 @@ kwar['detrended_eof_calculation'] = False
 kwar['detrended_anom_for_clustering'] = False
 kwar['nrsamp_sig'] = 500
 
-results_ref = cd.WRtool_core(var_season, lat, lon, dates_season, area, heavy_output = True, **kwar)
-kwar['ref_solver'] = results_ref['solver']
-kwar['ref_patterns_area'] = results_ref['cluspattern_area']
+#results_ref = cd.WRtool_core(var_season, lat, lon, dates_season, area, heavy_output = True, **kwar)
+#kwar['ref_solver'] = results_ref['solver']
+#kwar['ref_patterns_area'] = results_ref['cluspattern_area']
 kwar['use_reference_eofs'] = True
 
 
@@ -70,21 +70,24 @@ var_seas_set, dates_seas_set = ctl.seasonal_set(var_season, dates_season, season
 n_seas = len(var_seas_set)
 years_set = np.array([dat[0].year for dat in dates_seas_set])
 
-for n_choice in [5, 10, 20, 30, 40, 50, 60]:
-    all_res = []
-    for i in range(n_bootstrap):
-        ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
-        print(i, years_set[ok_yea])
-        var_ok = np.concatenate(var_seas_set[ok_yea])
-        dat_ok = np.concatenate(dates_seas_set[ok_yea])
+#for n_choice in [5, 10, 20, 30, 40, 50, 60]:
+for n_choice in [5, 10, 15, 20, 25, 30, 40, 50, 60]:
+    if n_choice == 60:
+        kwar['run_significance_calc'] = False
+    # all_res = []
+    # for i in range(n_bootstrap):
+    #     ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
+    #     print(i, years_set[ok_yea])
+    #     var_ok = np.concatenate(var_seas_set[ok_yea])
+    #     dat_ok = np.concatenate(dates_seas_set[ok_yea])
+    #
+    #     results = cd.WRtool_core(var_ok, lat, lon, dat_ok, area, **kwar)
+    #     results['years_set'] = years_set[ok_yea]
+    #
+    #     all_res.append(results)
 
-        results = cd.WRtool_core(var_ok, lat, lon, dat_ok, area, **kwar)
-        results['years_set'] = years_set[ok_yea]
-
-        all_res.append(results)
-
-    pickle.dump([results_ref, all_res], open(cart_out + 'res_bootstrap_{}yr_{}.p'.format(n_choice, n_bootstrap), 'w'))
-    #[results_ref, all_res] = pickle.load(open(cart_out + 'res_bootstrap_1000.p'))
+    #pickle.dump([results_ref, all_res], open(cart_out + 'res_bootstrap_{}yr_{}.p'.format(n_choice, n_bootstrap), 'w'))
+    [results_ref, all_res] = pickle.load(open(cart_out + 'res_bootstrap_{}yr_{}.p'.format(n_choice, n_bootstrap)))
 
     max_days = 29
     numclus = kwar['numclus']
@@ -109,19 +112,20 @@ for n_choice in [5, 10, 20, 30, 40, 50, 60]:
     all_figures = []
 
     # significance
-    all_sigs = np.array([koso['significance'] for koso in all_res])
-    fig = plt.figure()
-    plt.hist(all_sigs, bins = np.arange(60,101,2))
+    if 'significance' in all_res[0].keys():
+        all_sigs = np.array([koso['significance'] for koso in all_res])
+        fig = plt.figure()
+        plt.hist(all_sigs, bins = np.arange(60,101,2))
 
-    cof = ctl.calc_pdf(all_sigs)
-    cofvals2 = np.array([cof(i) for i in np.linspace(60, 100, 1000)])
-    plt.plot(np.linspace(60, 100, 1000), n_bootstrap*cofvals2)
+        cof = ctl.calc_pdf(all_sigs)
+        cofvals2 = np.array([cof(i) for i in np.linspace(60, 100, 1000)])
+        plt.plot(np.linspace(60, 100, 1000), n_bootstrap*cofvals2)
 
-    plt.xlabel('Significance')
-    plt.ylabel('Counts ({} runs)'.format(n_bootstrap))
-    plt.title('Variability of significance in {}-years sub-ensembles of ERA'.format(n_choice))
-    fig.savefig(cart_out + 'Significance_histo_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
-    all_figures.append(fig)
+        plt.xlabel('Significance')
+        plt.ylabel('Counts ({} runs)'.format(n_bootstrap))
+        plt.title('Variability of significance in {}-years sub-ensembles of ERA'.format(n_choice))
+        fig.savefig(cart_out + 'Significance_histo_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
+        all_figures.append(fig)
 
     # ellipse plot
     nsqr = np.sqrt(results_ref['cluspattern_area'].size)
@@ -144,8 +148,10 @@ for n_choice in [5, 10, 20, 30, 40, 50, 60]:
         rmss = [coso['RMS'][i]/nsqr for coso in all_res]
         ax.scatter(pats, rmss, s = 5)
 
-        ax.set_xlim(min(pats), 1.0)
-        ax.set_ylim(0., max(rmss))
+        #ax.set_xlim(min(pats), 1.0)
+        #ax.set_ylim(0., max(rmss))
+        ax.set_xlim(0.4, 1.0)
+        ax.set_ylim(0., 30.)
         ax.tick_params(labelsize=14)
         plt.gca().invert_xaxis()
         ax.set_xlabel('Pattern correlation', fontsize = 18)
@@ -205,12 +211,14 @@ for n_choice in [5, 10, 20, 30, 40, 50, 60]:
         ax.set_xticklabels(labs, size='small')
         ax.set_xlabel('Days')
         ax.set_ylabel('Frequency')
+        ax.set_ylim(0, 0.2)
         axes.append(ax)
 
     plt.suptitle('Residence times - {} yrs - {} runs'.format(n_choice, n_bootstrap))
     fig.tight_layout()
     fig.subplots_adjust(top=0.88)
     ctl.adjust_ax_scale(axes)
+    fig.savefig(cart_out+'Regime_residtimes_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
     all_figures.append(fig)
 
     # plot regime freq w std dev; anche hist delle regime freqs
@@ -233,6 +241,7 @@ for n_choice in [5, 10, 20, 30, 40, 50, 60]:
     ax.set_xticks([j*(kwar['numclus']*1.5) for j in range(kwar['numclus'])], minor = False)
     ax.set_xticklabels(pattnames, size='small')
     ax.set_ylabel('Frequency')
+    ax.set_ylim(0, 35)
     fig.savefig(cart_out+'Regime_frequency_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
     all_figures.append(fig)
 
@@ -251,11 +260,14 @@ for n_choice in [5, 10, 20, 30, 40, 50, 60]:
         ax.hist(all_freqs, bins = binzz)
 
         ax.set_xlim(10, 40)
+        ax.set_ylim(0, 250)
+
         ax.set_xlabel('Frequency')
         ax.set_title(pattnames[j])
         axes.append(ax)
 
     ctl.adjust_ax_scale(axes)
+    fig.tight_layout()
     fig.savefig(cart_out+'Regime_freqhisto_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
     all_figures.append(fig)
 

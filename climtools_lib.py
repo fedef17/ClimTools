@@ -303,13 +303,18 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
     < force_level_units > : str. Sometimes level units are not set inside the netcdf file. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
     """
+    print('INIZIO')
     ndim = cube.ndim
     datacoords = dict()
     aux_info = dict()
     ax_coord = dict()
 
+    print(datetime.now())
+
     if regrid_to_reference is not None:
         cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
+
+    print(datetime.now())
 
     if convert_units_to:
         if cube.units.name != convert_units_to:
@@ -320,7 +325,9 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             else:
                 cube.convert_units(convert_units_to)
 
+    print(datetime.now())
     data = cube.data
+    print(datetime.now())
     aux_info['var_units'] = cube.units.name
 
     coord_names = [cord.name() for cord in cube.coords()]
@@ -330,6 +337,8 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     allconames['lat'] = np.array(['latitude', 'lat'])
     allconames['lon'] = np.array(['longitude', 'lon'])
     allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
+
+    print(datetime.now())
 
     for i, nam in enumerate(coord_names):
         found = False
@@ -345,6 +354,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         if not found:
             print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
 
+    print(datetime.now())
     if 'level' in datacoords.keys() and extract_level_hPa is not None:
         okind = datacoords['level'] == extract_level_hPa
         if np.any(okind):
@@ -355,6 +365,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         else:
             raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
 
+    print(datetime.now())
     if 'time' in coord_names:
         time = cube.coord('time').points
         time_units = cube.coord('time').units
@@ -375,9 +386,11 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         aux_info['time_units'] = time_units.name
         aux_info['time_calendar'] = time_cal
 
+    print(datetime.now())
     data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
     datacoords['lat'] = lat
     datacoords['lon'] = lon
+    print('FINE')
 
     return data, datacoords, aux_info
 
@@ -1466,12 +1479,17 @@ def range_years(year1, year2):
     return data1, data2
 
 
-def sel_time_range(var, dates, dates_range):
+def sel_time_range(var, dates, dates_range, ignore_HHMM = True):
     """
     Extracts a subset in time.
+    < ignore_HHMM > : if True, considers only day, mon and year.
     """
-    dates_pdh = pd.to_datetime(dates)
-    okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
+
+    if ignore_HHMM:
+        okdates = np.array([(da.date() >= dates_range[0].date()) & (da.date() <= dates_range[1].date()) for da in dates])
+    else:
+        dates_pdh = pd.to_datetime(dates)
+        okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
 
     return var[okdates, ...], dates[okdates]
 
@@ -2565,6 +2583,39 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
         return np.array(resid_times), np.array(regime_dates), np.array(regime_nums)
 
 
+def calc_days_event(labels, resid_times, regime_nums):
+    """
+    Returns two quantities. For each point, the number of days from the beginning of the cluster event (first day, second day, ...) and the total number of days of the event the point belongs to.
+    """
+    days_event = np.zeros(len(labels))
+    length_event = np.zeros(len(labels))
+
+    numclus = len(resid_times)
+
+    for clu in range(numclus):
+        ok_nums = regime_nums[clu]
+        ok_times = resid_times[clu]
+
+        okclu = labels == clu
+        indici = np.arange(len(labels))[okclu]
+        for ind in indici:
+            imi1 = np.argmin(abs(ok_nums[:,0]-ind))
+            val1 = abs(ok_nums[imi1,0]-ind)
+            imi2 = np.argmin(abs(ok_nums[:,1]-ind))
+            val2 = abs(ok_nums[imi2,1]-ind)
+            if val1 <= val2:
+                imi = imi1
+            else:
+                imi = imi2
+            print('p', ind, ok_nums[imi, :])
+            if ok_nums[imi,0] <= ind and ok_nums[imi,1] > ind:
+                print(ok_nums[imi,0], ind, ok_nums[imi,1])
+                days_event[ind] = ind-ok_nums[imi,0]+1
+                length_event[ind] = ok_times[imi]
+
+    return days_event, length_event
+
+
 def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):
     """
     This calculates the probability for the regime transitions to other regimes. A matrix is produced with residence probability on the diagonal. Works with multimember ensemble.
@@ -2621,7 +2672,7 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, fix_length = 2, 
         max_days_between = fix_length-1
 
     for ens in range(n_ens):
-        print('ens member {}\n'.format(ens))
+        # print('ens member {}\n'.format(ens))
         trans_matrix_ens, trans_matrix_nums_ens = count_regime_transitions(indices_set[ens], dates_set[ens], max_days_between = max_days_between, filter_longer_than = filter_longer_than, filter_shorter_than = filter_shorter_than)
         if ens == 0:
             trans_matrix = np.empty(trans_matrix_ens.shape, dtype=object)
@@ -2632,11 +2683,11 @@ def find_transition_pcs(n_ens, indices_set, dates_set, pcs_set, fix_length = 2, 
 
         for i in range(numclus):
             for j in range(numclus):
-                if i == j and skip_persistence:
-                    print((i,j), '--> skipping..')
-                    continue
-                else:
-                    print((i,j))
+                # if i == j and skip_persistence:
+                #     print((i,j), '--> skipping..')
+                #     continue
+                # else:
+                #     print((i,j))
                 numsok = trans_matrix_nums_ens[i,j]
                 for (okin, okou) in numsok:
                     while okou-okin+1 < fix_length:

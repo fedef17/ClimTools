@@ -1206,7 +1206,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     print('COMPARE:', compare_models)
 
     if custom_model_colors is None:
-        colors = ctl.color_set(len(labels)+1, only_darker_colors = True)
+        colors = ctl.color_set(len(labels)+1, only_darker_colors = False)
         color_dict = dict(zip(labels, colors))
     else:
         if len(custom_model_colors) != len(labels)+1:
@@ -1218,7 +1218,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         for k in groups.keys():
             color_dict[k] = np.mean([color_dict[mod] for mod in groups[k]], axis = 0)
     if group_compare_style == 'both':
-        nuko = ctl.color_set(len(groups.keys()), only_darker_colors = True)
+        nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False)
         for k, col in zip(groups.keys(), nuko):
             color_dict[k] = col
 
@@ -1493,6 +1493,18 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat = result_obs['lat']
     lon = result_obs['lon']
 
+    if patt_ref[0].shape != result_models.values()[0]['cluspattern'][0].shape:
+        nupatt_ref = []
+        _, oklats, _ = np.intersect1d(result_obs['lat'], result_models.values()[0]['lat'], assume_unique = True, return_indices = True)
+        _, oklons, _ = np.intersect1d(result_obs['lon'], result_models.values()[0]['lon'], assume_unique = True, return_indices = True)
+        for nu in range(n_clus):
+            coso = patt_ref[nu][oklats, :]
+            coso2 = coso[:, oklons]
+            nupatt_ref.append(coso2)
+            lat = result_obs['lat'][oklats]
+            lon = result_obs['lon'][oklons]
+        patt_ref = nupatt_ref
+
     if patnames is None:
         patnames = ['clus_{}'.format(i) for i in range(len(patt_ref))]
     if patnames_short is None:
@@ -1576,16 +1588,17 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             fig.savefig(cart_out+'Regime_frequency_groups_{}.pdf'.format(tag))
             all_figures.append(fig)
 
+    i1 = int(np.ceil(np.sqrt(n_clus)))
+    i2 = n_clus/i1
+    if i2*i1 < n_clus:
+        i2 = i2 + 1
+
     # PLOTTIN the persistence histograms
     if 'resid_times' in result_models.values()[0].keys():
         axes = []
         for lab in labels:
             fig = plt.figure()
             # binzzz = np.arange(0,36,5)
-            i1 = int(np.ceil(np.sqrt(n_clus)))
-            i2 = n_clus/i1
-            if i2*i1 < n_clus:
-                i2 = i2 + 1
             for j in range(n_clus):
                 ax = fig.add_subplot(i1,i2,j+1)
                 ax.set_title(patnames[j])
@@ -1783,6 +1796,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         ctl.adjust_color_scale(mappe)
 
     patt = result_obs['cluspattern']
+    lat = result_obs['lat']
+    lon = result_obs['lon']
     filename = cart_out+'Allclus_OBSERVED.pdf'
     figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins)
     all_figures += figs
@@ -1791,6 +1806,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     # PLOTTIN the cluster patterns
     for lab in labels:
         print(lab)
+        lat = result_models[lab]['lat']
+        lon = result_models[lab]['lon']
         patt = result_models[lab]['cluspattern']
         if np.any(np.isnan(patt)):
             print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
@@ -1833,6 +1850,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                     print(lab, k, group_symbols[k])
                     markers.append(group_symbols[k])
 
+    group_colors = [color_dict[k] for k in groups.keys()]
     print(markers)
 
     # Taylor plots
@@ -1897,6 +1915,51 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     fig.savefig(cart_out + 'TaylorPlot.pdf')
     all_figures.append(fig)
+
+    # Ellipse plot
+    if 'RMS' in result_models.values()[0].keys():
+        data = dict()
+        for cos in ['RMS', 'patcor']:
+            fac = 1.
+            if cos == 'RMS': fac = nsqr
+            data[cos] = []
+            data[cos+'_err'] = []
+            data[cos+'_errlarge'] = []
+            for grp in groups.keys():
+                data[cos].append(np.mean([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
+                data[cos+'_err'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/(fac * np.sqrt(len(groups[grp])-1)))
+                data[cos+'_errlarge'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
+            data[cos] = np.stack(data[cos])
+            data[cos+'_err'] = np.stack(data[cos+'_err'])
+            data[cos+'_errlarge'] = np.stack(data[cos+'_errlarge'])
+
+        fig = plt.figure(figsize = (16,12))
+
+        for j in range(n_clus):
+            ax = fig.add_subplot(i1,i2,j+1)
+            ax.set_title(patnames[j], fontsize = 18, fontweight = 'bold')
+
+            ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = groups.keys(), ax = ax, colors = group_colors, alpha = 0.7)
+
+            for grp in groups.keys():
+                pats = [result_models[mod]['patcor'][j] for mod in groups[grp]]
+                rmss = [result_models[mod]['RMS'][j]/nsqr for mod in groups[grp]]
+                ax.scatter(pats, rmss, color = color_dict[grp], s = 25, marker = group_symbols[grp])
+
+            ax.set_xlim(0.35, 1.0)
+            ax.set_ylim(0., 27.0)
+            ax.tick_params(labelsize=14)
+            plt.gca().invert_xaxis()
+            ax.set_xlabel('Pattern correlation', fontsize = 18)
+            ax.set_ylabel('RMS (m)', fontsize = 18)
+            ax.grid()
+
+        plt.tight_layout()
+        # plt.subplots_adjust(top = 0.9)
+        # plt.suptitle('Average performance of PRIMAVERA stream1 coupled models', fontsize = 28)
+        fig.savefig(cart_out + 'ellipse_plot_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
 
     filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)
     ctl.plot_pdfpages(filename, all_figures)
