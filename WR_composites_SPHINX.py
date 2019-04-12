@@ -48,6 +48,8 @@ kwar['nrsamp_sig'] = 500
 
 results_ref = cd.WRtool_core(var_season, lat, lon, dates_season, area, heavy_output = True, **kwar)
 
+sys.exit()
+
 kwar['ref_solver'] = results_ref['solver']
 kwar['ref_patterns_area'] = results_ref['cluspattern_area']
 kwar['use_reference_eofs'] = True

@@ -28,6 +28,7 @@ import ctp
 
 from datetime import datetime
 import pickle
+from copy import deepcopy as dcopy
 
 import iris
 from cf_units import Unit
@@ -1259,8 +1260,12 @@ def sel_season(var, dates, season, cut = True):
     dates_season = dates[mask]
     dates_season_pdh = pd.to_datetime(dates_season)
 
-    if var_season.ndim == 2:
+    #print(var_season.shape)
+
+    if np.sum(mask) == 1:
         var_season = var_season[np.newaxis, :]
+
+    #print(var_season.shape)
 
     if season in mesi_short or len(dates) <= 12:
         cut = False
@@ -1283,6 +1288,8 @@ def sel_season(var, dates, season, cut = True):
 
             var_season = var_season[start:end, ...]
             dates_season = dates_season[start:end]
+
+    #print(var_season.shape)
 
     return var_season, dates_season
 
@@ -1464,11 +1471,11 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True):
         n_seas = len(okju) - 1
 
         all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
-        all_var_seas = [var_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+        all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
     else:
         n_seas = len(var_season)/len(season)
         all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
-        all_var_seas = [var_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
+        all_var_seas = [var_season[len(season)*i:len(season)*(i+1), ...] for i in range(n_seas)]
 
     return np.array(all_var_seas), np.array(all_dates_seas)
 
@@ -2619,13 +2626,29 @@ def calc_days_event(labels, resid_times, regime_nums):
                 imi = imi1
             else:
                 imi = imi2
-            print('p', ind, ok_nums[imi, :])
+            #print('p', ind, ok_nums[imi, :])
             if ok_nums[imi,0] <= ind and ok_nums[imi,1] > ind:
                 print(ok_nums[imi,0], ind, ok_nums[imi,1])
                 days_event[ind] = ind-ok_nums[imi,0]+1
                 length_event[ind] = ok_times[imi]
 
     return days_event, length_event
+
+
+def regime_filter_long(labels, dates, days_thres = 4):
+    """
+    Filters the regime label series keeping only events lasting at least days_event days.
+    The other labels are set to -1.
+    """
+
+    resid_times, regime_dates, regime_nums = calc_regime_residtimes(labels, dates)
+    days_event, length_event = calc_days_event(labels, resid_times, regime_nums)
+
+    oklabs = length_event >= days_thres
+    filt_labels = dcopy(labels)
+    filt_labels[~oklabs] = -1
+
+    return filt_labels
 
 
 def calc_regime_transmatrix(n_ens, indices_set, dates_set, max_days_between = 3, filter_longer_than = 1, filter_shorter_than = None):

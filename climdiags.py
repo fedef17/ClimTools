@@ -962,6 +962,11 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         filos.write('{:8.3f}'.format(obs['significance']))
 
     ctl.newline(filos)
+    filos.write('---- Optimal ratio of regime structure ----\n')
+    varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
+    filos.write('{:10.4f}'.format(varopt))
+
+    ctl.newline(filos)
     filos.write('---- Regimes frequencies ----\n')
     stringa = inputs['numclus']*'{:8.2f}'+'\n'
     filos.write(stringa.format(*obs['freq_clus']))
@@ -1012,6 +1017,11 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             ctl.newline(filos)
             filos.write('---- Sharpness of regime structure ----\n')
             filos.write('{:8.3f}'.format(models[mod]['significance']))
+
+        ctl.newline(filos)
+        filos.write('---- Optimal ratio of regime structure ----\n')
+        varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
+        filos.write('{:10.4f}'.format(varopt))
 
         ctl.newline(filos)
         filos.write('---- Regimes frequencies ----\n')
@@ -1073,6 +1083,15 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                 sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
                 std = np.std([models[mod]['significance'] for mod in inputs['groups'][gru]])
                 filos.write('{:8.3f} +/- {:8.3f}'.format(sig, std))
+
+            ctl.newline(filos)
+            filos.write('---- Optimal ratio of regime structure ----\n')
+            varopts = []
+            for mod in inputs['groups'][gru]:
+                varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
+            sig = np.mean(varopts)
+            std = np.std(varopts)
+            filos.write('{:10.4f} +/- {:10.4f}'.format(sig, std))
 
             ctl.newline(filos)
             filos.write('---- Regimes frequencies ----\n')

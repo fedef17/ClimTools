@@ -66,42 +66,44 @@ var_mod = dict()
 dates_mod = dict()
 
 all_res = dict()
+#for mod in ['base', 'stoc', 'era']:
+#    print(mod)
+#    if mod in ['base', 'stoc']:
+#        var_mod = []
+#        dates_mod = []
+#        for i in range(3):
+#            file_in = cart_in + filenam[mod].format(i)
+#            var, coords, aux_info = ctl.read_iris_nc(file_in, extract_level_hPa = 500)
+#            var_time, dates_time = ctl.sel_time_range(var, coords['dates'], (dates_season[0], dates_season[-1]))
+#            var_anoms = ctl.anomalies_daily_detrended(var_time, dates_time)
+#            var_seas_set, dates_seas_set = ctl.seasonal_set(var_anoms, dates_time, season)
+#            var_mod.append(var_seas_set)
+#            dates_mod.append(dates_seas_set)
+#
+#        var_mod = np.concatenate(var_mod)
+#        dates_mod = np.concatenate(dates_mod)
+#    elif mod == 'era':
+#        var_mod = var_era_set
+#        dates_mod = dates_era_set
+#
+#    all_res[mod] = []
+#    n_seas = len(var_mod)
+#    years_set = np.array([da[0].year for da in dates_mod])
+#    for i in range(n_bootstrap):
+#        ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
+#        print(i,'\n', years_set[ok_yea])
+#        var_ok = np.concatenate(var_mod[ok_yea])
+#        dat_ok = np.concatenate(dates_mod[ok_yea])
+#
+#        results = cd.WRtool_core(var_ok, lat, lon, dat_ok, area, **kwar)
+#        results['years_set'] = years_set[ok_yea]
+#
+#        all_res[mod].append(results)
+#
+#    pickle.dump(all_res[mod], open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}_{}.p'.format(n_choice, n_bootstrap, mod), 'w'))
+
 for mod in ['base', 'stoc', 'era']:
-    print(mod)
-    if mod in ['base', 'stoc']:
-        var_mod = []
-        dates_mod = []
-        for i in range(3):
-            file_in = cart_in + filenam[mod].format(i)
-            var, coords, aux_info = ctl.read_iris_nc(file_in, extract_level_hPa = 500)
-            var_time, dates_time = ctl.sel_time_range(var, coords['dates'], (dates_season[0], dates_season[-1]))
-            var_anoms = ctl.anomalies_daily_detrended(var_time, dates_time)
-            var_seas_set, dates_seas_set = ctl.seasonal_set(var_anoms, dates_time, season)
-            var_mod.append(var_seas_set)
-            dates_mod.append(dates_seas_set)
-
-        var_mod = np.concatenate(var_mod)
-        dates_mod = np.concatenate(dates_mod)
-    elif mod == 'era':
-        var_mod = var_era_set
-        dates_mod = dates_era_set
-
-    all_res[mod] = []
-    n_seas = len(var_mod)
-    years_set = np.array([da[0].year for da in dates_mod])
-    for i in range(n_bootstrap):
-        ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
-        print(i,'\n', years_set[ok_yea])
-        var_ok = np.concatenate(var_mod[ok_yea])
-        dat_ok = np.concatenate(dates_mod[ok_yea])
-
-        results = cd.WRtool_core(var_ok, lat, lon, dat_ok, area, **kwar)
-        results['years_set'] = years_set[ok_yea]
-
-        all_res[mod].append(results)
-
-pickle.dump([results_ref, all_res], open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}.p'.format(n_choice, n_bootstrap), 'w'))
-# [results_ref, all_res] = pickle.load(open(cart_out + 'res_bootstrap_{}yr_{}.p'.format(n_choice, n_bootstrap)))
+    all_res[mod] = pickle.load(open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}_{}.p'.format(n_choice, n_bootstrap, mod)))
 
 ens_mean = dict()
 ens_std = dict()
@@ -109,7 +111,7 @@ ens_std = dict()
 for mod in all_res.keys():
     max_days = 29
     numclus = kwar['numclus']
-    for i in range(len(all_res)):
+    for i in range(len(all_res[mod])):
         all_res[mod][i]['histo_resid_times'] = []
         for j in range(numclus):
             numarr, histoco = ctl.count_occurrences(all_res[mod][i]['resid_times'][j], num_range = (0, max_days))
@@ -124,6 +126,9 @@ for mod in all_res.keys():
         except Exception as prro:
             print(key, repr(prro))
             pass
+
+for mod in all_res.keys():
+    print(mod, all_res[mod][17].keys())
 
 all_figures = []
 
@@ -157,6 +162,7 @@ plt.subplots_adjust(top = 0.9)
 plt.suptitle('Performance of {}-yr subsets'.format(n_choice), fontsize = 28)
 fig.savefig(cart_out + 'ellipse_plot_{}yr_{}.pdf'.format(n_choice, n_bootstrap))
 all_figures.append(fig)
+
 
 # plot resid times w std dev
 for mod in all_res.keys():
