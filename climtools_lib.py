@@ -7,6 +7,7 @@ import os
 
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
@@ -3342,7 +3343,7 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None):
     """
     Plots a single map to a figure.
 
@@ -3392,6 +3393,11 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins)
+
+    if add_rectangles is not None:
+        colors = color_set(len(add_rectangles))
+        for rect, col in zip(add_rectangles, colors):
+            ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = None, edgecolor = col, alpha = 1.0, transform = ccrs.PlateCarree()))
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
