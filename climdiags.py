@@ -77,7 +77,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         var_season, dates_season = ctl.sel_season(var, dates, season)
     else:
         print('Concatenating {} input files..\n'.format(len(ifile)))
-        var = []
+        var_full = []
         dates_sel = []
         dates_full = []
         for fil in ifile:
@@ -90,10 +90,10 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             dates_full.append(dates)
 
             var_season, dates_season = ctl.sel_season(var, dates, season)
-            var.append(var_season)
+            var_full.append(var_season)
             dates_sel.append(dates_season)
 
-        var_season = np.concatenate(var)
+        var_season = np.concatenate(var_full)
         dates_season = np.concatenate(dates_sel)
         dates = np.concatenate(dates_full)
 

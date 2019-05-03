@@ -13,6 +13,8 @@ import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
 import matplotlib as mpl
 
+from shapely.geometry.polygon import LinearRing
+
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy.util as cutil
@@ -291,7 +293,10 @@ def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
     if nlat*nlon < nlat_ref*nlon_ref:
         raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
 
-    nucube = cube.regrid(ref_cube, schema)
+    if np.all(cube.coord('latitude').points == ref_cube.coord('latitude').points) and np.all(cube.coord('longitude').points == ref_cube.coord('longitude').points):
+        print('Grid check OK\n')
+    else:
+        nucube = cube.regrid(ref_cube, schema)
 
     return nucube
 
@@ -1872,44 +1877,71 @@ def first(condition):
     return ind
 
 
-def Rcorr(x,y):
+def Rcorr(x, y, latitude = None):
     """
     Returns correlation coefficient between two array of arbitrary shape.
     """
-    return np.corrcoef(x.flatten(), y.flatten())[1,0]
+    if latitude is not None:
+        weights_u = abs(np.cos(np.deg2rad(latitude)))
+        weights = np.tile(weights_u, (x.shape[1], 1)).T.flatten()
+        corrcoef = np.cov(x.flatten(), y.flatten(), aweights = weights)/np.sqrt(np.cov(x.flatten(), x.flatten(), aweights = weights) * np.cov(y.flatten(), y.flatten(), aweights = weights))
+    else:
+        corrcoef = np.corrcoef(x.flatten(), y.flatten())
+
+    return corrcoef[1,0]
 
 
-def distance(x, y):
+def distance(x, y, latitude = None):
     """
     L2 distance.
     """
+    if latitude is not None:
+        weights = abs(np.cos(np.deg2rad(latitude)))
+        for j in range(x.shape[1]):
+            x[:,j] = x[:,j]*weights
+            y[:,j] = y[:,j]*weights
+
     return LA.norm(x-y)
 
 
-def E_rms(x,y):
+def E_rms(x, y, latitude = None):
     """
     Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
     """
     n = x.size
+    n_lons = x.shape[1]
     #E = np.sqrt(1.0/n * np.sum((x.flatten()-y.flatten())**2))
-    E = 1/np.sqrt(n) * LA.norm(x-y)
+    if latitude is not None:
+        weights = abs(np.cos(np.deg2rad(latitude)))
+        for j in range(x.shape[1]):
+            x[:,j] = x[:,j]*weights
+            y[:,j] = y[:,j]*weights
+        n_norm = 0.
+        sum_norm = 0.
+        for i, w in enumerate(weights):
+            sum_norm += w*np.sum((x[i,:]-y[i,:])**2)
+            n_norm += n_lons*w
+
+        E = np.sqrt(sum_norm/n_norm)
+    else:
+        E = 1/np.sqrt(n) * LA.norm(x-y)
 
     return E
 
 
-def E_rms_cp(x,y):
+def E_rms_cp(x, y, latitude = None):
     """
     Returns centered-pattern root mean square, e.g. first subtracts the mean to the two series and then computes E_rms.
     """
     x1 = x - x.mean()
     y1 = y - y.mean()
 
-    E = E_rms(x1, y1)
+    E = E_rms(x1, y1, latitude = latitude)
 
     return E
 
 
-def cosine(x,y):
+def cosine(x, y):
     """
     Calculates the cosine of the angle between x and y. If x and y are 2D, the scalar product is taken using the np.vdot() function.
     """
@@ -1927,7 +1959,7 @@ def cosine(x,y):
         raise ValueError('Too many dimensions')
 
 
-def cosine_cp(x,y):
+def cosine_cp(x, y):
     """
     Before calculating the cosine, subtracts the mean to both x and y. This is exactly the same as calculating the correlation coefficient R.
     """
@@ -3124,6 +3156,18 @@ def new_basis_set_3D(rot):
 def color_brightness(color):
     return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
 
+def makeRectangle(area, npo = 20):
+    """
+    Produces a shapely polygon to properly plot a lat/lon rectangle on a map.
+    lonW, lonE, latS, latN = area
+    """
+    lonW, lonE, latS, latN = area
+    rlons = np.concatenate([np.tile(lonW, npo), np.linspace(lonW, lonE, npo), np.tile(lonE, npo), np.linspace(lonE, lonW, npo)])
+    rlats = np.concatenate([np.linspace(latS,latN,npo), np.tile(latN, npo), np.linspace(latN,latS,npo), np.tile(latS, npo)])
+    ring = LinearRing(list(zip(rlons, rlats)))
+
+    return ring
+
 def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
@@ -3397,7 +3441,9 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     if add_rectangles is not None:
         colors = color_set(len(add_rectangles))
         for rect, col in zip(add_rectangles, colors):
-            ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = None, edgecolor = col, alpha = 1.0, transform = ccrs.PlateCarree()))
+            # ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = None, edgecolor = col, alpha = 1.0, transform = ccrs.PlateCarree()))
+            ring = makeRectangle(rect)
+            ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 2.0)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])

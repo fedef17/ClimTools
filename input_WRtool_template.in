@@ -7,54 +7,61 @@ IMPORTANT NOTE: the value of the keys has to be written in the line that immedia
 
 # Name of the run
 [exp_name]
-test
+test_ignazio_ensemble
 
 # Directory of input files
 [cart_in]
-/data-hobbes/fabiano/PRIMAVERA/hist_1950/
+/data-archimede/seasonal/
 
 # Output data directory. (for each run, a subfolder /exp_name/ is created inside cart_out_general/)
 [cart_out_general]
 /home/fabiano/Research/lavori/WeatherRegimes/
 
-# INPUT FILES: specify either a filelist or enter the filenames directly. One amongst filelist and filenames has to be commented.
+############## INPUT FILES. Set Ensemble flag. Specify either a filelist or enter the filenames directly. One amongst filelist and filenames has to be commented. #########################
+
+# Flag to read ensembles. If set to True, each element in the filelist or filenames is treated as a partial filename: the code looks for all files that match that partial name. Partial naming accepts special charachter *.
+[is_ensemble]
+True
+
+# Option to treat ensembles: 'all' puts together all runs as if it was a single run; 'member' separates the analysis for each ensemble, treating it as a group; 'year' puts all members together and separates the analysis for years, treating each year as a group. AAAAAA -- ONLY ALL IS ACTIVE FOR NOW!
+[ens_option]
+all
 
 # Absolute path to the file that contains list of input files, one per line, with their relative path from cart_in/.
-[filelist]
-/home/fabiano/Research/lavori/WeatherRegimes/listafi
+#[filelist]
 
 # List of input files. If more than one file, list them in the same line, separated by commas.
-#[filenames]
-CMCC-CM2-HR4/CMCC-CM2-HR4_allyears_remap25.nc, CMCC-CM2-VHR4/CMCC-CM2-VHR4_allyears_remap25.nc, CNRM-CM6-1/CNRM-CM6-1_allyears_remap25.nc, EC-Earth-3-HR/EC-Earth-3-HR_allyears_remap25.nc, EC-Earth-3-LR/EC-Earth-3-LR_allyears_remap25.nc, ECMWF-IFS-HR/ECMWF-IFS-HR_allyears_remap25.nc, ECMWF-IFS-LR/ECMWF-IFS-LR_allyears_remap25.nc, HadGEM3-GC31-HM/HadGEM3-GC31-HM_allyears_remap25.nc,  HadGEM3-GC31-MM/HadGEM3-GC31-MM_allyears_remap25.nc, MPI-ESM1-2-HR/MPI-ESM1-2-HR_allyears_remap25.nc, MPI-ESM1-2-XR/MPI-ESM1-2-XR_allyears_remap25.nc
+[filenames]
+ecmwfS5/daily/may/25_ens_members/zg500_ecmwf_Aday_1999_m05_144by73_in_m_member*.nc
 
 # Name of the dataset. A name for each file is expected. If commented, automatic naming is applied: ens_1, ens_2, ...
-#[model_names]
-CMCC-CM2-HR4, CMCC-CM2-VHR4, CNRM-CM6-1, EC-Earth-3-HR, EC-Earth-3-LR, ECMWF-IFS-HR, ECMWF-IFS-LR, HadGEM3-GC31-HM,  HadGEM3-GC31-MM, MPI-ESM1-2-HR, MPI-ESM1-2-XR
+[model_names]
+ecmwfS5
 
-# Select year range (two values separated by comma)
-[year_range]
-1957, 2014
+# Select year range (two values separated by comma) # if commented it takes all yrs available
+#[year_range]
+1979, 2014
 
 ###################
 #### Group options. For meaningful visualization
 ########
 
 # Define a dictionary to group models in different categories. A comparison between the two groups will be done.
-[groups]
+#[groups]
 HR : CMCC-CM2-VHR4, EC-Earth-3-HR, ECMWF-IFS-HR, HadGEM3-GC31-HM, MPI-ESM1-2-XR
 LR : CMCC-CM2-HR4, EC-Earth-3-LR, ECMWF-IFS-LR, HadGEM3-GC31-MM, MPI-ESM1-2-HR
 
 # How should I compare groups? Possibilities: 'mean': visually groups the groups and computes the mean and stddev of the group, '1vs1' compares each element of a group with the corresponding elements of the other groups, 'both' does both comparisons.
-[group_compare_style]
+#[group_compare_style]
 both
 
 # Specify group symbols (for scatter plots).
-[group_symbols]
+#[group_symbols]
 HR: $H$
 LR: $L$
 
 # Specify reference group (differences are shown wrt this group):
-[reference_group]
+#[reference_group]
 LR
 
 
@@ -65,17 +72,17 @@ LR
 [run_compare]
 True
 
-# Use reference EOF space for all models?
+# Use reference EOF space for all models?  ###### Vincola EOF to OBS (true)
 [use_reference_eofs]
-False
+True
 
 # Name to be assigned to the observations.
 [obs_name]
-ERA
+ERA_is_obs
 
 # Name of the file with the observed fields
 [ERA_ref_orig]
-/data-hobbes/fabiano/OBS/ERA/ERA40+Int_daily_1957-2018_zg500_remap25_meters.nc
+/data-hobbes/fabiano/PRIMAVERA/highres_SST/zg500_ERAInterim_1979-2014.nc
 
 # Name of the subfolder of cart_out_general for the observations. The program checks for existing EOF solver and clusters in cart_out_general/ERA_ref_folder.
 [ERA_ref_folder]
@@ -89,7 +96,7 @@ ERA_ref_remap25
 [numpcs]
 4
 
-# Consider a number of pcs to explain some fraction of the total variance (perc)? (if this is set to True, numpcs is ignored. otherwise perc is ignored)
+# Consider a number of pcs to explain some fraction of the total variance (perc)? (if this is set to True, numpcs is ignored. otherwise perc is ignored)  ######## false uses numpcs , true uses percentage of variance
 [flag_perc]
 False
 
@@ -100,9 +107,9 @@ False
 
 # Number of clusters to be used:
 [numclus]
-4
+5
 
-# Calculate significance of clustering (run cluster_sig)
+# Calculate significance of clustering (run cluster_sig)  ######## if true computing time *10
 [run_sig_calc]
 False
 
@@ -113,26 +120,42 @@ False
 ##########################################################################
 ##############  options for PRECOMPUTE -- preprocessing  ################
 
-# Atmospheric level at which the variable is extracted (if more levels are present)
+# Atmospheric level at which the variable is extracted (if more levels are present)  #### livello atmosferico *ma gia' obbligato in input files che hanno solo livello, else sceglie lui
 [level]
 500
 
 # Season to be selected (options: JJA, DJF, DJFM, NDJFM)
 [season]
-DJF
+JJA
 
-# Regional average ('EAT': Euro-Atlantic, 'PNA': Pacific North American, 'NH': Northern Hemisphere)
+# Regional average ('EAT': Euro-Atlantic, 'PNA': Pacific North American, 'NH': Northern Hemisphere, 'Eu' for Europe, 'Med' for Mediterranean)
 # Area to be selected (options: EAT, PNA, NH)
 [area]
-EAT
+custom
+
+# Custom area (activated only if [area] is set to 'custom')
+[custom_area]
+-10, 80, 25, 60
 
 ##########################################################################
 ###################  other options  ###################
 
 # Pattern NAMES
-[patnames]
+#[patnames]
 NAO +, Sc. Blocking, Atl. Ridge, NAO -
 
 # Pattern tags
-[patnames_short]
+#[patnames_short]
 NP, BL, AR, NN
+
+# Visualization: standard, Nstereo, Sstereo
+[visualization]
+standard
+
+# Equatorward bounding latitude for polar/stereo plots
+[bounding_lat]
+30
+
+# Margins of the plot for visualization 'standard'. If no margins are specified, the whole globe is showed.
+[plot_margins]
+-10, 80, 25, 60

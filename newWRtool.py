@@ -56,9 +56,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area is_ensemble ens_option'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list, list]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list, list, bool, str]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -80,6 +80,8 @@ defaults['obs_name'] = 'ERA'
 defaults['visualization'] = 'Nstereo'
 defaults['bounding_lat'] = 30.
 defaults['plot_margins'] = None
+defaults['is_ensemble'] = False
+defaults['ens_option'] = 'all'
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
 
@@ -111,6 +113,26 @@ if len(inputs['filenames']) == 0:
 if inputs['model_names'] is None:
     n_mod = len(inputs['filenames'])
     inputs['model_names'] = ['ens_{}'.format(i) for i in range(n_mod)]
+
+if inputs['is_ensemble']:
+    print('This is an ensemble run, finding all files.. \n')
+    inputs['ensemble_filenames'] = dict()
+    # load the true file list
+    for filgenname, mod_name in zip(inputs['filenames'], inputs['model_names']):
+        modcart = inputs['cart_in']
+        namfilp = filgenname.split('*')
+        if '/' in filgenname:
+            modcart = inputs['cart_in'] + '/'.join(filgenname.split('/')[:-1]) + '/'
+            namfilp = filgenname.split('/')[-1].split('*')
+
+        lista_all = os.listdir(modcart)
+        lista_oks = [modcart + fi for fi in lista_all if np.all([namp in fi for namp in namfilp])]
+
+        inputs['ensemble_filenames'][mod_name] = lista_oks
+        print(mod_name, lista_oks)
+
+    if inputs['ens_option'] != 'all':
+        raise ValueError('AAAAAA -- as [ens_option] ONLY "all" IS ACTIVE FOR NOW!')
 
 print('filenames: ', inputs['filenames'])
 print('model names: ', inputs['model_names'])
@@ -180,7 +202,10 @@ if not os.path.exists(nomeout):
 
     model_outs = dict()
     for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
-        model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+        if not inputs['is_ensemble']:
+            model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+        else:
+            model_outs[modname] = cd.WRtool_from_file(inputs['ensemble_filenames'][modname], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
 else:
