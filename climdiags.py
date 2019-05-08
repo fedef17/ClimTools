@@ -830,9 +830,13 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     dates_all = obs['dates_allyear']
     dates_season = obs['dates']
 
-    var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+    if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+    else:
+        var_all = var
+        da = dates_season
 
-    time = nc.date2num(dates_all, units = obs['time_units'], calendar = obs['time_cal'])
+    time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
     time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
 
     cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
@@ -845,13 +849,41 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         dates_all = models[mod]['dates_allyear']
         dates_season = models[mod]['dates']
 
-        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+            var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        else:
+            var_all = var
+            da = dates_season
 
-        time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
-        time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+        time = nc.date2num(da, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+        tim_dif = time[1:]-time[:-1]
+        okpo = tim_dif < 0
 
-        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-        iris.save(cubo, outfil)
+        print(tim_dif)
+        print(okpo)
+        print(np.sum(okpo))
+        if np.any(okpo):
+            allinds = np.arange(len(tim_dif))[okpo]+1
+            allinds = [0] + list(allinds) + [None]
+            #check
+            if len(inputs['ensemble_members'][mod]) != len(allinds[:-1]):
+                raise ValueError('num of ens mems dont match {} vs {}\n'.format(len(inputs['ensemble_members'][mod]),len(allinds[:-1])))
+
+            for ens_id, i1, i2 in zip(inputs['ensemble_members'][mod], allinds[:-1], allinds[1:]):
+                timeok = time[i1:i2]
+                varok = var_all[i1:i2]
+                print(ens_id, i1, i2)
+
+                time_index = ctl.create_iris_coord(timeok, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+                cubo = ctl.create_iris_cube(varok, std_name, units, [time_index], long_name = long_name)
+                outfil_ens = outfil[:-3] + '_{}.nc'.format(ens_id)
+                iris.save(cubo, outfil_ens)
+        else:
+            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+            iris.save(cubo, outfil)
 
     # monthly clus frequency
     outfil = cart_out + 'clus_freq_monthly_ref.nc'
@@ -878,18 +910,52 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
         var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'])
 
-        cubolis = []
-        for i, fre in enumerate(var):
-            var_all, datesall = ctl.complete_time_range(fre, datesmon)
+        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+            _, datesall = ctl.complete_time_range(var[0], datesmon)
+        else:
+            datesall = datesmon
+        time = nc.date2num(datesall, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
 
-            time = nc.date2num(datesall, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
-            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+        tim_dif = time[1:]-time[:-1]
+        okpo = tim_dif < 0
 
-            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-            cubolis.append(cubo)
+        if np.any(okpo):
+            allinds = np.arange(len(tim_dif))[okpo]+1
+            allinds = [0] + list(allinds) + [None]
+            #check
+            if len(inputs['ensemble_members'][mod]) != len(allinds[:-1]):
+                raise ValueError('num of ens mems dont match {} vs {}\n'.format(len(inputs['ensemble_members'][mod]),len(allinds[:-1])))
 
-        cubolis = iris.cube.CubeList(cubolis)
-        iris.save(cubolis, outfil)
+            for ens_id, i1, i2 in zip(inputs['ensemble_members'][mod], allinds[:-1], allinds[1:]):
+                timeok = time[i1:i2]
+                time_index = ctl.create_iris_coord(timeok, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+                cubolis = []
+                for i, fre in enumerate(var):
+                    varok = fre[i1:i2]
+                    cubo = ctl.create_iris_cube(varok, std_name, units, [time_index], long_name = long_name)
+                    cubolis.append(cubo)
+
+                cubolis = iris.cube.CubeList(cubolis)
+                outfil_ens = outfil[:-3] + '_{}.nc'.format(ens_id)
+                iris.save(cubolis, outfil_ens)
+        else:
+            cubolis = []
+            for i, fre in enumerate(var):
+                if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+                    var_all, datesall = ctl.complete_time_range(fre, datesmon)
+                else:
+                    var_all = fre
+                    datesall = datesmon
+
+                time = nc.date2num(datesall, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+                time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+                cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+                cubolis.append(cubo)
+
+            cubolis = iris.cube.CubeList(cubolis)
+            iris.save(cubolis, outfil)
 
     # pcs
     outfil = cart_out + 'pcs_timeseries_ref.nc'
@@ -903,9 +969,13 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     cubolis = []
     for i, fre in enumerate(var):
         long_name = 'pcs {}'.format(i)
-        var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+            var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+        else:
+            var_all = fre
+            da = dates_season
 
-        time = nc.date2num(dates_all, units = obs['time_units'], calendar = obs['time_cal'])
+        time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
         time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
 
         cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
@@ -921,18 +991,51 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         dates_all = models[mod]['dates_allyear']
         dates_season = models[mod]['dates']
 
-        cubolis = []
-        for i, fre in enumerate(var):
-            var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+            _, da = ctl.complete_time_range(var[0], dates_season)
+        else:
+            da = dates_season
+        time = nc.date2num(da, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
 
-            time = nc.date2num(dates_all, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
-            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+        tim_dif = time[1:]-time[:-1]
+        okpo = tim_dif < 0
+        if np.any(okpo):
+            allinds = np.arange(len(tim_dif))[okpo]+1
+            allinds = [0] + list(allinds) + [None]
+            #check
+            if len(inputs['ensemble_members'][mod]) != len(allinds[:-1]):
+                raise ValueError('num of ens mems dont match {} vs {}\n'.format(len(inputs['ensemble_members'][mod]),len(allinds[:-1])))
 
-            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-            cubolis.append(cubo)
+            for ens_id, i1, i2 in zip(inputs['ensemble_members'][mod], allinds[:-1], allinds[1:]):
+                timeok = time[i1:i2]
+                time_index = ctl.create_iris_coord(timeok, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
 
-        cubolis = iris.cube.CubeList(cubolis)
-        iris.save(cubolis, outfil)
+                cubolis = []
+                for i, fre in enumerate(var):
+                    varok = fre[i1:i2]
+                    cubo = ctl.create_iris_cube(varok, std_name, units, [time_index], long_name = long_name)
+                    cubolis.append(cubo)
+
+                cubolis = iris.cube.CubeList(cubolis)
+                outfil_ens = outfil[:-3] + '_{}.nc'.format(ens_id)
+                iris.save(cubolis, outfil_ens)
+        else:
+            cubolis = []
+            for i, fre in enumerate(var):
+                if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+                    var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+                else:
+                    var_all = fre
+                    da = dates_season
+
+                time = nc.date2num(da, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+                time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+
+                cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+                cubolis.append(cubo)
+
+            cubolis = iris.cube.CubeList(cubolis)
+            iris.save(cubolis, outfil)
 
     return
 
@@ -1147,7 +1250,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_compare_style = 'both', group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None):
     """
     Plot the results of WRtool.
 
@@ -1193,30 +1296,14 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     if groups is not None:
         compare_models = []
         labels = []
-        if group_compare_style == 'group':
+        for ll in range(len(groups.values()[0])):
             for k in groups.keys():
-                labels += groups[k]
+                labels.append(groups[k][ll])
                 if k != reference_group:
-                    compare_models.append((k, reference_group))
-        elif group_compare_style == '1vs1':
-            for ll in range(len(groups.values()[0])):
-                for k in groups.keys():
-                    labels.append(groups[k][ll])
-                    if k != reference_group:
-                        compare_models.append((groups[k][ll], groups[reference_group][ll]))
-        elif group_compare_style == 'both':
-            for ll in range(len(groups.values()[0])):
-                for k in groups.keys():
-                    labels.append(groups[k][ll])
-                    if k != reference_group:
-                        compare_models.append((groups[k][ll], groups[reference_group][ll]))
-            for k in groups.keys():
-                if k != reference_group:
-                    compare_models.append((k, reference_group))
-        else:
-            print('# WARNING: group_compare_style <{}> not recognised. Applying default.\n'.format(group_compare_style))
-            for k in groups.keys():
-                labels += groups[k]
+                    compare_models.append((groups[k][ll], groups[reference_group][ll]))
+        for k in groups.keys():
+            if k != reference_group:
+                compare_models.append((k, reference_group))
     else:
         labels = result_models.keys()
         groups = dict()
@@ -1230,283 +1317,273 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     else:
         if len(custom_model_colors) != len(labels)+1:
             raise ValueError('Need {} custom_model_colors, {} given.'.format(len(result_models)+1, len(custom_model_colors)))
-            colors = custom_model_colors
-            color_dict = dict(zip(labels, colors))
+        colors = custom_model_colors
+        color_dict = dict(zip(labels, colors))
 
-    if group_compare_style == 'group':
-        for k in groups.keys():
-            color_dict[k] = np.mean([color_dict[mod] for mod in groups[k]], axis = 0)
-    if group_compare_style == 'both':
-        nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False)
-        for k, col in zip(groups.keys(), nuko):
-            color_dict[k] = col
+    nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False)
+    for k, col in zip(groups.keys(), nuko):
+        color_dict[k] = col
 
     if 'significance' in result_models.values()[0].keys():
-        if group_compare_style in ['group', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            for mod in groups[k]:
+                col = color_dict[mod]
+                ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+
+        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Significance of regime structure')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Significance')
+        fig.savefig(cart_out+'Significance_all_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            sig = np.mean([result_models[mod]['significance'] for mod in groups[k]])
+            stddev = np.std([result_models[mod]['significance'] for mod in groups[k]])
+            col = color_dict[k]
+            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
+            i+=1.2
+
+        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        if len(groups.keys()) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Significance of regime structure')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Significance')
+        fig.savefig(cart_out+'Significance_groups_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for ll in range(len(groups.values()[0])):
             for k in groups.keys():
-                for mod in groups[k]:
-                    col = color_dict[mod]
-                    ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Significance of regime structure')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Significance')
-            fig.savefig(cart_out+'Significance_all_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for k in groups.keys():
-                sig = np.mean([result_models[mod]['significance'] for mod in groups[k]])
-                stddev = np.std([result_models[mod]['significance'] for mod in groups[k]])
-                col = color_dict[k]
-                ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-                i+=1.2
-
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
-            if len(groups.keys()) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Significance of regime structure')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Significance')
-            fig.savefig(cart_out+'Significance_groups_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-        if group_compare_style in ['1vs1', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for ll in range(len(groups.values()[0])):
-                for k in groups.keys():
-                    mod = groups[k][ll]
-                    col = color_dict[mod]
-                    ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Significance of regime structure')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Significance')
-            fig.savefig(cart_out+'Significance_1vs1_{}.pdf'.format(tag))
-            all_figures.append(fig)
+                mod = groups[k][ll]
+                col = color_dict[mod]
+                ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Significance of regime structure')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Significance')
+        fig.savefig(cart_out+'Significance_1vs1_{}.pdf'.format(tag))
+        all_figures.append(fig)
 
     nsqr = np.sqrt(result_obs['cluspattern_area'].size)
     if 'RMS' in result_models.values()[0].keys():
-        if group_compare_style in ['group', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            for mod in groups[k]:
+                col = color_dict[mod]
+                rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
+                ax.bar(i, rms, width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Total RMS vs observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('RMS (m)')
+        fig.savefig(cart_out+'RMS_all_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            rmss = [np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr for mod in groups[k]]
+            sig = np.mean(rmss)
+            stddev = np.std(rmss)
+            # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
+            # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
+            col = color_dict[k]
+            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
+            i+=1.2
+
+        if len(groups.keys()) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Total RMS vs observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('RMS (m)')
+        fig.savefig(cart_out+'RMS_groups_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for ll in range(len(groups.values()[0])):
             for k in groups.keys():
-                for mod in groups[k]:
-                    col = color_dict[mod]
-                    rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
-                    ax.bar(i, rms, width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Total RMS vs observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('RMS (m)')
-            fig.savefig(cart_out+'RMS_all_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for k in groups.keys():
-                rmss = [np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr for mod in groups[k]]
-                sig = np.mean(rmss)
-                stddev = np.std(rmss)
-                # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
-                # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
-                col = color_dict[k]
-                ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-                i+=1.2
-
-            if len(groups.keys()) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Total RMS vs observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('RMS (m)')
-            fig.savefig(cart_out+'RMS_groups_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-        if group_compare_style in ['1vs1', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for ll in range(len(groups.values()[0])):
-                for k in groups.keys():
-                    mod = groups[k][ll]
-                    col = color_dict[mod]
-                    rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
-                    ax.bar(i, rms, width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Total RMS vs observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('RMS (m)')
-            fig.savefig(cart_out+'RMS_1vs1_{}.pdf'.format(tag))
-            all_figures.append(fig)
+                mod = groups[k][ll]
+                col = color_dict[mod]
+                rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
+                ax.bar(i, rms, width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Total RMS vs observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('RMS (m)')
+        fig.savefig(cart_out+'RMS_1vs1_{}.pdf'.format(tag))
+        all_figures.append(fig)
 
     if 'patcor' in result_models.values()[0].keys():
-        if group_compare_style in ['group', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            for mod in groups[k]:
+                col = color_dict[mod]
+                #rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
+                rms = np.mean(result_models[mod]['patcor'])
+                ax.bar(i, rms, width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Pattern correlation with observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Correlation')
+        fig.savefig(cart_out+'patcor_all_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for k in groups.keys():
+            rmss = [np.mean(np.array(result_models[mod]['patcor'])) for mod in groups[k]]
+            sig = np.mean(rmss)
+            stddev = np.std(rmss)
+            # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
+            # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
+            col = color_dict[k]
+            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
+            i+=1.2
+
+        if len(groups.keys()) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Pattern correlation with observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Correlation')
+        fig.savefig(cart_out+'patcor_groups_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+        wi = 0.6
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        i = 0
+        for ll in range(len(groups.values()[0])):
             for k in groups.keys():
-                for mod in groups[k]:
-                    col = color_dict[mod]
-                    #rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
-                    rms = np.mean(result_models[mod]['patcor'])
-                    ax.bar(i, rms, width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Pattern correlation with observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Correlation')
-            fig.savefig(cart_out+'patcor_all_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for k in groups.keys():
-                rmss = [np.mean(np.array(result_models[mod]['patcor'])) for mod in groups[k]]
-                sig = np.mean(rmss)
-                stddev = np.std(rmss)
-                # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
-                # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
-                col = color_dict[k]
-                ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-                i+=1.2
-
-            if len(groups.keys()) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Pattern correlation with observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Correlation')
-            fig.savefig(cart_out+'patcor_groups_{}.pdf'.format(tag))
-            all_figures.append(fig)
-
-        if group_compare_style in ['1vs1', 'both']:
-            wi = 0.6
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            i = 0
-            for ll in range(len(groups.values()[0])):
-                for k in groups.keys():
-                    mod = groups[k][ll]
-                    col = color_dict[mod]
-                    rms = np.mean(np.array(result_models[mod]['patcor']))
-                    ax.bar(i, rms, width = wi, color = col, label = mod)
-                    i+=0.7
-                i+=0.5
-            if len(labels) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Pattern correlation with observations')
-            ax.set_xticks([])
-            #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-            #ax.set_xticklabels(labels+[obs_name], size='small')
-            ax.set_ylabel('Correlation')
-            fig.savefig(cart_out+'patcor_1vs1_{}.pdf'.format(tag))
-            all_figures.append(fig)
+                mod = groups[k][ll]
+                col = color_dict[mod]
+                rms = np.mean(np.array(result_models[mod]['patcor']))
+                ax.bar(i, rms, width = wi, color = col, label = mod)
+                i+=0.7
+            i+=0.5
+        if len(labels) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Pattern correlation with observations')
+        ax.set_xticks([])
+        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        #ax.set_xticklabels(labels+[obs_name], size='small')
+        ax.set_ylabel('Correlation')
+        fig.savefig(cart_out+'patcor_1vs1_{}.pdf'.format(tag))
+        all_figures.append(fig)
 
     patt_ref = result_obs['cluspattern']
     lat = result_obs['lat']
@@ -1565,47 +1642,46 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig.savefig(cart_out+'Regime_frequency_{}.pdf'.format(tag))
         all_figures.append(fig)
 
-        if group_compare_style in ['group', 'both']:
-            fig = plt.figure()
-            ax = plt.subplot(111)
-            ax.grid(axis = 'y', zorder = 0)
-            ax.set_axisbelow(True)
-            wi = 0.8
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        ax.grid(axis = 'y', zorder = 0)
+        ax.set_axisbelow(True)
+        wi = 0.8
 
-            n_tot = len(groups.keys())+1
-            for j in range(n_clus):
-                central = j*(n_tot*1.5)
+        n_tot = len(groups.keys())+1
+        for j in range(n_clus):
+            central = j*(n_tot*1.5)
 
-                for i, k in enumerate(groups.keys()):
-                    sig = np.mean([result_models[mod]['freq_clus'][j] for mod in groups[k]])
-                    stddev = np.std([result_models[mod]['freq_clus'][j] for mod in groups[k]])
-                    col = color_dict[k]
-                    labelmod = None
-                    if j == 0: labelmod = k
-                    if plot_diffs:
-                        ax.bar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
-                        ax.errorbar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], yerr = stddev, color = 'black', capsize = 3, zorder = 6)
-                    else:
-                        ax.bar(central-(n_tot-1)/2.+i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = labelmod, capsize = 3, zorder = 5)
-                        ax.errorbar(central-(n_tot-1)/2.+i, sig, yerr = stddev, color = 'black', capsize = 3, zorder = 6)
+            for i, k in enumerate(groups.keys()):
+                sig = np.mean([result_models[mod]['freq_clus'][j] for mod in groups[k]])
+                stddev = np.std([result_models[mod]['freq_clus'][j] for mod in groups[k]])
+                col = color_dict[k]
                 labelmod = None
-                if j == 0: labelmod = obs_name
-                if not plot_diffs:
-                    ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j], width = wi,  color = 'black', label = labelmod, zorder = 5)
-            if len(groups.keys()) > 4:
-                # Shrink current axis by 20%
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                # Put a legend to the right of the current axis
-                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
-            else:
-                ax.legend(fontsize = 'small', loc = 4)
-            ax.set_title('Regimes frequencies')
-            ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor = False)
-            ax.set_xticklabels(patnames_short, size='small')
-            ax.set_ylabel('Frequency')
-            fig.savefig(cart_out+'Regime_frequency_groups_{}.pdf'.format(tag))
-            all_figures.append(fig)
+                if j == 0: labelmod = k
+                if plot_diffs:
+                    ax.bar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
+                    ax.errorbar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], yerr = stddev, color = 'black', capsize = 3, zorder = 6)
+                else:
+                    ax.bar(central-(n_tot-1)/2.+i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = labelmod, capsize = 3, zorder = 5)
+                    ax.errorbar(central-(n_tot-1)/2.+i, sig, yerr = stddev, color = 'black', capsize = 3, zorder = 6)
+            labelmod = None
+            if j == 0: labelmod = obs_name
+            if not plot_diffs:
+                ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j], width = wi,  color = 'black', label = labelmod, zorder = 5)
+        if len(groups.keys()) > 4:
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+        else:
+            ax.legend(fontsize = 'small', loc = 4)
+        ax.set_title('Regimes frequencies')
+        ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor = False)
+        ax.set_xticklabels(patnames_short, size='small')
+        ax.set_ylabel('Frequency')
+        fig.savefig(cart_out+'Regime_frequency_groups_{}.pdf'.format(tag))
+        all_figures.append(fig)
 
     i1 = int(np.ceil(np.sqrt(n_clus)))
     i2 = n_clus/i1
@@ -1952,32 +2028,33 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             data[cos+'_err'] = np.stack(data[cos+'_err'])
             data[cos+'_errlarge'] = np.stack(data[cos+'_errlarge'])
 
-        fig = plt.figure(figsize = (16,12))
+        if not np.any([len(groups[k]) == 1 for k in groups.keys()]):
+            fig = plt.figure(figsize = (16,12))
 
-        for j in range(n_clus):
-            ax = fig.add_subplot(i1,i2,j+1)
-            ax.set_title(patnames[j], fontsize = 18, fontweight = 'bold')
+            for j in range(n_clus):
+                ax = fig.add_subplot(i1,i2,j+1)
+                ax.set_title(patnames[j], fontsize = 18, fontweight = 'bold')
 
-            ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = groups.keys(), ax = ax, colors = group_colors, alpha = 0.7)
+                ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = groups.keys(), ax = ax, colors = group_colors, alpha = 0.7)
 
-            for grp in groups.keys():
-                pats = [result_models[mod]['patcor'][j] for mod in groups[grp]]
-                rmss = [result_models[mod]['RMS'][j]/nsqr for mod in groups[grp]]
-                ax.scatter(pats, rmss, color = color_dict[grp], s = 25, marker = group_symbols[grp])
+                for grp in groups.keys():
+                    pats = [result_models[mod]['patcor'][j] for mod in groups[grp]]
+                    rmss = [result_models[mod]['RMS'][j]/nsqr for mod in groups[grp]]
+                    ax.scatter(pats, rmss, color = color_dict[grp], s = 25, marker = group_symbols[grp])
 
-            ax.set_xlim(0.35, 1.0)
-            ax.set_ylim(0., 27.0)
-            ax.tick_params(labelsize=14)
-            plt.gca().invert_xaxis()
-            ax.set_xlabel('Pattern correlation', fontsize = 18)
-            ax.set_ylabel('RMS (m)', fontsize = 18)
-            ax.grid()
+                ax.set_xlim(0.35, 1.0)
+                ax.set_ylim(0., 27.0)
+                ax.tick_params(labelsize=14)
+                plt.gca().invert_xaxis()
+                ax.set_xlabel('Pattern correlation', fontsize = 18)
+                ax.set_ylabel('RMS (m)', fontsize = 18)
+                ax.grid()
 
-        plt.tight_layout()
-        # plt.subplots_adjust(top = 0.9)
-        # plt.suptitle('Average performance of PRIMAVERA stream1 coupled models', fontsize = 28)
-        fig.savefig(cart_out + 'ellipse_plot_{}.pdf'.format(tag))
-        all_figures.append(fig)
+            plt.tight_layout()
+            # plt.subplots_adjust(top = 0.9)
+            # plt.suptitle('Average performance of PRIMAVERA stream1 coupled models', fontsize = 28)
+            fig.savefig(cart_out + 'ellipse_plot_{}.pdf'.format(tag))
+            all_figures.append(fig)
 
 
     filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)

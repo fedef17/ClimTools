@@ -56,9 +56,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols group_compare_style reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area is_ensemble ens_option'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area is_ensemble ens_option'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, str, bool, bool, bool, str, str, str, float, list, list, bool, str]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, bool, bool, bool, str, str, str, float, list, list, bool, str]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -117,6 +117,7 @@ if inputs['model_names'] is None:
 if inputs['is_ensemble']:
     print('This is an ensemble run, finding all files.. \n')
     inputs['ensemble_filenames'] = dict()
+    inputs['ensemble_members'] = dict()
     # load the true file list
     for filgenname, mod_name in zip(inputs['filenames'], inputs['model_names']):
         modcart = inputs['cart_in']
@@ -127,9 +128,17 @@ if inputs['is_ensemble']:
 
         lista_all = os.listdir(modcart)
         lista_oks = [modcart + fi for fi in lista_all if np.all([namp in fi for namp in namfilp])]
+        namfilp.append(modcart)
 
-        inputs['ensemble_filenames'][mod_name] = lista_oks
-        print(mod_name, lista_oks)
+        inputs['ensemble_filenames'][mod_name] = np.sort(lista_oks)
+        inputs['ensemble_members'][mod_name] = []
+        for coso in np.sort(lista_oks):
+            for namp in namfilp:
+                coso = coso.replace(namp,' ')
+            ens_id = '_'.join(coso.strip().split())
+            inputs['ensemble_members'][mod_name].append(ens_id)
+        print(mod_name, inputs['ensemble_filenames'][mod_name])
+        print(mod_name, inputs['ensemble_members'][mod_name])
 
     if inputs['ens_option'] != 'all':
         raise ValueError('AAAAAA -- as [ens_option] ONLY "all" IS ACTIVE FOR NOW!')
@@ -221,7 +230,7 @@ n_models = len(model_outs.keys())
 file_res = inputs['cart_out'] + 'results_' + std_outname(inputs['exp_name'], inputs) + '.dat'
 cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
 
-cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_compare_style = inputs['group_compare_style'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
 cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
 if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)

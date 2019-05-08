@@ -24,6 +24,7 @@ from numpy import linalg as LA
 from eofs.standard import Eof
 from scipy import stats, optimize
 import itertools as itt
+import math
 
 from sklearn.cluster import KMeans
 import ctool
