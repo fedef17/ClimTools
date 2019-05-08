@@ -1308,6 +1308,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         labels = result_models.keys()
         groups = dict()
         groups['all'] = labels
+        group_symbols = dict()
+        group_symbols['all'] = 'o'
 
     print('COMPARE:', compare_models)
 
