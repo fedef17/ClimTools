@@ -4249,8 +4249,8 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     ax.set_thetagrids(anggr, labels=labgr, frac = 1.1)
 
     if relative_std:
-        sigma_obs = np.std(observation)
-        sigmas_pred = np.array([np.std(var)/sigma_obs for var in models])
+        sigma_obs_abs = np.std(observation)
+        sigmas_pred = np.array([np.std(var)/sigma_obs_abs for var in models])
         sigma_obs = 1.0
     else:
         sigmas_pred = np.array([np.std(var) for var in models])
@@ -4321,7 +4321,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     plt.ylabel(label_ERMS_axis)
 
     for sig in [1., 2., 3.]:
-        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs, fill = False, edgecolor = 'black', linestyle = '--', clip_on=False)
+        circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs_abs, fill = False, edgecolor = 'black', linestyle = '--', clip_on=True)
         ax.add_artist(circle)
 
     plt.scatter(np.mean(observation), 0., color = 'black', s = obs_points_size+20, marker = 'D', zorder = 5, label = obs_label)
