@@ -414,6 +414,10 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
     """
 
     print('Reading {}\n'.format(ifile))
+    is_ensemble = False
+    if type(ifile) in [list, np.ndarray]:
+        is_ensemble = True
+        print('WARNING!!!! Reading an ENSEMBLE of input files instead than a single file! Is this desired?\n')
 
     fh = iris.load(ifile)
 
@@ -433,13 +437,23 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
     print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, variab_names))
 
     all_vars = dict()
-    for cu in fh:
-        all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
+    if not is_ensemble:
+        for cu in fh:
+            all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
+        if select_var is not None:
+            print('Read variable: {}\n'.format(select_var))
+            return all_vars[select_var]
+    else:
+        ens_id = 0
+        if select_var is not None:
+            print('Read variable: {}\n'.format(select_var))
+        for cu in fh:
+            if select_var is not None:
+                if cu.name() != select_var: continue
+            all_vars[cu.name()+'_{}'.format(ens_id)] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
+            ens_id += 1
 
-    if select_var is not None:
-        print('Read variable: {}\n'.format(select_var))
-        return all_vars[select_var]
-    elif len(all_vars.keys()) == 1:
+    if len(all_vars.keys()) == 1:
         print('Read variable: {}\n'.format(all_vars.keys()[0]))
         return all_vars.values()[0]
     else:

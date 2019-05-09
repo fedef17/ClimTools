@@ -84,6 +84,8 @@ defaults['is_ensemble'] = False
 defaults['ens_option'] = 'all'
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
+for ke in inputs.keys():
+    print('{} : {}\n'.format(ke, inputs[ke]))
 
 if inputs['area'] == 'custom':
     if inputs['custom_area'] is None:
@@ -130,7 +132,7 @@ if inputs['is_ensemble']:
         lista_oks = [modcart + fi for fi in lista_all if np.all([namp in fi for namp in namfilp])]
         namfilp.append(modcart)
 
-        inputs['ensemble_filenames'][mod_name] = np.sort(lista_oks)
+        inputs['ensemble_filenames'][mod_name] = list(np.sort(lista_oks))
         inputs['ensemble_members'][mod_name] = []
         for coso in np.sort(lista_oks):
             for namp in namfilp:
@@ -207,6 +209,7 @@ if not os.path.exists(nomeout):
         ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'])
         pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
     else:
+        print('Reference calculation already performed, reading from {}\n'.format(ERA_ref_out))
         ERA_ref = pickle.load(open(ERA_ref_out, 'r'))
 
     model_outs = dict()
@@ -240,5 +243,5 @@ print('Check results in directory: {}\n'.format(inputs['cart_out']))
 print(ctl.datestamp()+'\n')
 print('Ended successfully!\n')
 
-os.system('mv {} {}'.format(logname, inputs['cart_out']))
+os.system('cp {} {}'.format(logname, inputs['cart_out']))
 os.system('cp {} {}'.format(file_input, inputs['cart_out']))

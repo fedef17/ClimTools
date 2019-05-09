@@ -65,7 +65,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     """
 
     print('Running precompute\n')
-    if type(ifile) is not list:
+    if type(ifile) not in [list, np.ndarray]:
         # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
         # print(type(var))
         # print(var.shape)
