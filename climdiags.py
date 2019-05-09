@@ -1950,6 +1950,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     group_colors = [color_dict[k] for k in groups.keys()]
     print(markers)
 
+    obs = result_obs['cluspattern_area']
+    modpats = [result_models[lab]['cluspattern_area'] for lab in labels]
+    max_val_sd = 1.1*np.max([np.max([np.std(pat[i])/np.std(obs[i]) for pat in modpats]) for i in range(len(patnames))])
     # Taylor plots
     for num, patt in enumerate(patnames):
         obs = result_obs['cluspattern_area'][num, ...]
@@ -1961,12 +1964,16 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         label_ERMS_axis = 'Total RMS error (m)'
         label_bias_axis = 'Pattern mean (m)'
 
-        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70)
+        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70, max_val_sd = max_val_sd)
         all_figures += figs
 
     numens_ok = int(np.ceil(n_clus))
     side1 = int(np.ceil(np.sqrt(numens_ok)))
     side2 = int(np.ceil(numens_ok/float(side1)))
+    if side1 > side2:
+        cos = side1
+        side1 = side2
+        side2 = cos
 
     fig = plt.figure(figsize=(16,12))
     for num, patt in enumerate(patnames):
@@ -1978,7 +1985,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         colors = ctl.color_set(len(modpats), bright_thres = 0.3)
 
         legok = False
-        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70)
+        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70, max_val_sd = max_val_sd)
 
 
     #Custom legend

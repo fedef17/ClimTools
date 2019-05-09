@@ -3456,9 +3456,9 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     if add_rectangles is not None:
         colors = color_set(len(add_rectangles))
         for rect, col in zip(add_rectangles, colors):
-            # ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = None, edgecolor = col, alpha = 1.0, transform = ccrs.PlateCarree()))
-            ring = makeRectangle(rect)
-            ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 2.0)
+            ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = 'none', edgecolor = col, alpha = 1.0, transform = proj))
+            # ring = makeRectangle(rect)
+            # ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 2.0)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -4195,8 +4195,8 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
         all_artists.append(ell)
 
     if not polar:
-        ax.set_xlim(min(x)-min(errx), max(x)+max(errx))
-        ax.set_ylim(min(y)-min(erry), max(y)+max(erry))
+        ax.set_xlim(min(x)-abs(max(errx)), max(x)+abs(max(errx)))
+        ax.set_ylim(min(y)-abs(max(erry)), max(y)+abs(max(erry)))
 
     if labels is not None:
         ax.legend(handles = all_artists, fontsize = legendfontsize)
@@ -4207,7 +4207,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     return
 
 
-def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True):
+def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True, relative_std = True, max_val_sd = None):
     """
     Produces two figures:
     - a Taylor diagram
@@ -4248,8 +4248,13 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
 
     ax.set_thetagrids(anggr, labels=labgr, frac = 1.1)
 
-    sigmas_pred = np.array([np.std(var) for var in models])
-    sigma_obs = np.std(observation)
+    if relative_std:
+        sigma_obs = np.std(observation)
+        sigmas_pred = np.array([np.std(var)/sigma_obs for var in models])
+        sigma_obs = 1.0
+    else:
+        sigmas_pred = np.array([np.std(var) for var in models])
+        sigma_obs = np.std(observation)
     corrs_pred = np.array([Rcorr(observation, var) for var in models])
 
     if colors is None:
@@ -4268,6 +4273,10 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
+
+    if max_val_sd is None:
+        max_val_sd = 1.1 * np.max(sigmas_pred)
+    ax.set_ylim(0., max_val_sd)
 
     for sig in [1., 2., 3.]:
         circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
