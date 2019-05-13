@@ -225,7 +225,11 @@ if not os.path.exists(nomeout):
             model_outs[modname] = cd.WRtool_from_file(inputs['ensemble_filenames'][modname], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
-    io.savemat(nomeout[:-2]+'.mat', mdict = {'models': model_outs, 'reference': ERA_ref})
+    try:
+        io.savemat(nomeout[:-2]+'.mat', mdict = {'models': model_outs, 'reference': ERA_ref})
+    except Exception as caos:
+        print(repr(caos))
+        print('Unable to produce .mat OUTPUTTTTT!!!!')
 else:
     print('Computation already performed. Reading output from {}\n'.format(nomeout))
     [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
