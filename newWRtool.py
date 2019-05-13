@@ -12,6 +12,9 @@ import climtools_lib as ctl
 import climdiags as cd
 
 #######################################
+plt.rcParams['xtick.labelsize'] = 14
+plt.rcParams['ytick.labelsize'] = 14
+
 def std_outname(tag, inputs):
     name_outputs = '{}_{}_{}_{}clus'.format(tag, inputs['season'], inputs['area'], inputs['numclus'])
 
@@ -238,7 +241,7 @@ cd.out_WRtool_mainres(file_res, model_outs, ERA_ref, inputs)
 
 arearect = None
 if inputs['draw_rectangle_area']:
-    if inputs['area'] == 'custom': 
+    if inputs['area'] == 'custom':
         arearect = inputs['custom_area']
     else:
         arearect = ctl.sel_area_translate(inputs['area'])

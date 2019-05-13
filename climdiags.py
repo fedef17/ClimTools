@@ -113,6 +113,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     results['time_cal'] = aux_info['time_calendar']
     results['time_units'] = aux_info['time_units']
 
+    var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season)
+    results['monthly_freq'] = dict()
+    results['monthly_freq']['freq'] = var
+    results['monthly_freq']['dates'] = pd.to_datetime(datesmon)
+
     return results
 
 
@@ -1964,7 +1969,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         label_ERMS_axis = 'Total RMS error (m)'
         label_bias_axis = 'Pattern mean (m)'
 
-        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70, max_val_sd = max_val_sd)
+        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 80, obs_points_size = 100, max_val_sd = max_val_sd)
         all_figures += figs
 
     numens_ok = int(np.ceil(n_clus))
@@ -1985,7 +1990,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         colors = ctl.color_set(len(modpats), bright_thres = 0.3)
 
         legok = False
-        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 50, obs_points_size = 70, max_val_sd = max_val_sd)
+        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 80, obs_points_size = 100, max_val_sd = max_val_sd)
 
 
     #Custom legend

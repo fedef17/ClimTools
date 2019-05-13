@@ -5,13 +5,13 @@ import numpy as np
 import sys
 import os
 
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
-import matplotlib as mpl
 
 from shapely.geometry.polygon import LinearRing
 
@@ -4250,7 +4250,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     return
 
 
-def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 35, obs_points_size = 50, enlarge_rmargin = True, relative_std = True, max_val_sd = None):
+def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None):
     """
     Produces two figures:
     - a Taylor diagram
