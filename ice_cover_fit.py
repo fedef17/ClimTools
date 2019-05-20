@@ -23,8 +23,9 @@ from copy import deepcopy as cp
 import iris
 ###############################################
 
-cart_in = '/data-hobbes/fabiano/SPHINX/ice_cover/'
-cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/ice_cover_virna/'
+#cart_in = '/data-hobbes/fabiano/SPHINX/ice_cover/'
+cart_in = '/data-woodstock/SPHINX/Fede/'
+cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/ice_cover_virna/extended/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
 filista = os.listdir(cart_in)
@@ -44,7 +45,8 @@ tas = dict()
 coso = iris.load(cart_in + tasfil)
 for cos in coso:
     varna = cos.var_name
-    tas[varna] = cos.data.squeeze()
+    print(cos, varna, cos.data.shape)
+    tas[varna] = cos.data.squeeze() - np.float64(273.15)
 
 # prima il caso son: fitto una retta per ognuno e vedo come viene il plot e se ci sono differenze significative tra uno e l'altro.
 expmems = ['lcb0', 'lcb1', 'lcb2', 'lcs0', 'lcs1', 'lcs2']
@@ -56,18 +58,21 @@ axes = []
 #plt.ion()
 
 p0s = dict()
-p0s[('mam', 'lcs')] = (-5e11, -2.5e12, 1.e13, 15)
-p0s[('mam', 'lcb')] = (-5e11, -2.5e12, -5e12, 1.e13, 15.5, 17.5)
-p0s[('son', 'lcs')] = (-5e11, -2.5e12, 1.e13, 15)
+#p0s[('mam', 'lcs')] = (-5e11, -2.5e12, 1.e13, 15)
+#p0s[('mam', 'lcb')] = (-5e11, -2.5e12, -5e12, 1.e13, 15.5, 17.5)
+p0s[('mam', 'lcb')] = (-5e11, -2.5e12, -5e12, 1.e13, 16, 19)
+p0s[('mam', 'lcs')] = (-5e11, -2.5e12, -5e12, 1.e13, 16, 19)
+#p0s[('son', 'lcs')] = (-5e11, -2.5e12, 1.e13, 15)
 p0s[('son', 'lcb')] = (-5e11, -2.5e12, -1.e9, 1.e13, 15, 17)
+p0s[('son', 'lcs')] = (-5e11, -2.5e12, -1.e9, 1.e13, 15, 17)
 
+n_cut = 2
 results = dict()
 
 for seas in ['mam', 'son']:
     fig = plt.figure(figsize=(24, 12), dpi=150)
     for i, exp in enumerate(expmems):
-        n_cut = 1
-        if exp[:-1] == 'lcb': n_cut = 2
+        #if exp[:-1] == 'lcb': n_cut = 2
 
         x = tas[exp]
         y = icec[(seas, exp)]
@@ -112,8 +117,8 @@ for seas in ['mam', 'son']:
     x_base = np.concatenate([tas[exp] for exp in expmems if 'lcb' in exp])
     y_base = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcb' in exp])
 
-    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = 1, approx_par = p0s[(seas, 'lcs')])
-    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = 2, approx_par = p0s[(seas, 'lcb')])
+    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = n_cut, approx_par = p0s[(seas, 'lcs')])
+    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = n_cut, approx_par = p0s[(seas, 'lcb')])
 
     #print(seas, exp, xcuts)
     x = np.concatenate([x_stoc, x_base])
@@ -153,12 +158,13 @@ for seas in ['mam', 'son']:
         agag = np.array(agag)/1.e6
         c1 = np.mean(agag, axis = 0)
         delta_c1 = np.std(agag, axis = 0)
-        if cos == 'lcb':
+        #if cos == 'lcb':
+        if n_cut == 2:
             print('------- {} - {} ------------\n'.format(seas, cos))
             print('Cuts: {:8.2f} pm {:8.2f} C, {:8.2f} pm {:8.2f} C \n'.format(xcuts[0], delta_xcuts[0], xcuts[1], delta_xcuts[1]))
             print('Slopes: {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C \n'.format(ms[0], delta_ms[0], ms[1], delta_ms[1], ms[2], delta_ms[2]))
             print('Intercept: {:9.4e} pm {:9.4e} km2 \n'.format(c1, delta_c1))
-        elif cos == 'lcs':
+        elif n_cut == 1: #cos == 'lcs':
             print('------- {} - {} ------------\n'.format(seas, cos))
             print('Cut: {:8.2f} pm {:8.2f} C \n'.format(xcuts[0], delta_xcuts[0]))
             print('Slopes: {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C \n'.format(ms[0], delta_ms[0], ms[1], delta_ms[1]))
@@ -167,14 +173,18 @@ for seas in ['mam', 'son']:
 
 print('\n\n---------- SINGLE CUT FIT ----------------------\n')
 
+n_cut = 1
+
 figures = []
 axes = []
 #plt.ion()
 
 p0s = dict()
-p0s[('mam', 'lcs')] = (-2.5e12, 1.e13)
+#p0s[('mam', 'lcs')] = (-2.5e12, 1.e13)
+p0s[('mam', 'lcs')] = (-2.5e12, -5e12, 1.e13, 17.5)
 p0s[('mam', 'lcb')] = (-2.5e12, -5e12, 1.e13, 17.5)
-p0s[('son', 'lcs')] = (-2.5e12, 1.e13)
+#p0s[('son', 'lcs')] = (-2.5e12, 1.e13)
+p0s[('son', 'lcs')] = (-2.5e12, -1.e9, 1.e13, 17)
 p0s[('son', 'lcb')] = (-2.5e12, -1.e9, 1.e13, 17)
 
 results = dict()
@@ -182,8 +192,8 @@ results = dict()
 for seas in ['mam', 'son']:
     fig = plt.figure(figsize=(24, 12), dpi=150)
     for i, exp in enumerate(expmems):
-        n_cut = 0
-        if exp[:-1] == 'lcb': n_cut = 1
+        n_cut = 1
+        #if exp[:-1] == 'lcb': n_cut = 1
 
         x = tas[exp]
         y = icec[(seas, exp)]
@@ -230,8 +240,8 @@ for seas in ['mam', 'son']:
     x_base = np.concatenate([tas[exp] for exp in expmems if 'lcb' in exp])
     y_base = np.concatenate([icec[(seas, exp)] for exp in expmems if 'lcb' in exp])
 
-    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = 0, approx_par = p0s[(seas, 'lcs')])
-    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = 1, approx_par = p0s[(seas, 'lcb')])
+    xcuts_stoc, lines_stoc = ctl.cutline2_fit(x_stoc, y_stoc, n_cut = n_cut, approx_par = p0s[(seas, 'lcs')])
+    xcuts_base, lines_base = ctl.cutline2_fit(x_base, y_base, n_cut = n_cut, approx_par = p0s[(seas, 'lcb')])
 
     #print(seas, exp, xcuts)
     x = np.concatenate([x_stoc, x_base])
@@ -265,14 +275,15 @@ for seas in ['mam', 'son']:
         agag = np.array(agag)/1.e6
         c1 = np.mean(agag, axis = 0)
         delta_c1 = np.std(agag, axis = 0)
-        if cos == 'lcb':
+        #if cos == 'lcb':
+        if n_cut == 1:
             print('------- {} - {} ------------\n'.format(seas, cos))
 #            print('Cuts: {:8.2f} pm {:8.2f} C, {:8.2f} pm {:8.2f} C \n'.format(xcuts[0], delta_xcuts[0], xcuts[1], delta_xcuts[1]))
 #            print('Slopes: {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C \n'.format(ms[0], delta_ms[0], ms[1], delta_ms[1], ms[2], delta_ms[2]))
             print('Cuts: {:8.2f} pm {:8.2f} C \n'.format(xcuts[0], delta_xcuts[0]))
             print('Slopes: {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C \n'.format(ms[0], delta_ms[0], ms[1], delta_ms[1]))
             print('Intercept: {:9.4e} pm {:9.4e} km2 \n'.format(c1, delta_c1))
-        elif cos == 'lcs':
+        elif n_cut == 0: #cos == 'lcs':
             print('------- {} - {} ------------\n'.format(seas, cos))
 #            print('Cut: {:8.2f} pm {:8.2f} C \n'.format(xcuts[0], delta_xcuts[0]))
 #            print('Slopes: {:9.4e} pm {:9.4e} km2/C, {:9.4e} pm {:9.4e} km2/C \n'.format(ms[0], delta_ms[0], ms[1], delta_ms[1]))
@@ -282,14 +293,30 @@ for seas in ['mam', 'son']:
 # CLIMATE SENSITIVITY
 print('\n\n-----------------  CLIMATE SENSITIVITY --------------------\n')
 
-for delta in [10,20,30]:
+yf = 2150
+yi = 1860
+delta = 10
+cs_all = dict()
+cs_all['lcb'] = []
+cs_all['lcs'] = []
+
+cs_all_delta = dict()
+cs_all_delta['lcb'] = []
+cs_all_delta['lcs'] = []
+
+allyfs = np.arange(1950, 2161, 5)
+
+for yf in allyfs:
+#for delta in [10,20,30]:
     print('-----------------  {} yr window --------------------\n'.format(delta))
     clim_sens = dict()
     t_piA = dict()
     t_fuA = dict()
     for exp in expmems:
-        t_pi = np.mean(tas[exp][:delta], axis = 0)
-        t_fu = np.mean(tas[exp][-delta:], axis = 0)
+        ini = yi - 1850
+        fin = yf - 2161
+        t_pi = np.mean(tas[exp][max([0, ini-delta]):ini+delta], axis = 0)
+        t_fu = np.mean(tas[exp][fin-delta:min([-1, fin+delta])], axis = 0)
         clim_sens[exp] = t_fu - t_pi
         t_piA[exp] = t_pi
         t_fuA[exp] = t_fu
@@ -299,10 +326,35 @@ for delta in [10,20,30]:
         cs = np.mean(agag)
         delta_cs = np.std(agag)
         print('--------------- {} ------------\n'.format(cos))
-        print('T diff {}-2100 to 1850-{}: {:8.2f} pm {:6.2f}\n'.format(2100-delta, 1850+delta, cs, delta_cs))
+        print('T diff {}-{} to {}-{}: {:8.2f} pm {:6.2f}\n'.format(yf-delta, yf, yi, yi+delta, cs, delta_cs))
 
         for gigi in [t_piA, t_fuA]:
             agag = [gigi[exp] for exp in expmems if cos in exp]
-            cs = np.mean(agag)
-            delta_cs = np.std(agag)
-            print('T: {:8.2f} pm {:6.2f}\n'.format(cs, delta_cs))
+            fint = np.mean(agag)
+            delta_fint = np.std(agag)
+            print('T: {:8.2f} pm {:6.2f}\n'.format(fint, delta_fint))
+
+        cs_all[cos].append(cs)
+        cs_all_delta[cos].append(delta_cs)
+
+for cos in ['lcb', 'lcs']:
+    cs_all[cos] = np.array(cs_all[cos])
+    cs_all_delta[cos] = np.array(cs_all_delta[cos])
+
+plt.close('all')
+plt.ion()
+
+fig = plt.figure()
+plt.fill_between(allyfs, cs_all['lcb']-cs_all_delta['lcb'], cs_all['lcb']+cs_all_delta['lcb'], color = 'blue', alpha = 0.2)
+plt.plot(allyfs, cs_all['lcb'], label = 'base', color = 'blue')
+plt.fill_between(allyfs, cs_all['lcs']-cs_all_delta['lcs'], cs_all['lcs']+cs_all_delta['lcs'], color = 'orange', alpha = 0.2)
+plt.plot(allyfs, cs_all['lcs'], label = 'stoc', color = 'orange')
+plt.legend()
+plt.xlabel('years')
+plt.ylabel('transient climate sensitivity (K)')
+plt.grid()
+fig.savefig(cart_out + 'transient_climate_sensitivity.pdf')
+
+plt.xlim(2075,2125)
+plt.ylim(3,7)
+fig.savefig(cart_out + 'transient_climate_sensitivity_zoom.pdf')

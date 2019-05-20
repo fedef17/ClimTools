@@ -294,9 +294,17 @@ def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
     if nlat*nlon < nlat_ref*nlon_ref:
         raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
 
-    if np.all(cube.coord('latitude').points == ref_cube.coord('latitude').points) and np.all(cube.coord('longitude').points == ref_cube.coord('longitude').points):
-        print('Grid check OK\n')
+    if nlat == nlat_ref and nlon == nlon_ref:
+        lat_check = cube.coord('latitude').points == ref_cube.coord('latitude').points
+        lon_check = cube.coord('longitude').points == ref_cube.coord('longitude').points
+
+        if np.all(lat_check) and np.all(lon_check):
+            print('Grid check OK\n')
+        else:
+            print('Same nlat, nlon, but different grid. Regridding to reference..\n')
+            nucube = cube.regrid(ref_cube, schema)
     else:
+        print('Different nlat, nlon. Regridding to reference..\n')
         nucube = cube.regrid(ref_cube, schema)
 
     return nucube
@@ -1850,7 +1858,7 @@ def yearly_average(var, dates, dates_range = None, cut = True):
     return nuvar, nudates
 
 
-def global_mean(field, latitude, mask = None):
+def global_mean(field, latitude, mask = None, skip_nan = True):
     """
     Calculates a global mean of field, weighting with the cosine of latitude.
 
@@ -1862,7 +1870,7 @@ def global_mean(field, latitude, mask = None):
         if field.ndim == 3 and mask.ndim == 2:
             mask = np.tile(mask, (field.shape[0],1,1))
 
-    zonal_field = zonal_mean(field, mask = mask)
+    zonal_field = zonal_mean(field, mask = mask, skip_nan = skip_nan)
     #print(zonal_field.shape)
     if np.any(np.isnan(zonal_field)):
         if zonal_field.ndim == 2:
@@ -1894,7 +1902,7 @@ def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
     return mea
 
 
-def zonal_mean(field, mask = None):
+def zonal_mean(field, mask = None, skip_nan = True):
     """
     Calculates a zonal mean of field.
 
@@ -1909,6 +1917,8 @@ def zonal_mean(field, mask = None):
             mask[~ zonal_mask, 0] = True
             mea = np.average(field, axis = -1, weights = mask)
             mea[~ zonal_mask] = np.nan
+    elif skip_nan:
+        mea = np.nanmean(field, axis = -1)
     else:
         mea = np.average(field, axis = -1)
 
@@ -1950,25 +1960,27 @@ def distance(x, y, latitude = None):
     """
     if latitude is not None:
         weights = abs(np.cos(np.deg2rad(latitude)))
+        x2 = np.empty_like(x)
+        y2 = np.empty_like(y)
         for j in range(x.shape[1]):
-            x[:,j] = x[:,j]*weights
-            y[:,j] = y[:,j]*weights
+            x2[:,j] = x[:,j]*weights
+            y2[:,j] = y[:,j]*weights
 
-    return LA.norm(x-y)
+        return LA.norm(x2-y2)
+    else:
+        return LA.norm(x-y)
 
 
 def E_rms(x, y, latitude = None):
     """
     Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
+    < latitude > : if given, weights with the cosine of latitude (FIRST axis of the array).
     """
     n = x.size
     n_lons = x.shape[1]
-    #E = np.sqrt(1.0/n * np.sum((x.flatten()-y.flatten())**2))
+
     if latitude is not None:
         weights = abs(np.cos(np.deg2rad(latitude)))
-        for j in range(x.shape[1]):
-            x[:,j] = x[:,j]*weights
-            y[:,j] = y[:,j]*weights
         n_norm = 0.
         sum_norm = 0.
         for i, w in enumerate(weights):
@@ -2157,6 +2169,10 @@ def cutline2_fit(x, y, n_cut = 1, approx_par = None):
         lines = [(m1,c1), (m2,c2)]
     elif n_cut == 2:
         def func(x, m1, m2, m3, c1, xcut1, xcut2):
+            print(xcut1, xcut2)
+            if xcut2 < xcut1:
+                y = m1*x + c1
+                return y
             c2 = xcut1*(m1-m2)+c1
             c3 = xcut2*(m2-m3)+c2
             x1 = x[x < xcut1]
@@ -2171,6 +2187,7 @@ def cutline2_fit(x, y, n_cut = 1, approx_par = None):
             y = np.concatenate([y1,y2,y3])
             return y
 
+        print(x.shape, y.shape)
         result = optimize.curve_fit(func, x, y, p0 = approx_par)
         m1, m2, m3, c1, xcut1, xcut2 = result[0]
         c2 = xcut1*(m1-m2)+c1
@@ -2180,6 +2197,16 @@ def cutline2_fit(x, y, n_cut = 1, approx_par = None):
         lines = [(m1,c1), (m2,c2), (m3,c3)]
 
     return xcuts, lines
+
+
+def genlatlon(n_lat, n_lon):
+    """
+    Generates lat and lon arrays, using the number of points n_lat,n_lon and the full range (-90,90), (-180,180).
+    """
+    lat = np.linspace(-90., 90., n_lat)
+    lon = np.linspace(-180., 180., n_lon)
+
+    return lat, lon
 
 
 def eof_computation_bkp(var, varunits, lat, lon):
@@ -3256,7 +3283,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False):
     """
     Plots field contours on the axis of a figure.
 
@@ -3281,6 +3308,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
+    if draw_grid:
+        gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = '-')
 
     cyclic = False
     if max(lon)+10. > 360 and min(lon)-10. < 0.:
@@ -3320,16 +3349,16 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         colors = color_set(len(rectangle_list))
         if len(rectangle_list) == 1: colors = ['white']
         for rect, col in zip(rectangle_list, colors):
-            ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = 'none', edgecolor = col, alpha = 1.0, transform = proj, linewidth = 2.0, zorder = 20))
-            # ring = makeRectangle(rect)
-            # ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 2.0)
+            # ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = 'none', edgecolor = col, alpha = 1.0, transform = proj, linewidth = 2.0, zorder = 20))
+            ring = makeRectangle(rect)
+            ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 2.0)
 
     return map_plot
 
 
 def get_cbar_range(data, symmetrical = False, percentiles = (0,100), n_color_levels = None):
-    mi = np.percentile(data, percentiles[0])
-    ma = np.percentile(data, percentiles[1])
+    mi = np.nanpercentile(data, percentiles[0])
+    ma = np.nanpercentile(data, percentiles[1])
     if symmetrical:
         oko = max(abs(mi), abs(ma))
         if n_color_levels is not None:
@@ -3406,16 +3435,18 @@ def def_projection(visualization, central_lat_lon):
     else:
         clon = 0.
 
-    if visualization == 'standard':
+    if visualization == 'standard' or visualization == 'Standard':
         proj = ccrs.PlateCarree()
-    elif visualization == 'polar' or visualization == 'Npolar':
+    elif visualization == 'polar' or visualization == 'Npolar' or visualization == 'npolar':
         proj = ccrs.Orthographic(central_longitude = clon, central_latitude = 90)
-    elif visualization == 'Spolar':
+    elif visualization == 'Spolar' or visualization == 'spolar':
         proj = ccrs.Orthographic(central_longitude = clon, central_latitude = -90)
-    elif visualization == 'Nstereo' or visualization == 'stereo':
+    elif visualization == 'Nstereo' or visualization == 'stereo' or visualization == 'nstereo':
         proj = ccrs.NorthPolarStereo()#central_longitude=clon)
-    elif visualization == 'Sstereo':
+    elif visualization == 'Sstereo' or visualization == 'sstereo':
         proj = ccrs.SouthPolarStereo()#central_longitude=clon)
+    elif visualization == 'Robinson' or visualization == 'robinson':
+        proj = ccrs.Robinson(central_longitude = clon)
     else:
         raise ValueError('visualization {} not recognised. Only standard, Npolar (or polar), Spolar, Nstereo (or stereo), Sstereo accepted'.format(visualization))
 
@@ -3452,7 +3483,7 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False):
     """
     Plots a single map to a figure.
 
@@ -3501,7 +3532,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -3727,7 +3758,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = True, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3811,6 +3842,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     all_figures = []
     for i in range(num_figs):
         fig = plt.figure(figsize = figsize)#(24,14)
+        #fig, axs = plt.subplots(side1, side2, figsize = figsize)
+        axes_for_colorbar = []
         for nens in range(numens_ok*i, numens_ok*(i+1)):
             if nens >= numens:
                 print('no more panels here')
@@ -3818,7 +3851,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
 
             if number_subplots:
                 subtit = nens
@@ -3844,15 +3877,18 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
                         rect.set_linewidth(6.0)
                         ax.add_artist(rect)
 
-        cax = plt.axes([0.1, 0.06, 0.8, 0.03])
+        #rect = [left, bottom, width, height]
+        cax = plt.axes([0.1, 0.08, 0.8, 0.03])
         #cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+
+        # cb = plt.colorbar(map_plot, ax = axs[0, :2], shrink=0.6, location='bottom')
         cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
         cb.ax.tick_params(labelsize=18)
         cb.set_label(cb_label, fontsize=20)
 
         plt.suptitle(title, fontsize=35, fontweight='bold')
 
-        top    = 0.90  # the top of the subplots
+        top    = 0.92  # the top of the subplots
         bottom = 0.13    # the bottom
         left   = 0.02    # the left side
         right  = 0.98  # the right side
