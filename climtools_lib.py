@@ -1902,12 +1902,16 @@ def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
     return mea
 
 
-def zonal_mean(field, mask = None, skip_nan = True):
+def zonal_mean(field, mask = None, skip_nan = True, skip_inf = True):
     """
     Calculates a zonal mean of field.
 
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
+
+    if skip_inf:
+        skip_nan = True
+        field[np.isinf(field)] = np.nan
 
     if mask is not None:
         zonal_mask = np.any(mask, axis = -1)
