@@ -147,7 +147,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -171,6 +171,13 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
         print('Analyzing a set of daily data..\n')
     else:
         print('Analyzing a set of monthly data..\n')
+
+
+    if use_reference_clusters:
+        print('\n\n <<<<< Using reference cluster centers! No KMeans is run on the models. (use_reference_clusters set to True)>>>>> \n\n\n')
+        use_reference_eofs = True
+        if ref_clusters_centers is None:
+            raise ValueError('reference cluster centers is None!')
 
     if use_reference_eofs:
         print('\n\n <<<<< Using reference EOF space for the whole analysis!! (use_reference_eofs set to True)>>>>> \n\n\n')
@@ -226,6 +233,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
             else:
                 PCs = ref_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
     else:
+        # No detrending
         if is_daily:
             climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
             var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
@@ -249,11 +257,22 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
         else:
             PCs = ref_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
 
-    print('Running clustering\n')
-    #### CLUSTERING
-    centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
-
-    dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+    if not use_reference_clusters:
+        print('Running clustering\n')
+        #### CLUSTERING
+        centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
+        dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+    else:
+        print('Assigning pcs to closest reference cluster center\n')
+        centroids = ref_clusters_centers
+        labels = []
+        dist_centroid = []
+        for el in PCs:
+            distcen = [ctl.distance(el, centr) for centr in centroids]
+            labels.append(np.argmin(distcen))
+            dist_centroid.append(np.min(distcen))
+        labels = np.array(labels)
+        dist_centroid = np.array(dist_centroid)
 
     if detrended_anom_for_clustering:
         cluspattern = ctl.compute_clusterpatterns(var_anom_dtr, labels)
@@ -1255,7 +1274,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True):
     """
     Plot the results of WRtool.
 
@@ -1914,19 +1933,23 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if np.any(np.isnan(patt)):
             print('There are {} NaNs in this patt.. replacing with zeros\n'.format(np.sum(np.isnan(patt))))
             patt[np.isnan(patt)] = 0.0
-        cartout_mod = cart_out + 'mod_{}/'.format(lab)
-        if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
+        if not out_only_main_figs:
+            cartout_mod = cart_out + 'mod_{}/'.format(lab)
+            if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
+            filename = cartout_mod+'Allclus_'+lab+'.pdf'
+        else:
+            filename = None
 
-        filename = cartout_mod+'Allclus_'+lab+'.pdf'
         figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area)
         all_figures += figs
-        for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
-            nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
-            print(nunam)
-            fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area)
-            all_figures.append(fig)
+        if not out_only_main_figs:
+            for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
+                nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
+                print(nunam)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area)
+                all_figures.append(fig)
 
-    if compare_models is not None:
+    if compare_models is not None and not out_only_main_figs:
         for coup in compare_models:
             if coup[0] not in result_models.keys():
                 continue
@@ -1959,18 +1982,19 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     modpats = [result_models[lab]['cluspattern_area'] for lab in labels]
     max_val_sd = 1.1*np.max([np.max([np.std(pat[i])/np.std(obs[i]) for pat in modpats]) for i in range(len(patnames))])
     # Taylor plots
-    for num, patt in enumerate(patnames):
-        obs = result_obs['cluspattern_area'][num, ...]
-        modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
+    if not out_only_main_figs:
+        for num, patt in enumerate(patnames):
+            obs = result_obs['cluspattern_area'][num, ...]
+            modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
-        colors = ctl.color_set(len(modpats), bright_thres = 0.3)
+            colors = ctl.color_set(len(modpats), bright_thres = 0.3)
 
-        filename = cart_out + 'TaylorPlot_{}.pdf'.format(patnames_short[num])
-        label_ERMS_axis = 'Total RMS error (m)'
-        label_bias_axis = 'Pattern mean (m)'
+            filename = cart_out + 'TaylorPlot_{}.pdf'.format(patnames_short[num])
+            label_ERMS_axis = 'Total RMS error (m)'
+            label_bias_axis = 'Pattern mean (m)'
 
-        figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = 80, obs_points_size = 100, max_val_sd = max_val_sd)
-        all_figures += figs
+            figs = ctl.Taylor_plot(modpats, obs, filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
+            all_figures += figs
 
     numens_ok = int(np.ceil(n_clus))
     side1 = int(np.ceil(np.sqrt(numens_ok)))
@@ -1990,7 +2014,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         colors = ctl.color_set(len(modpats), bright_thres = 0.3)
 
         legok = False
-        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = 80, obs_points_size = 100, max_val_sd = max_val_sd)
+        ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
 
 
     #Custom legend

@@ -3017,7 +3017,7 @@ def compute_centroid_distance(PCs, centroids, labels):
     """
     distances = []
     for pc, lab in zip(PCs, labels):
-        distances.append( distance(pc, centroids[lab]) )
+        distances.append(distance(pc, centroids[lab]))
 
     return np.array(distances)
 
@@ -3829,14 +3829,15 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         numens_ok = side1*side2
         num_figs = int(np.ceil(1.0*numens/numens_ok))
 
-    namef = []
-    namef.append(filename)
-    if num_figs > 1:
-        indp = filename.rfind('.')
-        figform = filename[indp:]
-        basename = filename[:indp]
-        for i in range(num_figs)[1:]:
-            namef.append(basename+'_{}'.format(i)+figform)
+    if filename is not None:
+        namef = []
+        namef.append(filename)
+        if num_figs > 1:
+            indp = filename.rfind('.')
+            figform = filename[indp:]
+            basename = filename[:indp]
+            for i in range(num_figs)[1:]:
+                namef.append(basename+'_{}'.format(i)+figform)
 
     if cluster_labels is not None:
         numclus = len(np.unique(cluster_labels))
@@ -3900,7 +3901,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         wspace = 0.05    # the amount of width reserved for blank space between subplots
         plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 
-        fig.savefig(namef[i])
+        if filename is not None:
+            fig.savefig(namef[i])
         all_figures.append(fig)
         # plt.close(fig)
 

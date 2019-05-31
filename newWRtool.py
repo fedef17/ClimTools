@@ -4,12 +4,20 @@
 import numpy as np
 import sys
 import os
+
+import matplotlib
+matplotlib.use('Agg') # This is to avoid the code crash if no Xwindow is available
 from matplotlib import pyplot as plt
+
 import pickle
 from scipy import io
 
 import climtools_lib as ctl
 import climdiags as cd
+
+import warnings
+warnings.simplefilter('default')
+warnings.filterwarnings('always', category=DeprecationWarning)
 
 #######################################
 plt.rcParams['xtick.labelsize'] = 14
@@ -28,7 +36,9 @@ def std_outname(tag, inputs):
     else:
         name_outputs += '_allyrs'
 
-    if inputs['use_reference_eofs']:
+    if inputs['use_reference_clusters']:
+        name_outputs += '_refCLUS'
+    elif inputs['use_reference_eofs']:
         name_outputs += '_refEOF'
 
     if inputs['detrended_anom_for_clustering']:
@@ -60,9 +70,9 @@ if len(sys.argv) > 1:
 else:
     file_input = 'input_WRtool.in'
 
-keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area is_ensemble ens_option draw_rectangle_area'
+keys = 'exp_name cart_in cart_out_general filenames model_names level season area numclus numpcs flag_perc perc ERA_ref_orig ERA_ref_folder run_sig_calc run_compare patnames patnames_short heavy_output model_tags year_range groups group_symbols reference_group detrended_eof_calculation detrended_anom_for_clustering use_reference_eofs obs_name filelist visualization bounding_lat plot_margins custom_area is_ensemble ens_option draw_rectangle_area use_reference_clusters out_netcdf out_figures out_only_main_figs taylor_mark_dim starred_field_names'
 keys = keys.split()
-itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, bool, bool, bool, str, str, str, float, list, list, bool, str, bool]
+itype = [str, str, str, list, list, float, str, str, int, int, bool, float, str, str, bool, bool, list, list, bool, list, list, dict, dict, str, bool, bool, bool, str, str, str, float, list, list, bool, str, bool, bool, bool, bool, bool, int, list]
 
 if len(itype) != len(keys):
     raise RuntimeError('Ill defined input keys in {}'.format(__file__))
@@ -87,6 +97,11 @@ defaults['plot_margins'] = None
 defaults['is_ensemble'] = False
 defaults['ens_option'] = 'all'
 defaults['draw_rectangle_area'] = False
+defaults['use_reference_clusters'] = False
+defaults['out_netcdf'] = True
+defaults['out_figures'] = True
+defaults['out_only_main_figs'] = True
+defaults['taylor_mark_dim'] = 100
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
 for ke in inputs.keys():
@@ -137,18 +152,42 @@ if inputs['is_ensemble']:
         lista_oks = [modcart + fi for fi in lista_all if np.all([namp in fi for namp in namfilp])]
         namfilp.append(modcart)
 
-        inputs['ensemble_filenames'][mod_name] = list(np.sort(lista_oks))
-        inputs['ensemble_members'][mod_name] = []
-        for coso in np.sort(lista_oks):
-            for namp in namfilp:
-                coso = coso.replace(namp,' ')
-            ens_id = '_'.join(coso.strip().split())
-            inputs['ensemble_members'][mod_name].append(ens_id)
-        print(mod_name, inputs['ensemble_filenames'][mod_name])
-        print(mod_name, inputs['ensemble_members'][mod_name])
+        if inputs['ens_option'] == 'all':
+            inputs['ensemble_filenames'][mod_name] = list(np.sort(lista_oks))
+            inputs['ensemble_members'][mod_name] = []
+            for coso in np.sort(lista_oks):
+                for namp in namfilp:
+                    coso = coso.replace(namp,' ')
+                ens_id = '_'.join(coso.strip().split())
+                inputs['ensemble_members'][mod_name].append(ens_id)
+            print(mod_name, inputs['ensemble_filenames'][mod_name])
+            print(mod_name, inputs['ensemble_members'][mod_name])
 
-    if inputs['ens_option'] != 'all':
-        raise ValueError('AAAAAA -- as [ens_option] ONLY "all" IS ACTIVE FOR NOW!')
+        if inputs['ens_option'] == 'member' or inputs['ens_option'] == 'year':
+            raise ValueError('NOT IMPLEMENTED')
+            # mem_field = inputs['starred_field_names'].index('member')
+            # allfiles = list(np.sort(lista_oks))
+            # all_ids = []
+            # all_mems = []
+            # for coso in allfiles:
+            #     for namp in namfilp:
+            #         coso = coso.replace(namp,' ')
+            #     ens_id = '_'.join(coso.strip().split())
+            #     all_ids.append(ens_id)
+            #     all_mems.append(coso.strip().split()[mem_field])
+            #
+            # if inputs['groups'] is not None:
+            #     raise ValueError('ens_option == member and groups specified are not compatible')
+            # else:
+            #     inputs['groups'] = dict()
+            #
+            # inputs['groups'][mod_name] = []
+            # for mem in np.sort(np.unique(all_mems)):
+            #     inputs['model_names']
+            #     inputs['ensemble_filenames'][mod_name]
+            #     inputs['ensemble_members'][mod_name]
+            #     inputs['groups'][mod_name] = []
+
 
 print('filenames: ', inputs['filenames'])
 print('model names: ', inputs['model_names'])
@@ -220,16 +259,16 @@ if not os.path.exists(nomeout):
     model_outs = dict()
     for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
         if not inputs['is_ensemble']:
-            model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+            model_outs[modname] = cd.WRtool_from_file(inputs['cart_in']+modfile, inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'], use_reference_clusters = inputs['use_reference_clusters'], ref_clusters_centers = ERA_ref['centroids'])
         else:
-            model_outs[modname] = cd.WRtool_from_file(inputs['ensemble_filenames'][modname], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'])
+            model_outs[modname] = cd.WRtool_from_file(inputs['ensemble_filenames'][modname], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'], use_reference_clusters = inputs['use_reference_clusters'], ref_clusters_centers = ERA_ref['centroids'])
 
     pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
     try:
         io.savemat(nomeout[:-2]+'.mat', mdict = {'models': model_outs, 'reference': ERA_ref})
     except Exception as caos:
         print(repr(caos))
-        print('Unable to produce .mat OUTPUTTTTT!!!!')
+        print('Unable to produce .mat OUTPUT!!')
 else:
     print('Computation already performed. Reading output from {}\n'.format(nomeout))
     [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
@@ -250,11 +289,13 @@ if inputs['draw_rectangle_area']:
     else:
         arearect = ctl.sel_area_translate(inputs['area'])
 
-cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'], draw_rectangle_area = arearect)#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+if inputs['out_figures']:
+    cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'], draw_rectangle_area = arearect, taylor_mark_dim = inputs['taylor_mark_dim'], out_only_main_figs = inputs['out_only_main_figs'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
-cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
-if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
-cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
+if inputs['out_netcdf']:
+    cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
+    if not os.path.exists(cart_out_nc): os.mkdir(cart_out_nc)
+    cd.out_WRtool_netcdf(cart_out_nc, model_outs, ERA_ref, inputs)
 
 print('Check results in directory: {}\n'.format(inputs['cart_out']))
 print(ctl.datestamp()+'\n')

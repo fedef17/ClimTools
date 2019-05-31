@@ -19,11 +19,11 @@ test_ignazio_ensemble
 
 ############## INPUT FILES. Set Ensemble flag. Specify either a filelist or enter the filenames directly. One amongst filelist and filenames has to be commented. #########################
 
-# Flag to read ensembles. If set to True, each element in the filelist or filenames is treated as a partial filename: the code looks for all files that match that partial name. Partial naming accepts special charachter *.
+# Flag to read ensembles. If set to True, each element in the filelist or filenames is treated as a partial filename: the code looks for all files that match that partial name. Partial naming accepts special character *.
 [is_ensemble]
 True
 
-# Option to treat ensembles: 'all' puts together all runs as if it was a single run; 'member' separates the analysis for each ensemble, treating it as a group; 'year' puts all members together and separates the analysis for years, treating each year as a group. AAAAAA -- ONLY ALL IS ACTIVE FOR NOW!
+# Option to treat ensembles: 'all' puts together all runs as if it were a single run; 'member' separates the analysis for each ensemble, treating it as a group; 'year' puts all members together and separates the analysis for years, treating each year as a group. AAAAAA -- ONLY ALL IS ACTIVE FOR NOW!
 [ens_option]
 all
 
