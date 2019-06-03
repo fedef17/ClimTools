@@ -750,7 +750,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
     for flun in fluxnames+['tot']:
         fig = plt.figure()
         plt.title('{} fluxes - {}'.format(flun, tag))
-        cset = ctl.color_set(len(seasons)+1, bright_thres = 1)
+        cset = ctl.color_set(len(seasons)+1, only_darker_colors = False)
         for seas, col in zip(seasons+['year'], cset):
             plt.plot(lat, results[flun]['zonal'][seas], label = seas, color = col, linewidth = 2.)
             #plt.plot(lat, era_fluxes_zonal_itrp[(seas, flun)], label = 'ERA '+seas, color = col, linewidth = 0.7, linestyle = '--')
@@ -1274,7 +1274,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_name = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True):
     """
     Plot the results of WRtool.
 
@@ -1282,7 +1282,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     < result_models > : dict, output of WRtool, either for single or multiple member analysis
     < result_obs > : dict, output of WRtool for a single reference observation
 
-    < model_name > : str, only needed for single member. For the multi-member the names are taken from results.keys().
+    < model_names > : list. If None, the names are taken from results.keys().
     < groups > : dict, only needed for multimember. Each entry contains a list of results.keys() belonging to that group. Group names are the group dict keys().
     < custom_model_colors > : len(models)+1 colors for the models.
     < compare_models > : list of tuples. Each tuple (model_1, model_2) is compared directly (regime statistics, patterns, ecc.)
@@ -1295,8 +1295,11 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     n_clus = len(result_obs['cluspattern'])
 
-    if model_name is None:
-        model_name = 'model'
+    if model_names is None:
+        if n_ens == 1:
+            model_names = ['model']
+        else:
+            model_names = result_models.keys()
     if obs_name is None:
         obs_name = 'Obs'
 
@@ -1304,7 +1307,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         print('entro', result_models.keys())
         resultooo = copy(result_models)
         result_models = dict()
-        result_models[model_name] = resultooo
+        result_models[model_names[0]] = resultooo
 
     all_figures = []
 
@@ -1329,7 +1332,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             if k != reference_group:
                 compare_models.append((k, reference_group))
     else:
-        labels = result_models.keys()
+        #labels = result_models.keys()
+        labels = model_names
         groups = dict()
         groups['all'] = labels
         group_symbols = dict()
@@ -1762,7 +1766,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                     ax = fig.add_subplot(i1,i2,j+1)
                     ax.set_title(patnames[j])
 
-                    if coup[1] in result_models.keys():
+                    if coup[1] in model_names:
                         model_1 = result_models[coup[1]]['resid_times'][j]
                     elif coup[1] in groups.keys():
                         model_1 = np.concatenate([result_models[k]['resid_times'][j] for k in groups[coup[1]]])
@@ -1770,7 +1774,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                         print('# WARNING: compare_models: {} not found. continue..\n'.format(coup[1]))
                         continue
 
-                    if coup[0] in result_models.keys():
+                    if coup[0] in model_names:
                         model_0 = result_models[coup[0]]['resid_times'][j]
                     elif coup[0] in groups.keys():
                         model_0 = np.concatenate([result_models[k]['resid_times'][j] for k in groups[coup[0]]])
@@ -1852,7 +1856,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if compare_models is not None:
             for coup in compare_models:
                 print(coup)
-                if coup[1] in result_models.keys():
+                if coup[1] in model_names:
                     model_1 = result_models[coup[1]]['trans_matrix']
                 elif coup[1] in groups.keys():
                     model_1 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[1]]], axis = 0)
@@ -1860,7 +1864,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                     print('# WARNING: compare_models: {} not found. continue..\n'.format(coup[1]))
                     continue
 
-                if coup[0] in result_models.keys():
+                if coup[0] in model_names:
                     model_0 = result_models[coup[0]]['trans_matrix']
                 elif coup[0] in groups.keys():
                     model_0 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[0]]], axis = 0)
@@ -1951,7 +1955,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     if compare_models is not None and not out_only_main_figs:
         for coup in compare_models:
-            if coup[0] not in result_models.keys():
+            if coup[0] not in model_names:
                 continue
             patt = result_models[coup[0]]['cluspattern']
             patt2 = result_models[coup[1]]['cluspattern']
@@ -1987,7 +1991,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             obs = result_obs['cluspattern_area'][num, ...]
             modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
-            colors = ctl.color_set(len(modpats), bright_thres = 0.3)
+            colors = ctl.color_set(len(modpats), only_darker_colors = False)
 
             filename = cart_out + 'TaylorPlot_{}.pdf'.format(patnames_short[num])
             label_ERMS_axis = 'Total RMS error (m)'
@@ -2011,7 +2015,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         obs = result_obs['cluspattern_area'][num, ...]
         modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
-        colors = ctl.color_set(len(modpats), bright_thres = 0.3)
+        colors = ctl.color_set(len(modpats), only_darker_colors = False)
 
         legok = False
         ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)

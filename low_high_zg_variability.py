@@ -272,17 +272,17 @@ figsizemf = (16,16)
 # fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'stat_eddy_all.pdf', title = 'Stationary eddy', visualization = projtype, bounding_lat = 30, plot_anomalies = True, cbar_range = [-205, 205], add_rectangles = areas['stat eddy'], draw_grid = True, subtitles = ['era']+mod_all, figsize = figsize, cb_label = 'zg (m)')
 #
 #
-# datalist = [mean_field_all[k]-mean_field_all['era'] for k in mod_all]
-# fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'mean_field_all_bias.pdf', title = 'Mean field bias', visualization = projtypemf, bounding_lat = 30, cbar_range = [-100.,100.], plot_anomalies = False, draw_grid = True, subtitles = mod_all, figsize = figsizemf, cb_label = 'zg (m)', add_rectangles = areas['mean field'])
-#
-# datalist = [lowfrvar[k]-lowfrvar['era'] for k in mod_all]
-# fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'low_fr_var_all_bias.pdf', title = 'Low fr var bias', visualization = projtype, bounding_lat = 30, cbar_range = [-40., 40.], plot_anomalies = False, add_rectangles = areas['low fr var'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)')
-#
-# datalist = [highfrvar[k]-highfrvar['era'] for k in mod_all]
-# fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'high_fr_var_all_bias.pdf', title = 'High fr var bias', visualization = projtype, bounding_lat = 30, cbar_range = [-20., 20], plot_anomalies = False, add_rectangles = areas['high fr var'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)')
-#
-# datalist = [stat_eddy_all[k]-stat_eddy_all['era'] for k in mod_all]
-# fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'stat_eddy_all_bias.pdf', title = 'Stationary eddy bias', visualization = projtype, bounding_lat = 30, plot_anomalies = True, cbar_range = [-50, 50], add_rectangles = areas['stat eddy'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)')
+datalist = [mean_field_all[k]-mean_field_all['era'] for k in mod_all]
+fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'mean_field_all_bias.pdf', title = 'Mean field bias', visualization = projtypemf, bounding_lat = 30, cbar_range = [-100.,100.], plot_anomalies = False, draw_grid = True, subtitles = mod_all, figsize = figsizemf, cb_label = 'zg (m)', add_rectangles = areas['mean field'], reference_abs_field = mean_field_all['era'])
+
+datalist = [lowfrvar[k]-lowfrvar['era'] for k in mod_all]
+fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'low_fr_var_all_bias.pdf', title = 'Low fr var bias', visualization = projtype, bounding_lat = 30, cbar_range = [-40., 40.], plot_anomalies = False, add_rectangles = areas['low fr var'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)', reference_abs_field = lowfrvar['era'])
+
+datalist = [highfrvar[k]-highfrvar['era'] for k in mod_all]
+fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'high_fr_var_all_bias.pdf', title = 'High fr var bias', visualization = projtype, bounding_lat = 30, cbar_range = [-20., 20], plot_anomalies = False, add_rectangles = areas['high fr var'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)', reference_abs_field = highfrvar['era'])
+
+datalist = [stat_eddy_all[k]-stat_eddy_all['era'] for k in mod_all]
+fig = ctl.plot_multimap_contour(datalist, lat, lon, cart_out + 'stat_eddy_all_bias.pdf', title = 'Stationary eddy bias', visualization = projtype, bounding_lat = 30, plot_anomalies = True, cbar_range = [-50, 50], add_rectangles = areas['stat eddy'], draw_grid = True, subtitles = mod_all, figsize = figsize, cb_label = 'zg (m)', reference_abs_field = stat_eddy_all['era'])
 
 
 for cos, nam, uni, finam in zip([all_rms, all_patcor], ['RMS', '1 - patcor'], ['(m)', ''], ['rms','pat']):

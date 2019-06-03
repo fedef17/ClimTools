@@ -290,7 +290,7 @@ if inputs['draw_rectangle_area']:
         arearect = ctl.sel_area_translate(inputs['area'])
 
 if inputs['out_figures']:
-    cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'], draw_rectangle_area = arearect, taylor_mark_dim = inputs['taylor_mark_dim'], out_only_main_figs = inputs['out_only_main_figs'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
+    cd.plot_WRtool_results(inputs['cart_out'], std_outname(inputs['exp_name'], inputs), n_models, model_outs, ERA_ref, model_names = inputs['model_names'], obs_name = inputs['obs_name'], patnames = inputs['patnames'], patnames_short = inputs['patnames_short'], central_lat_lon = clatlo, groups = inputs['groups'], group_symbols = inputs['group_symbols'], reference_group = inputs['reference_group'], visualization = inputs['visualization'], bounding_lat = inputs['bounding_lat'], plot_margins = inputs['plot_margins'], draw_rectangle_area = arearect, taylor_mark_dim = inputs['taylor_mark_dim'], out_only_main_figs = inputs['out_only_main_figs'])#, custom_model_colors = ['indianred', 'forestgreen', 'black'], compare_models = [('stoc', 'base')])
 
 if inputs['out_netcdf']:
     cart_out_nc = inputs['cart_out'] + 'outnc_' + std_outname(inputs['exp_name'], inputs) + '/'
