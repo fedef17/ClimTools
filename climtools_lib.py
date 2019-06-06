@@ -12,6 +12,7 @@ import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter
+import seaborn as sns
 
 from shapely.geometry.polygon import LinearRing
 
@@ -1631,14 +1632,18 @@ def date_series(init_dat, end_dat, freq = 'day', calendar = 'proleptic_gregorian
     return dates
 
 
-def check_daily(dates):
+def check_daily(dates, allow_diff_HH = True):
     """
     Checks if the dataset is a daily dataset.
+
+    < allow_diff_HH > : if set to True (default), allows for a difference up to 12 hours.
     """
     daydelta = pd.Timedelta('1 days')
     delta = dates[1]-dates[0]
 
     if delta == daydelta:
+        return True
+    elif allow_diff_HH and (daydelta >= pd.Timedelta('12 hours') and daydelta <= pd.Timedelta('36 hours')):
         return True
     else:
         return False
@@ -3225,6 +3230,55 @@ def new_basis_set_3D(rot):
 
     return basis
 
+
+def project_vector_on_basis(vector, basis):
+    """
+    Gives a set of components of vector in the specified basis.
+    """
+    vec_comp = []
+    for bavec in basis:
+        vec_comp.append(np.dot(vector.flatten(), bavec.flatten()))
+    vec_comp = np.array(vec_comp)
+
+    return vec_comp
+
+
+def project_set_on_new_basis(old_components_set, old_basis, new_basis):
+    """
+    Projects the old_components_set onto the new_basis.
+    < old_basis > : the old set of basis orthogonal arrays (numpcs).
+    < new_basis > : the new set of basis orthogonal arrays (numpcs).
+
+    < old_components_set > : the set of components to be projected (n_points, numpcs).
+    """
+    change_basis_mat = change_of_base_matrix(old_basis, new_basis)
+
+    new_components_set = []
+    for vec in old_components_set:
+        new_components_set.append(change_basis_mat.dot(vec))
+
+    new_components_set = np.array(new_components_set)
+
+    return new_components_set
+
+
+def change_of_base_matrix(old_basis, new_basis):
+    """
+    Finds the matrix for change of base to the new_basis.
+    < old_basis > : the old set of basis orthogonal arrays (numpcs).
+    < new_basis > : the new set of basis orthogonal arrays (numpcs).
+    """
+    # find the components of new basis vectors onto the old basis
+    new_basis_comp = []
+    for bavec in new_basis:
+        new_basis_comp.append(project_vector_on_basis(bavec, old_basis))
+    new_basis_comp = np.array(new_basis_comp)
+
+    # find the change of basis matrix
+    change_basis_mat = LA.inv(new_basis_comp)
+
+    return change_basis_mat
+
 # def base_set(plane):
 #     """
 #     Finds an arbitrary base to project onto inside plane.
@@ -3252,37 +3306,41 @@ def makeRectangle(area, npo = 20):
 
     return ring
 
-def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False):
+def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False, use_seaborn = True, sns_palette = 'hls'):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
 
     < full_cb_range > : if True, takes all cb values. If false takes the portion 0.05/0.95.
     """
-    if bright_thres is None:
-        if only_darker_colors:
-            bright_thres = 0.6
+    if not use_seaborn:
+        if bright_thres is None:
+            if only_darker_colors:
+                bright_thres = 0.6
+            else:
+                bright_thres = 1.0
+
+        cmappa = cm.get_cmap(cmap)
+        colors = []
+
+        if full_cb_range:
+            valori = np.linspace(0.0,1.0,n)
         else:
-            bright_thres = 1.0
+            valori = np.linspace(0.05,0.95,n)
 
-    cmappa = cm.get_cmap(cmap)
-    colors = []
+        for cos in valori:
+            colors.append(cmappa(cos))
 
-    if full_cb_range:
-        valori = np.linspace(0.0,1.0,n)
+        for i, (col,val) in enumerate(zip(colors, valori)):
+            if color_brightness(col) > bright_thres:
+                # Looking for darker color
+                col2 = cmappa(val+1.0/(3*n))
+                col3 = cmappa(val-1.0/(3*n))
+                colori = [col, col2, col3]
+                brighti = np.array([color_brightness(co) for co in colori]).argmin()
+                colors[i] = colori[brighti]
     else:
-        valori = np.linspace(0.05,0.95,n)
-
-    for cos in valori:
-        colors.append(cmappa(cos))
-
-    for i, (col,val) in enumerate(zip(colors, valori)):
-        if color_brightness(col) > bright_thres:
-            # Looking for darker color
-            col2 = cmappa(val+1.0/(3*n))
-            col3 = cmappa(val-1.0/(3*n))
-            colori = [col, col2, col3]
-            brighti = np.array([color_brightness(co) for co in colori]).argmin()
-            colors[i] = colori[brighti]
+        # Calling the default seaborn palette
+        colors = sns.color_palette(sns_palette, n)
 
     return colors
 
@@ -4459,6 +4517,162 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     plt.close()
 
     return
+
+
+def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False):
+    """
+    Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
+    """
+    if fig_label is None:
+        fig_label = 'regime {}'.format(reg)
+
+    if xi_grid is None:
+        (x0, x1) = (np.percentile(pcs, 1), np.percentile(pcs, 99))
+        xss = np.linspace(x0, x1, n_grid_points)
+        xi_grid, yi_grid = np.meshgrid(xss, xss)
+
+    if color is None:
+        cmappa = 'Blues'
+    else:
+        cmappa = custom_alphagradient_cmap(color)
+
+    okclu = labels == reg
+    okpc = pcs[okclu, :]
+    kufu = calc_pdf(okpc[:,eof_proj].T)
+    zi = kufu(np.vstack([xi_grid.flatten(), yi_grid.flatten()]))
+    print(min(zi), max(zi))
+    if normalize_pdf:
+        zi = zi/np.max(zi)
+    elif levels is not None:
+        if type(levels) is not int:
+            levels = np.array(levels)*np.max(zi)
+    cont = ax.contour(xi_grid, yi_grid, zi.reshape(xi_grid.shape), levels, cmap = cm.get_cmap(cmappa))
+
+    if plot_centroid:
+        cent = np.mean(okpc[:,eof_proj], axis = 0)
+        ax.scatter(cent[0], cent[1], color = color, marker = 'x', s = 20)
+    #ax.clabel(cont, inline=1, fontsize=10)
+
+    return
+
+
+def plot_allregime_pdfs(labels, pcs, eof_proj = [(0,1), (0,2), (1,2)], all_regimes_together = True, n_grid_points = 100, filename = None, centroids = None, levels = [0.1, 0.5]):
+    """
+    Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
+    """
+    n_clus = np.max(labels)+1
+
+    fig = plt.figure(figsize = (16,12))
+    if not all_regimes_together:
+        nrow = n_clus
+        ncol = len(eof_proj)
+    else:
+        nrow = 1
+        ncol = len(eof_proj)
+
+    colors = color_set(n_clus)
+
+    (x0, x1) = (np.percentile(pcs, 1), np.percentile(pcs, 99))
+    xss = np.linspace(x0, x1, n_grid_points)
+    xi_grid, yi_grid = np.meshgrid(xss, xss)
+
+    for reg, col in zip(range(n_clus), colors):
+        for i, proj in enumerate(eof_proj):
+            if not all_regimes_together:
+                ind = ncol*reg + i+1
+            else:
+                ind = i+1
+            ax = plt.subplot(nrow, ncol, ind)
+            plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, levels = levels)
+            ax.set_xlabel('EOF {}'.format(proj[0]))
+            ax.set_ylabel('EOF {}'.format(proj[1]))
+
+            if centroids is not None:
+                print(ind, centroids[reg][proj[0]], centroids[reg][proj[1]])
+                ax.scatter(centroids[reg][proj[0]], centroids[reg][proj[1]], color = col, marker = 'x', s = 100)
+
+    plt.tight_layout()
+    if filename is not None:
+        fig.savefig(filename)
+
+    return fig
+
+
+def custom_alphagradient_cmap(color):
+    # define custom colormap with fixed colour and alpha gradient
+    # use simple linear interpolation in the entire scale
+    if type(color) is str:
+        color = cm.colors.ColorConverter.to_rgb(color)
+
+    cm.register_cmap(name='custom', data={'red': [(0.,color[0],color[0]), (1.,color[0],color[0])], 'green': [(0.,color[1],color[1]), (1.,color[1],color[1])], 'blue':  [(0.,color[2],color[2]), (1.,color[2],color[2])], 'alpha': [(0.,0,0), (1.,1,1)]})
+
+    cmap = cm.get_cmap('custom')
+
+    return cmap
+
+
+#def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
+def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12)):
+    """
+    Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
+
+    One figure per each regime with all model pdfs.
+    """
+    if model_names is None:
+        model_names = results.keys()
+
+    if colors is None:
+        colors = color_set(len(model_names))
+        colors[0] = 'black'
+
+    n_clus = np.max(results.values()[0]['labels'])+1
+
+    fig = plt.figure(figsize = figsize)
+    nrow = n_clus
+    ncol = len(eof_proj)
+
+    x0s = []
+    x1s = []
+    pcs_set = [results[mod]['pcs'] for mod in model_names]
+    for pcs in pcs_set:
+        (x0, x1) = (np.min(pcs), np.max(pcs))
+        x0s.append(x0)
+        x1s.append(x1)
+    xss = np.linspace(np.min(x0s), np.max(x1s), n_grid_points)
+    xi_grid, yi_grid = np.meshgrid(xss, xss)
+
+    for reg in range(n_clus):
+        for i, proj in enumerate(eof_proj):
+            ind = ncol*reg + i+1
+            ax = plt.subplot(nrow, ncol, ind)
+            for mod, col in zip(model_names, colors):
+                labels = results[mod]['labels']
+                pcs = results[mod]['pcs']
+                plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, fig_label = mod, levels = levels, plot_centroid = plot_centroids)
+            ax.set_xlabel('EOF {}'.format(proj[0]))
+            ax.set_ylabel('EOF {}'.format(proj[1]))
+
+            # if plot_centroids is not None:
+            #     for mod, col in zip(model_names, colors):
+            #         cent = results[mod]['centroids']
+            #         ax.scatter(cent[reg][proj[0]], cent[reg][proj[1]], color = col, marker = 'x', s = 20)
+
+    plt.tight_layout()
+    plt.subplots_adjust(bottom = 0.12, top = 0.93)
+    fig = custom_legend(fig, colors, model_names)
+
+    if filename is not None:
+        fig.savefig(filename)
+
+    return fig
+
+
+def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 10):
+    if ncol is None:
+        ncol = int(np.ceil(len(labels)/2.0))
+    proxy = [plt.Rectangle((0,0),1,1, fc = col) for col in colors]
+    fig.legend(proxy, labels, loc = loc, ncol = ncol, fontsize = fontsize)
+    return fig
 
 
 def clus_visualize_2D():

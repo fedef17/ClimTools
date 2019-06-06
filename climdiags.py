@@ -63,16 +63,19 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     < area > : string. Restricts the input field to this region. (EAT, PNA, NH, Med, Eu)
     """
+    netcdf4_read = False
 
     print('Running precompute\n')
     if type(ifile) not in [list, np.ndarray]:
-        # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-        # print(type(var))
-        # print(var.shape)
-        var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
-        lat = coords['lat']
-        lon = coords['lon']
-        dates = coords['dates']
+        if netcdf4_read:
+            var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            print(type(var))
+            print(var.shape)
+        else:
+            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
 
         var_season, dates_season = ctl.sel_season(var, dates, season)
     else:
@@ -89,7 +92,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
             dates_full.append(dates)
 
-            var_season, dates_season = ctl.sel_season(var, dates, season)
+            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False)
             var_full.append(var_season)
             dates_sel.append(dates_season)
 
@@ -110,8 +113,12 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     results = WRtool_core(var_season, lat, lon, dates_season, area, **kwargs)
     results['dates_allyear'] = dates
-    results['time_cal'] = aux_info['time_calendar']
-    results['time_units'] = aux_info['time_units']
+    if netcdf4_read:
+        results['time_cal'] = time_cal
+        results['time_units'] = time_units
+    else:
+        results['time_cal'] = aux_info['time_calendar']
+        results['time_units'] = aux_info['time_units']
 
     var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season)
     results['monthly_freq'] = dict()
@@ -1274,7 +1281,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls'):
     """
     Plot the results of WRtool.
 
@@ -1328,6 +1335,11 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
+
+        for el in model_names:
+            if not el in labels:
+                labels.append(el)
+
         for k in groups.keys():
             if k != reference_group:
                 compare_models.append((k, reference_group))
@@ -1342,7 +1354,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     print('COMPARE:', compare_models)
 
     if custom_model_colors is None:
-        colors = ctl.color_set(len(labels)+1, only_darker_colors = False)
+        colors = ctl.color_set(len(labels)+1, only_darker_colors = False, use_seaborn = use_seaborn, sns_palette = color_palette)
         color_dict = dict(zip(labels, colors))
     else:
         if len(custom_model_colors) != len(labels)+1:
@@ -1350,7 +1362,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         colors = custom_model_colors
         color_dict = dict(zip(labels, colors))
 
-    nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False)
+    nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False, use_seaborn = use_seaborn, sns_palette = 'Set2')
     for k, col in zip(groups.keys(), nuko):
         color_dict[k] = col
 
@@ -1991,8 +2003,6 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             obs = result_obs['cluspattern_area'][num, ...]
             modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
-            colors = ctl.color_set(len(modpats), only_darker_colors = False)
-
             filename = cart_out + 'TaylorPlot_{}.pdf'.format(patnames_short[num])
             label_ERMS_axis = 'Total RMS error (m)'
             label_bias_axis = 'Pattern mean (m)'
@@ -2014,8 +2024,6 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
         obs = result_obs['cluspattern_area'][num, ...]
         modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
-
-        colors = ctl.color_set(len(modpats), only_darker_colors = False)
 
         legok = False
         ctl.Taylor_plot(modpats, obs, ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
