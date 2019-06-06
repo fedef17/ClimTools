@@ -2030,7 +2030,7 @@ def cosine(x, y):
     elif x.ndim == 2:
         return np.vdot(x,y)/(LA.norm(x)*LA.norm(y))
     else:
-        raise ValueError('Too many dimensions')
+        return np.dot(x.flatten(),y.flatten())/(LA.norm(x)*LA.norm(y))
 
 
 def cosine_cp(x, y):
@@ -3272,7 +3272,7 @@ def change_of_base_matrix(old_basis, new_basis):
     new_basis_comp = []
     for bavec in new_basis:
         new_basis_comp.append(project_vector_on_basis(bavec, old_basis))
-    new_basis_comp = np.array(new_basis_comp)
+    new_basis_comp = np.array(new_basis_comp).T # le cui COLONNE sono i vettori della base nuova nelle coordinate della vecchia
 
     # find the change of basis matrix
     change_basis_mat = LA.inv(new_basis_comp)
@@ -4519,7 +4519,7 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     return
 
 
-def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False):
+def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False, eof_axis_lim = None):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
     """
@@ -4551,6 +4551,10 @@ def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, f
     if plot_centroid:
         cent = np.mean(okpc[:,eof_proj], axis = 0)
         ax.scatter(cent[0], cent[1], color = color, marker = 'x', s = 20)
+
+    if eof_axis_lim is not None:
+        ax.set_xlim(eof_axis_lim)
+        ax.set_ylim(eof_axis_lim)
     #ax.clabel(cont, inline=1, fontsize=10)
 
     return
@@ -4612,7 +4616,7 @@ def custom_alphagradient_cmap(color):
 
 
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
-def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12)):
+def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
 
@@ -4623,7 +4627,10 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
 
     if colors is None:
         colors = color_set(len(model_names))
-        colors[0] = 'black'
+        if reference is not None:
+            colors[first(np.array(model_names) == reference)] = 'black'
+        else:
+            colors[0] = 'black'
 
     n_clus = np.max(results.values()[0]['labels'])+1
 
@@ -4633,8 +4640,24 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
 
     x0s = []
     x1s = []
-    pcs_set = [results[mod]['pcs'] for mod in model_names]
-    for pcs in pcs_set:
+
+    if reference is not None:
+        check_all = [cosine(results[mod]['model_eofs'], results[reference]['model_eofs']) for mod in model_names]
+        if not np.all([isclose(ck, 1.0) for ck in check_all]):
+            print(check_all)
+            print('EOFs are different! PCs have to be projected on reference space!\n')
+            nu_pcs_set = dict()
+            for mod in model_names:
+                if mod == reference:
+                    nu_pcs_set[mod] = results[mod]['pcs']
+                else:
+                    nu_pcs_set[mod] = project_set_on_new_basis(results[mod]['pcs'], results[mod]['model_eofs'], results[reference]['model_eofs'])
+        else:
+            nu_pcs_set = {mod: results[mod]['pcs'] for mod in model_names}
+    else:
+        nu_pcs_set = {mod: results[mod]['pcs'] for mod in model_names}
+
+    for pcs in nu_pcs_set.values():
         (x0, x1) = (np.min(pcs), np.max(pcs))
         x0s.append(x0)
         x1s.append(x1)
@@ -4645,10 +4668,13 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
         for i, proj in enumerate(eof_proj):
             ind = ncol*reg + i+1
             ax = plt.subplot(nrow, ncol, ind)
+            ax.axhline(0, color = 'grey')
+            ax.axvline(0, color = 'grey')
             for mod, col in zip(model_names, colors):
                 labels = results[mod]['labels']
-                pcs = results[mod]['pcs']
-                plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, fig_label = mod, levels = levels, plot_centroid = plot_centroids)
+                #pcs = results[mod]['pcs']
+                pcs = nu_pcs_set[mod]
+                plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, fig_label = mod, levels = levels, plot_centroid = plot_centroids, eof_axis_lim = eof_axis_lim)
             ax.set_xlabel('EOF {}'.format(proj[0]))
             ax.set_ylabel('EOF {}'.format(proj[1]))
 

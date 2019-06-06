@@ -146,9 +146,11 @@ if inputs['is_ensemble']:
     for filgenname, mod_name in zip(inputs['filenames'], inputs['model_names']):
         modcart = inputs['cart_in']
         namfilp = filgenname.split('*')
+        while '' in namfilp: namfilp.remove('')
         if '/' in filgenname:
             modcart = inputs['cart_in'] + '/'.join(filgenname.split('/')[:-1]) + '/'
             namfilp = filgenname.split('/')[-1].split('*')
+        while '' in namfilp: namfilp.remove('')
 
         lista_all = os.listdir(modcart)
         lista_oks = [modcart + fi for fi in lista_all if np.all([namp in fi for namp in namfilp])]
@@ -159,8 +161,8 @@ if inputs['is_ensemble']:
             inputs['ensemble_members'][mod_name] = []
             for coso in np.sort(lista_oks):
                 for namp in namfilp:
-                    coso = coso.replace(namp,' ')
-                ens_id = '_'.join(coso.strip().split())
+                    coso = coso.replace(namp,'###')
+                ens_id = '_'.join(coso.strip('###').split())
                 inputs['ensemble_members'][mod_name].append(ens_id)
             print(mod_name, inputs['ensemble_filenames'][mod_name])
             print(mod_name, inputs['ensemble_members'][mod_name])

@@ -327,9 +327,13 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
     results['dist_centroid'] = dist_centroid
 
     results['pcs'] = PCs
-    results['eofs'] = eof_solver.eofs()[:numpcs]
-    results['eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
-    results['eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
+    if 'use_reference_eofs' and ref_solver is not None:
+        results['eofs_ref_pcs'] = ref_solver.eofs()[:numpcs]
+    else:
+        results['eofs_ref_pcs'] = eof_solver.eofs()[:numpcs]
+    results['model_eofs'] = eof_solver.eofs()[:numpcs]
+    results['model_eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
+    results['model_eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
 
     results['resid_times'] = ctl.calc_regime_residtimes(labels, dates = dates_season)[0]
     results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
@@ -483,9 +487,9 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
     results['all']['lon_area'] = lon_area
 
     results['all']['centroids'] = centroids
-    results['all']['eofs'] = eof_solver.eofs()[:numpcs]
-    results['all']['eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
-    results['all']['eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
+    results['all']['model_eofs'] = eof_solver.eofs()[:numpcs]
+    results['all']['model_eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
+    results['all']['model_eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
 
     if heavy_output:
         results['all']['solver'] = eof_solver
@@ -818,7 +822,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     std_name = 'geopotential_height_anomaly'
     units = 'm'
 
-    for nam in ['eofs', 'cluspattern', 'cluspattern_area']:
+    for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
         outfil = cart_out + '{}_ref.nc'.format(nam)
         var = obs[nam]
         lat = obs['lat_area']
@@ -832,7 +836,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
         iris.save(cubo, outfil)
 
-        if inputs['use_reference_eofs'] and nam == 'eofs': continue
+        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
 
         # for each model
         for mod in models.keys():
@@ -1120,13 +1124,13 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         filos.write('cluster {}: '.format(i) + stringa.format(*cen))
 
     ctl.newline(filos)
-    oks = np.sqrt(obs['eofs_eigenvalues'][:10])
+    oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
     filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
     stringa = len(oks)*'{:10.3e}'+'\n'
     filos.write(stringa.format(*oks))
 
     ctl.newline(filos)
-    oks = np.cumsum(obs['eofs_varfrac'][:10])
+    oks = np.cumsum(obs['model_eofs_varfrac'][:10])
     filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
     stringa = len(oks)*'{:8.2f}'+'\n'
     filos.write(stringa.format(*oks))
@@ -1177,13 +1181,13 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             filos.write('cluster {}: '.format(i) + stringa.format(*cen))
 
         ctl.newline(filos)
-        oks = np.sqrt(models[mod]['eofs_eigenvalues'][:10])
+        oks = np.sqrt(models[mod]['model_eofs_eigenvalues'][:10])
         filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
         stringa = len(oks)*'{:10.3e}'+'\n'
         filos.write(stringa.format(*oks))
 
         ctl.newline(filos)
-        oks = np.cumsum(models[mod]['eofs_varfrac'][:10])
+        oks = np.cumsum(models[mod]['model_eofs_varfrac'][:10])
         filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
         stringa = len(oks)*'{:8.2f}'+'\n'
         filos.write(stringa.format(*oks))
