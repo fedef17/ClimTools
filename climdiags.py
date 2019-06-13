@@ -823,6 +823,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     units = 'm'
 
     for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
+        if nam == 'model_eofs' and 'model_eofs' not in obs.keys(): nam = 'eofs' # backward Compatibility
         outfil = cart_out + '{}_ref.nc'.format(nam)
         var = obs[nam]
         lat = obs['lat_area']
@@ -836,7 +837,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
         iris.save(cubo, outfil)
 
-        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
+        if inputs['use_reference_eofs'] and (nam == 'model_eofs' or nam == 'eofs'): continue
 
         # for each model
         for mod in models.keys():
@@ -915,7 +916,12 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 outfil_ens = outfil[:-3] + '_{}.nc'.format(ens_id)
                 iris.save(cubo, outfil_ens)
         else:
-            time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+            try:
+                time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+            except Exception as errrr:
+                print('Error with model {}\n'.format(mod))
+                pickle.dump([mod, models[mod]['time_units'], models[mod]['time_cal'], time], open('error_iris_monotonic.p', 'w'))
+                raise errrr
 
             cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
             iris.save(cubo, outfil)
@@ -1124,14 +1130,22 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         filos.write('cluster {}: '.format(i) + stringa.format(*cen))
 
     ctl.newline(filos)
-    oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
-    filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+    if 'model_eofs_varfrac' in obs.keys():
+        oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
+        filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
+    else:
+        oks = np.sqrt(obs['eofs_eigenvalues'][:10])
+        filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
     stringa = len(oks)*'{:10.3e}'+'\n'
     filos.write(stringa.format(*oks))
 
     ctl.newline(filos)
-    oks = np.cumsum(obs['model_eofs_varfrac'][:10])
-    filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+    if 'model_eofs_varfrac' in obs.keys():
+        oks = np.sqrt(obs['model_eofs_varfrac'][:10])
+        filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
+    else:
+        oks = np.sqrt(obs['eofs_varfrac'][:10])
+        filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
     stringa = len(oks)*'{:8.2f}'+'\n'
     filos.write(stringa.format(*oks))
     ctl.newline(filos)
@@ -1181,14 +1195,22 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             filos.write('cluster {}: '.format(i) + stringa.format(*cen))
 
         ctl.newline(filos)
-        oks = np.sqrt(models[mod]['model_eofs_eigenvalues'][:10])
-        filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+        if 'model_eofs_eigenvalues' in models[mod].keys():
+            oks = np.sqrt(models[mod]['model_eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.sqrt(models[mod]['eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
         stringa = len(oks)*'{:10.3e}'+'\n'
         filos.write(stringa.format(*oks))
 
         ctl.newline(filos)
-        oks = np.cumsum(models[mod]['model_eofs_varfrac'][:10])
-        filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+        if 'model_eofs_varfrac' in models[mod].keys():
+            oks = np.cumsum(models[mod]['model_eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.cumsum(models[mod]['eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
         stringa = len(oks)*'{:8.2f}'+'\n'
         filos.write(stringa.format(*oks))
         ctl.newline(filos)
@@ -1285,7 +1307,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls'):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', groups_ord_list = None):
     """
     Plot the results of WRtool.
 
@@ -1320,6 +1342,11 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         result_models = dict()
         result_models[model_names[0]] = resultooo
 
+    #groups_ord_list = ['LR', 'HR']
+
+    if groups_ord_list is None:
+        groups_ord_list = groups.keys()
+
     all_figures = []
 
     # syms = []
@@ -1335,7 +1362,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         compare_models = []
         labels = []
         for ll in range(len(groups.values()[0])):
-            for k in groups.keys():
+            #for k in groups.keys():
+            for k in groups_ord_list:
                 labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
@@ -1344,7 +1372,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             if not el in labels:
                 labels.append(el)
 
-        for k in groups.keys():
+        #for k in groups.keys():
+        for k in groups_ord_list:
             if k != reference_group:
                 compare_models.append((k, reference_group))
     else:

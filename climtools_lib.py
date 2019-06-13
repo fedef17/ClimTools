@@ -3341,6 +3341,15 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     else:
         # Calling the default seaborn palette
         colors = sns.color_palette(sns_palette, n)
+        if sns_palette == 'Paired':
+            if n > 10:
+                colors[10] = cm.colors.ColorConverter.to_rgb('burlywood')
+            if n > 11:
+                colors[11] = cm.colors.ColorConverter.to_rgb('saddlebrown')
+            if n > 12:
+                colors[12] = cm.colors.ColorConverter.to_rgb('palegoldenrod')
+            if n > 13:
+                colors[13] = cm.colors.ColorConverter.to_rgb('goldenrod')
 
     return colors
 
@@ -4540,7 +4549,7 @@ def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, f
     okpc = pcs[okclu, :]
     kufu = calc_pdf(okpc[:,eof_proj].T)
     zi = kufu(np.vstack([xi_grid.flatten(), yi_grid.flatten()]))
-    print(min(zi), max(zi))
+    #print(min(zi), max(zi))
     if normalize_pdf:
         zi = zi/np.max(zi)
     elif levels is not None:
@@ -4616,7 +4625,7 @@ def custom_alphagradient_cmap(color):
 
 
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
-def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None):
+def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = True):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
 
@@ -4630,7 +4639,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
         if reference is not None:
             colors[first(np.array(model_names) == reference)] = 'black'
         else:
-            colors[0] = 'black'
+            colors[-1] = 'black'
 
     n_clus = np.max(results.values()[0]['labels'])+1
 
@@ -4641,8 +4650,12 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     x0s = []
     x1s = []
 
-    if reference is not None:
-        check_all = [cosine(results[mod]['model_eofs'], results[reference]['model_eofs']) for mod in model_names]
+    if reference is not None and check_for_eofs:
+        if 'model_eofs' not in results[model_names[0]].keys():
+            eofkey = 'eofs'
+        else:
+            eofkey = 'model_eofs'
+        check_all = [cosine(results[mod][eofkey], results[reference][eofkey]) for mod in model_names]
         if not np.all([isclose(ck, 1.0) for ck in check_all]):
             print(check_all)
             print('EOFs are different! PCs have to be projected on reference space!\n')
@@ -4651,7 +4664,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
                 if mod == reference:
                     nu_pcs_set[mod] = results[mod]['pcs']
                 else:
-                    nu_pcs_set[mod] = project_set_on_new_basis(results[mod]['pcs'], results[mod]['model_eofs'], results[reference]['model_eofs'])
+                    nu_pcs_set[mod] = project_set_on_new_basis(results[mod]['pcs'], results[mod][eofkey], results[reference][eofkey])
         else:
             nu_pcs_set = {mod: results[mod]['pcs'] for mod in model_names}
     else:
@@ -4684,8 +4697,9 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
             #         ax.scatter(cent[reg][proj[0]], cent[reg][proj[1]], color = col, marker = 'x', s = 20)
 
     plt.tight_layout()
-    plt.subplots_adjust(bottom = 0.12, top = 0.93)
-    fig = custom_legend(fig, colors, model_names)
+    if not nolegend:
+        #plt.subplots_adjust(bottom = 0.12, top = 0.93)
+        fig = custom_legend(fig, colors, model_names)
 
     if filename is not None:
         fig.savefig(filename)
@@ -4693,7 +4707,8 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 10):
+def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 10, bottom_margin = 0.08):
+    plt.subplots_adjust(bottom = bottom_margin)
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
     proxy = [plt.Rectangle((0,0),1,1, fc = col) for col in colors]

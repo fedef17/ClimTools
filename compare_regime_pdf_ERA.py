@@ -90,6 +90,8 @@ else:
     results2 = results_all['period2_assigntoclosest']
 results_ref = results_all['reference']
 
+sys.exit()
+
 # Proietto sulla nuova base
 cfrom = 0
 cto = 1
@@ -267,8 +269,9 @@ for reg in range(4):
     ctl.plot_pdfpages(cart_out + 'regime{}_pdf_proj_diffclustering{}.pdf'.format(reg, filter_tag), figs)
 
 filos = open(cart_out + 'results_kolmog_ERA.dat', 'w')
-for test in ['KolmogSmir', 'MannWhit']:
-    filos.write('-------------- TEST: {} --------------\n\n'.format(test))
+
+for test in ['KolmogSmir', 'MannWhit', 'Anderson']:
+    filos.write('\n\n-------------- TEST: {} --------------\n\n'.format(test))
     for nomecoso in ['reclustering', 'assigntoclosest']:
         filos.write(nomecoso)
         results1 = results_all['period1_{}'.format(nomecoso)]
@@ -292,6 +295,9 @@ for test in ['KolmogSmir', 'MannWhit']:
                     filos.write('eof {:3d}: D -> {:8.4f} , pval -> {:12.3e}\n'.format(eof, D, pval))
                 elif test == 'MannWhit':
                     D, pval = stats.mannwhitneyu(okpc1[:, eof], okpc2[:, eof], alternative='two-sided')
+                    filos.write('eof {:3d}: D -> {:8.4f} , pval -> {:12.3e}\n'.format(eof, D, pval))
+                elif test == 'Anderson':
+                    D, critvals, pval = stats.anderson_ksamp([okpc1[:, eof], okpc2[:, eof]])
                     filos.write('eof {:3d}: D -> {:8.4f} , pval -> {:12.3e}\n'.format(eof, D, pval))
 
 filos.close()
