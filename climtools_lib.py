@@ -1423,10 +1423,16 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     dates_pdh = pd.to_datetime(dates)
     climat_mean = []
     dates_climate_mean = []
-    years = np.unique(dates_pdh.year)[::step_year]
+    allyears = np.unique(dates_pdh.year)
+    years = allyears[::step_year]
 
     for yea in years:
         okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
+        numyea = np.sum((allyears >= yea - window_years/2) & (allyears <= yea + window_years/2))
+        print(yea, numyea)
+        if numyea < window_years:
+            print('skipped')
+            continue
         clm, dtclm, _ = daily_climatology(var[okye], dates[okye], window_days, refyear = yea)
         climat_mean.append(clm)
         dates_climate_mean.append(dtclm)
@@ -1441,10 +1447,17 @@ def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     dates_pdh = pd.to_datetime(dates)
     climat_mean = []
     dates_climate_mean = []
-    years = np.unique(dates_pdh.year)[::step_year]
+
+    allyears = np.unique(dates_pdh.year)
+    years = allyears[::step_year]
 
     for yea in years:
         okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
+        numyea = np.sum((allyears >= yea - window_years/2) & (allyears <= yea + window_years/2))
+        print(yea, numyea)
+        if numyea < window_years:
+            print('skipped')
+            continue
         clm, dtclm, _ = monthly_climatology(var[okye], dates[okye], refyear = yea)
         climat_mean.append(clm)
         dates_climate_mean.append(dtclm)
@@ -1680,11 +1693,12 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
         climat_mean, dates_climate_mean = trend_daily_climat(var, dates, window_days = window_days, window_years = window_years, step_year = step_year)
 
     var_anom_tot = []
-    year_steps = np.unique(dates_pdh.year)[::step_year]
+    year_ref_all = np.array([dat[0].year for dat in dates_climate_mean])
+    #year_steps = np.unique(dates_pdh.year)[::step_year]
     #okyetot = np.zeros(len(var), dtype=bool)
 
     for yea in np.unique(dates_pdh.year):
-        yearef = np.argmin(abs(year_steps - yea))
+        yearef = np.argmin(abs(year_ref_all - yea))
         okye = dates_pdh.year == yea
         var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
         var_anom_tot.append(var_anom)
@@ -1746,10 +1760,12 @@ def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_me
         climat_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
 
     var_anom_tot = []
-    year_steps = np.unique(dates_pdh.year)[::step_year]
+    #year_steps = np.unique(dates_pdh.year)[::step_year]
+    year_ref_all = np.array([dat[0].year for dat in dates_climate_mean])
 
     for yea in np.unique(dates_pdh.year):
-        yearef = np.argmin(abs(year_steps - yea))
+        #yearef = np.argmin(abs(year_steps - yea))
+        yearef = np.argmin(abs(year_ref_all - yea))
         okye = dates_pdh.year == yea
         var_anom = anomalies_monthly(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef])
         var_anom_tot.append(var_anom)
@@ -3342,14 +3358,11 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
         # Calling the default seaborn palette
         colors = sns.color_palette(sns_palette, n)
         if sns_palette == 'Paired':
-            if n > 10:
-                colors[10] = cm.colors.ColorConverter.to_rgb('burlywood')
-            if n > 11:
-                colors[11] = cm.colors.ColorConverter.to_rgb('saddlebrown')
-            if n > 12:
-                colors[12] = cm.colors.ColorConverter.to_rgb('palegoldenrod')
-            if n > 13:
-                colors[13] = cm.colors.ColorConverter.to_rgb('goldenrod')
+            max_sns_paired = 10
+            other_colors = ['burlywood', 'saddlebrown', 'palegoldenrod', 'goldenrod', 'lightslategray', 'darkslategray', 'orchid', 'darkmagenta']
+            if n > max_sns_paired and n <= max_sns_paired + len(other_colors):
+                for i in range(n - max_sns_paired):
+                    colors[max_sns_paired+i] = cm.colors.ColorConverter.to_rgb(other_colors[i])
 
     return colors
 

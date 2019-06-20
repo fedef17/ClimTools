@@ -48,7 +48,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -63,14 +63,16 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     < area > : string. Restricts the input field to this region. (EAT, PNA, NH, Med, Eu)
     """
-    netcdf4_read = False
+    # print(kwargs.keys())
+    # print(numpcs)
+    # print(netcdf4_read)
 
     print('Running precompute\n')
     if type(ifile) not in [list, np.ndarray]:
         if netcdf4_read:
             var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            print(type(var))
-            print(var.shape)
+            # print(type(var))
+            # print(var.shape)
         else:
             var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
             lat = coords['lat']
@@ -80,25 +82,48 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         var_season, dates_season = ctl.sel_season(var, dates, season)
     else:
         print('Concatenating {} input files..\n'.format(len(ifile)))
+        var_sel = []
         var_full = []
         dates_sel = []
         dates_full = []
         for fil in ifile:
             # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
-            var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
-            lat = coords['lat']
-            lon = coords['lon']
-            dates = coords['dates']
+            if netcdf4_read:
+                var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            else:
+                var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
 
             dates_full.append(dates)
+            var_full.append(var)
 
             var_season, dates_season = ctl.sel_season(var, dates, season, cut = False)
-            var_full.append(var_season)
+            var_sel.append(var_season)
             dates_sel.append(dates_season)
 
-        var_season = np.concatenate(var_full)
+        var_season = np.concatenate(var_sel)
         dates_season = np.concatenate(dates_sel)
+        var = np.concatenate(var_full)
         dates = np.concatenate(dates_full)
+
+    #HERE calculate climat_mean
+    print('Calculating mean climatology\n')
+    if ctl.check_daily(dates):
+        climat_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
+
+        climat_mean_dtr, dates_climate_mean_dtr = None, None
+        if kwargs['detrended_eof_calculation']:
+            print('Calculating detrended climatology')
+            climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var, dates, window_days = kwargs['wnd_days'], window_years = kwargs['wnd_years'])
+    else:
+        climat_mean, dates_climate_mean, _ = ctl.monthly_climatology(var, dates)
+
+        climat_mean_dtr, dates_climate_mean_dtr = None, None
+        if kwargs['detrended_eof_calculation']:
+            print('Calculating detrended climatology')
+            climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
 
     if sel_yr_range is not None:
         print('Selecting date range {}\n'.format(sel_yr_range))
@@ -111,7 +136,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
         dates = dates[okdat]
 
-    results = WRtool_core(var_season, lat, lon, dates_season, area, **kwargs)
+    results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, climat_mean_dtr = climat_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, **kwargs)
+
     results['dates_allyear'] = dates
     if netcdf4_read:
         results['time_cal'] = time_cal
@@ -154,14 +180,14 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
 
     < numpcs > : int. Number of Principal Components to be retained in the reduced phase space.
     < numclus > : int. Number of clusters.
-    < wnd > : int. Number of days of the averaging window to calculate the climatology.
+    < wnd_days > : int. Number of days of the averaging window to calculate the climatology.
 
     < clus_algorithm > : 'molteni' or 'sklearn', algorithm to be used for clustering.
     < nrsamp_sig > : number of samples to be used for significance calculation.
@@ -172,6 +198,8 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
 
     < detrended_eof_calculation > : Calculates a 20-year running mean for the geopotential before calculating the eofs.
     < detrended_anom_for_clustering > : Calculates the anomalies for clustering using the same detrended running mean.
+
+    Note on the anomaly calculation: it is suggested to calculate the climatological mean (climat_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
     """
     is_daily = ctl.check_daily(dates_season)
     if is_daily:
@@ -200,11 +228,13 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
         # Detrending
         print('Detrended eof calculation\n')
         if is_daily:
-            climat_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season, dates_season, window_days = wnd)
-            var_anom_dtr = ctl.anomalies_daily_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr)
+            if climat_mean_dtr is None:
+                climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var_season, dates_season, window_days = wnd_days, window_years = wnd_years)
+            var_anom_dtr = ctl.anomalies_daily_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climate_mean_dtr)
         else:
-            climat_mean_dtr, dates_climat_dtr = ctl.trend_monthly_climat(var_season, dates_season)
-            var_anom_dtr = ctl.anomalies_monthly_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr)
+            if climat_mean_dtr is None:
+                climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var_season, dates_season, window_years = wnd_years)
+            var_anom_dtr = ctl.anomalies_monthly_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climate_mean_dtr)
 
         var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
 
@@ -227,11 +257,13 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
         else:
             # Use anomalies wrt total time mean for clustering calculations
             if is_daily:
-                climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
-                var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+                if climat_mean is None:
+                    climat_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
+                var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
             else:
-                climat_mean, dates_climat, climat_std = ctl.monthly_climatology(var_season, dates_season)
-                var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+                if climat_mean is None:
+                    climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
+                var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
 
             var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
@@ -242,11 +274,13 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd = 5, numpcs = 4, p
     else:
         # No detrending
         if is_daily:
-            climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season, dates_season, wnd)
-            var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+            if climat_mean is None:
+                climat_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
+            var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
         else:
-            climat_mean, dates_climat, climat_std = ctl.monthly_climatology(var_season, dates_season)
-            var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climat)
+            if climat_mean is None:
+                climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
+            var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
 
         var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
@@ -822,10 +856,19 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     std_name = 'geopotential_height_anomaly'
     units = 'm'
 
+    print('obs: ', obs.keys())
+    print('models: ', models.values()[0].keys())
     for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
-        if nam == 'model_eofs' and 'model_eofs' not in obs.keys(): nam = 'eofs' # backward Compatibility
+        obsnam = nam
+        modelnam = nam
+        if nam == 'model_eofs':
+            if 'model_eofs' not in models.values()[0].keys():
+                modelnam = 'eofs' # backward Compatibility
+            if 'model_eofs' not in obs.keys():
+                obsnam = 'eofs' # backward Compatibility
+
         outfil = cart_out + '{}_ref.nc'.format(nam)
-        var = obs[nam]
+        var = obs[obsnam]
         lat = obs['lat_area']
         lon = obs['lon_area']
         if nam == 'cluspattern':
@@ -837,13 +880,13 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
         iris.save(cubo, outfil)
 
-        if inputs['use_reference_eofs'] and (nam == 'model_eofs' or nam == 'eofs'): continue
+        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
 
         # for each model
         for mod in models.keys():
             outfil = cart_out + '{}_{}.nc'.format(nam, mod)
 
-            var = models[mod][nam]
+            var = models[mod][modelnam]
             lat = models[mod]['lat_area']
             lon = models[mod]['lon_area']
             if nam == 'cluspattern':
@@ -1031,9 +1074,11 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         var = models[mod]['pcs'].T
         dates_all = models[mod]['dates_allyear']
         dates_season = models[mod]['dates']
+        print(var.shape)
+        print(dates_season.shape)
 
         if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
-            _, da = ctl.complete_time_range(var[0], dates_season)
+            _, da = ctl.complete_time_range(var[0], dates_season, dates_all = dates_all)
         else:
             da = dates_season
         time = nc.date2num(da, units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
@@ -1141,10 +1186,10 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
     ctl.newline(filos)
     if 'model_eofs_varfrac' in obs.keys():
-        oks = np.sqrt(obs['model_eofs_varfrac'][:10])
+        oks = np.cumsum(obs['model_eofs_varfrac'][:10])
         filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
     else:
-        oks = np.sqrt(obs['eofs_varfrac'][:10])
+        oks = np.cumsum(obs['eofs_varfrac'][:10])
         filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
     stringa = len(oks)*'{:8.2f}'+'\n'
     filos.write(stringa.format(*oks))
@@ -1307,7 +1352,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', groups_ord_list = None):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls'):
     """
     Plot the results of WRtool.
 
@@ -1342,38 +1387,21 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         result_models = dict()
         result_models[model_names[0]] = resultooo
 
-    #groups_ord_list = ['LR', 'HR']
-
-    if groups_ord_list is None:
-        groups_ord_list = groups.keys()
-
     all_figures = []
-
-    # syms = []
-    # labels = []
-    # colors = []
-    # if groups is not None:
-    #     for grounam in groups.keys()
-    #     labels = results.keys()
-    #     colors = ctl.color_set(len(models)+1)
 
     compare_models = None
     if groups is not None:
         compare_models = []
-        labels = []
+        # labels = []
         for ll in range(len(groups.values()[0])):
-            #for k in groups.keys():
-            for k in groups_ord_list:
-                labels.append(groups[k][ll])
+            for k in groups.keys():
+                #labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
 
-        for el in model_names:
-            if not el in labels:
-                labels.append(el)
+        labels = model_names
 
-        #for k in groups.keys():
-        for k in groups_ord_list:
+        for k in groups.keys():
             if k != reference_group:
                 compare_models.append((k, reference_group))
     else:
