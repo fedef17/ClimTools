@@ -1395,6 +1395,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         # labels = []
         for ll in range(len(groups.values()[0])):
             for k in groups.keys():
+                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
                 #labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
@@ -1490,6 +1491,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(groups.values()[0])):
             for k in groups.keys():
+                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
@@ -1578,6 +1580,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(groups.values()[0])):
             for k in groups.keys():
+                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
@@ -1666,6 +1669,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(groups.values()[0])):
             for k in groups.keys():
+                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.mean(np.array(result_models[mod]['patcor']))

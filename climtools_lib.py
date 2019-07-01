@@ -23,7 +23,7 @@ import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
-from scipy import stats, optimize
+from scipy import stats, optimize, signal
 import itertools as itt
 import math
 
@@ -2395,6 +2395,69 @@ def calc_varopt_molt(pcs, centroids, labels):
     varopt = varopt/varint
 
     return varopt
+
+
+def calc_autocorr_wlag(pcs, dates = None, maxlag = 40):
+    """
+    Calculates the variance ratio of the partition, as defined in Molteni's cluster_sig.
+    In Molteni this is defined as: media pesata sulla frequenza del quadrato della norma di ogni cluster centroid Sum(centroid**2) DIVISO media della varianza interna su tutti gli elementi Sum(pc-centroid)**2.
+    < pcs > : the sequence of pcs.
+    < centroids > : the cluster centroids coordinates.
+    < labels > : the cluster labels for each element.
+    """
+
+    if dates is not None:
+        dates_diff = dates[1:] - dates[:-1]
+        jump = dates_diff > pd.Timedelta('2 days')
+
+        okju = np.where(jump)[0] + 1
+        okju = np.append([0], okju)
+        okju = np.append(okju, [len(dates)])
+        n_seas = len(okju) - 1
+    else:
+        n_seas = 0
+
+    if n_seas > 0:
+        all_dates_seas = [dates[okju[i]:okju[i+1]] for i in range(n_seas)]
+        all_var_seas = [pcs[okju[i]:okju[i+1], ...] for i in range(n_seas)]
+
+        # alllags = np.arange(-maxlag, maxlag+1)
+        # results = []
+        # for ilag in alllags:
+        #     res_seas = []
+        #     for pcs_seas in all_var_seas:
+        #         pcs_lag = pcs_seas[maxlag+ilag:-maxlag+ilag, ...]
+        #         pcs_0 = pcs_seas[maxlag:-maxlag, ...]
+        #         res_seas.append(np.correlate(pcs, pcs_lag))
+        #     results.append(np.mean(res_seas, axis = 0))
+        res_seas = []
+        for pcs_seas in all_var_seas:
+            res = signal.correlate(pcs_seas, pcs_seas)
+            pio = np.argmax(res[:,pcs.shape[1]-1])
+            ini = pio - maxlag
+            if ini < 0: ini = 0
+            fin = pio + maxlag
+            if fin >= len(res): fin = None
+            print(pio, ini, fin)
+            res_seas.append(res[ini:fin, :])
+        results = np.mean(res_seas, axis = 0)
+    else:
+        # alllags = np.arange(-maxlag, maxlag+1)
+        # results = []
+        # for ilag in alllags:
+        #     pcs_lag = pcs[maxlag+ilag:-maxlag+ilag-1, ...]
+        #     pcs_0 = pcs[maxlag:-maxlag-1, ...]
+        #     results.append(np.correlate(pcs, pcs_lag))
+        res = signal.correlate(pcs, pcs)
+        pio = np.argmax(res[:,pcs.shape[1]-1])
+        ini = pio - maxlag
+        if ini < 0: ini = 0
+        fin = pio + maxlag
+        print(pio, ini, fin)
+        if fin > len(res): fin = None
+        results = res[ini:fin, :]
+
+    return results
 
 
 def calc_clus_freq(labels, numclus = None):
