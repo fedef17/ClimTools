@@ -19,7 +19,7 @@ from scipy import stats
 
 #######################################
 #cart_out = '/home/fabiano/Research/lavori/WeatherRegimes/phasespace_ERA/'
-cart_out = '/home/fabiano/Research/articoli/Papers/primavera_regimes/figures_phasespace_v3/'
+cart_out = '/home/fabiano/Research/articoli/Papers/primavera_regimes/figures/figures_phasespace_v4/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
 cart_out_ERA = '/home/fabiano/Research/lavori/WeatherRegimes/phasespace_ERA/'
@@ -27,15 +27,15 @@ cart_out_ERA = '/home/fabiano/Research/lavori/WeatherRegimes/phasespace_ERA/'
 # cart = '/home/fabiano/Research/lavori/WeatherRegimes/primavera_coupled_1957-2014/'
 # filo = cart + 'out_primavera_coupled_1957-2014_DJF_EAT_4clus_4pcs_1957-2014_dtr.p'
 
-cart = '/home/fabiano/Research/lavori/WeatherRegimes/prima_coup_v3/'
-filo = cart + 'out_prima_coup_v3_DJF_EAT_4clus_4pcs_1957-2014_refEOF.p'
+tag = 'v4'
+cart = '/home/fabiano/Research/lavori/WeatherRegimes/prima_coup_v4/'
+filo = cart + 'out_prima_coup_v4_DJF_EAT_4clus_4pcs_1957-2014_refEOF.p'
 
-# model_names = ['CMCC-CM2-HR4', 'CMCC-CM2-VHR4', 'CNRM-CM6-1', 'CNRM-CM6-1-HR', 'EC-Earth-3-LR', 'EC-Earth-3-HR', 'ECMWF-IFS-LR', 'ECMWF-IFS-HR', 'MPI-ESM1-2-HR', 'MPI-ESM1-2-XR', 'HadGEM3-GC31-MM', 'HadGEM3-GC31-HM', 'HadGEM3-GC31-LL']
-
-model_names = ['CMCC-CM2-HR4', 'CMCC-CM2-VHR4', 'CNRM-CM6-1', 'CNRM-CM6-1-HR', 'EC-Earth-3-LR', 'EC-Earth-3-HR', 'ECMWF-IFS-LR', 'ECMWF-IFS-HR', 'MPI-ESM1-2-HR', 'MPI-ESM1-2-XR', 'HadGEM3-GC31-MM', 'HadGEM3-GC31-HM', 'HadGEM3-GC31-LL-det', 'HadGEM3-GC31-LL-stoc', 'EC-Earth-3P-LR-det', 'EC-Earth-3P-LR-stoc']
+model_names = ['CMCC-CM2-HR4', 'CMCC-CM2-VHR4', 'CNRM-CM6-1', 'CNRM-CM6-1-HR', 'EC-Earth3P', 'EC-Earth3P-HR', 'ECMWF-IFS-LR', 'ECMWF-IFS-HR', 'MPI-ESM1-2-HR', 'MPI-ESM1-2-XR', 'HadGEM3-GC31-MM', 'HadGEM3-GC31-HM', 'HadGEM3-GC31-LL-det', 'HadGEM3-GC31-LL-stoc', 'EC-Earth3P-det', 'EC-Earth3P-stoc']
+model_coups = ['CMCC-CM2', 'CNRM-CM6-1', 'EC-Earth3P', 'ECMWF-IFS', 'MPI-ESM1-2', 'HadGEM3-GC31', 'HadGEM3-GC31 (det vs stoc)', 'EC-Earth3P (det vs stoc)']
 model_names_all = model_names + ['ERA']
 
-model_coups = ['CMCC-CM2', 'CNRM-CM6-1', 'EC-Earth-3', 'ECMWF-IFS', 'MPI-ESM1-2', 'HadGEM3-GC31', 'HadGEM3-GC31 (det vs stoc)', 'EC-Earth-3P (det vs stoc)']
+model_coups = ['CMCC-CM2', 'CNRM-CM6-1', 'EC-Earth3P', 'ECMWF-IFS', 'MPI-ESM1-2', 'HadGEM3-GC31', 'HadGEM3-GC31 (det vs stoc)', 'EC-Earth3P (det vs stoc)']
 
 colors = ctl.color_set(len(model_names), sns_palette = 'Paired')
 colors_wERA = colors + ['black']
@@ -57,51 +57,53 @@ check_for_eofs = False
 results, results_ref = pickle.load(open(filo, 'r'))
 results['ERA'] = results_ref
 
-fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_v3.pdf', reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA)
+fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_{}_2eofs.pdf'.format(tag), eof_proj = [(0,1)], reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA, fix_subplots_shape = (2, 2))
 allfigs.append(fig)
 
-fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_v3_4eofs.pdf', eof_proj = [(0,1), (1,2), (2,3), (3,0)], figsize = (20,12), reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA)
+fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_{}_3eofs.pdf'.format(tag), reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA)
+allfigs.append(fig)
+
+fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_{}_4eofs.pdf'.format(tag), eof_proj = [(0,1), (1,2), (2,3), (3,0)], figsize = (20,12), reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA)
 allfigs.append(fig)
 
 # filo = filogen.format('_refEOF')
 # results, results_ref = pickle.load(open(filo, 'r'))
 
-
 all_mod_stats = dict()
 
 t0 = datetime.now()
-# for mod in model_names:
-#     for reg in range(4):
-#         okclu = results[mod]['labels'] == reg
-#         okpc1 = results[mod]['pcs'][okclu, :]
-#         okclu = results_ref['labels'] == reg
-#         okpc2 = results_ref['pcs'][okclu, :]
-#
-#         # 1D KS on the pcs
-#         kss = np.mean([stats.ks_2samp(okpc1[:, eof], okpc2[:, eof]).statistic for eof in range(4)])
-#         all_mod_stats[('KS 1D', mod, reg)] = kss
-#
-#         # voglio std_dev della distanza dal centroide suo
-#         cen = results[mod]['centroids'][reg]
-#         dist = np.mean([ctl.distance(po, cen) for po in okpc1])
-#         stddist = np.std([ctl.distance(po, cen) for po in okpc1])
-#         all_mod_stats[('Clus radius', mod, reg)] = dist
-#         all_mod_stats[('Clus std', mod, reg)] = stddist
-#
-#         # voglio ks su distanza dal centroide ref
-#         cen = results_ref['centroids'][reg]
-#         dist1 = [ctl.distance(po, cen) for po in okpc1]
-#         dist2 = [ctl.distance(po, cen) for po in okpc2]
-#         kss = stats.ks_2samp(dist1, dist2).statistic
-#         all_mod_stats[('KS dist refcentroid', mod, reg)] = kss
-#
-#         # cen to cen distance
-#         dist = ctl.distance(results[mod]['centroids'][reg], results_ref['centroids'][reg])
-#         all_mod_stats[('dist centocen', mod, reg)] = dist
-#
-# pickle.dump(all_mod_stats, open(cart_out + 'all_stats_models_primacoup_v3.p', 'w'))
+for mod in model_names:
+    for reg in range(4):
+        okclu = results[mod]['labels'] == reg
+        okpc1 = results[mod]['pcs'][okclu, :]
+        okclu = results_ref['labels'] == reg
+        okpc2 = results_ref['pcs'][okclu, :]
 
-all_mod_stats = pickle.load(open(cart_out + 'all_stats_models_primacoup_v3.p'))
+        # 1D KS on the pcs
+        kss = np.mean([stats.ks_2samp(okpc1[:, eof], okpc2[:, eof]).statistic for eof in range(4)])
+        all_mod_stats[('KS 1D', mod, reg)] = kss
+
+        # voglio std_dev della distanza dal centroide suo
+        cen = results[mod]['centroids'][reg]
+        dist = np.mean([ctl.distance(po, cen) for po in okpc1])
+        stddist = np.std([ctl.distance(po, cen) for po in okpc1])
+        all_mod_stats[('Clus radius', mod, reg)] = dist
+        all_mod_stats[('Clus std', mod, reg)] = stddist
+
+        # voglio ks su distanza dal centroide ref
+        cen = results_ref['centroids'][reg]
+        dist1 = [ctl.distance(po, cen) for po in okpc1]
+        dist2 = [ctl.distance(po, cen) for po in okpc2]
+        kss = stats.ks_2samp(dist1, dist2).statistic
+        all_mod_stats[('KS dist refcentroid', mod, reg)] = kss
+
+        # cen to cen distance
+        dist = ctl.distance(results[mod]['centroids'][reg], results_ref['centroids'][reg])
+        all_mod_stats[('dist centocen', mod, reg)] = dist
+
+pickle.dump(all_mod_stats, open(cart_out + 'all_stats_models_primacoup_{}.p'.format(tag), 'w'))
+
+all_mod_stats = pickle.load(open(cart_out + 'all_stats_models_primacoup_{}.p'.format(tag)))
 ERA_ref_thresholds = pickle.load(open(cart_out_ERA + 'ERA_ref_thresholds_allstats.p'))
 print('TO BE REPLACED WITH NEW ERA v3 PHASESPACE STATISTICS')
 
@@ -134,7 +136,7 @@ for nam, tit in zip(stat_nams, titles):
     fig.suptitle(tit)
     plt.subplots_adjust(top = 0.9)
     fig = ctl.custom_legend(fig, colors, model_names)
-    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_v3.pdf')
+    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_{}.pdf'.format(tag))
     allfigs.append(fig)
 
 
@@ -164,7 +166,7 @@ for nam, tit in zip(stat_nams, titles):
     fig.suptitle(tit)
     plt.subplots_adjust(top = 0.9)
     fig = ctl.custom_legend(fig, colors[1::2], model_coups)
-    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_v3_1vs1.pdf')
+    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_{}_1vs1.pdf'.format(tag))
     allfigs.append(fig)
 
 
@@ -205,7 +207,7 @@ for nam, tit in zip(stat_nams, titles):
     fig.suptitle(tit)
     plt.subplots_adjust(top = 0.9)
     fig = ctl.custom_legend(fig, colors, model_names)
-    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_v3_wresolution.pdf')
+    fig.savefig(cart_out + '_'.join(nam.split())+'_models_primacoup_{}_wresolution.pdf'.format(tag))
     allfigs.append(fig)
 
-ctl.plot_pdfpages(cart_out + 'allstats_models_primacoup_v3.pdf', allfigs, save_single_figs = False)
+ctl.plot_pdfpages(cart_out + 'allstats_models_primacoup_{}.pdf'.format(tag), allfigs, save_single_figs = False)

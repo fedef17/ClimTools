@@ -18,14 +18,14 @@ from datetime import datetime
 from scipy import stats
 
 #######################################
-cart_out = '/home/fabiano/Research/articoli/Papers/primavera_regimes/figures_v3_nodtr/'
+cart_out = '/home/fabiano/Research/articoli/Papers/primavera_regimes/figures/figures_v4_nodtr/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
 
-cart = '/home/fabiano/Research/lavori/WeatherRegimes/prima_coup_v3/'
-filogen = cart + 'out_prima_coup_v3_DJF_EAT_4clus_4pcs_1957-2014_refEOF.p'
+cart = '/home/fabiano/Research/lavori/WeatherRegimes/prima_coup_v4/'
+filogen = cart + 'out_prima_coup_v4_DJF_EAT_4clus_4pcs_1957-2014_refEOF.p'
 
-model_names = ['CMCC-CM2-HR4', 'CMCC-CM2-VHR4', 'CNRM-CM6-1', 'CNRM-CM6-1-HR', 'EC-Earth-3-LR', 'EC-Earth-3-HR', 'ECMWF-IFS-LR', 'ECMWF-IFS-HR', 'MPI-ESM1-2-HR', 'MPI-ESM1-2-XR', 'HadGEM3-GC31-MM', 'HadGEM3-GC31-HM', 'HadGEM3-GC31-LL-det', 'HadGEM3-GC31-LL-stoc', 'EC-Earth-3P-LR-det', 'EC-Earth-3P-LR-stoc']
-model_coups = ['CMCC-CM2', 'CNRM-CM6-1', 'EC-Earth-3', 'ECMWF-IFS', 'MPI-ESM1-2', 'HadGEM3-GC31', 'HadGEM3-GC31 (det vs stoc)', 'EC-Earth-3P (det vs stoc)']
+model_names = ['CMCC-CM2-HR4', 'CMCC-CM2-VHR4', 'CNRM-CM6-1', 'CNRM-CM6-1-HR', 'EC-Earth3P', 'EC-Earth3P-HR', 'ECMWF-IFS-LR', 'ECMWF-IFS-HR', 'MPI-ESM1-2-HR', 'MPI-ESM1-2-XR', 'HadGEM3-GC31-MM', 'HadGEM3-GC31-HM', 'HadGEM3-GC31-LL-det', 'HadGEM3-GC31-LL-stoc', 'EC-Earth3P-det', 'EC-Earth3P-stoc']
+model_coups = ['CMCC-CM2', 'CNRM-CM6-1', 'EC-Earth3P', 'ECMWF-IFS', 'MPI-ESM1-2', 'HadGEM3-GC31', 'HadGEM3-GC31 (det vs stoc)', 'EC-Earth3P (det vs stoc)']
 model_names_all = model_names + ['ERA']
 
 colors = ctl.color_set(len(model_names), sns_palette = 'Paired')
@@ -49,7 +49,7 @@ for mod in results:
     #results[mod]['significance'] = significance[mod]
     results[mod]['varopt'] = ctl.calc_varopt_molt(results[mod]['pcs'], results[mod]['centroids'], results[mod]['labels'])
 
-    results[mod]['autocorr_wlag'] = ctl.calc_autocorr_wlag(results[mod]['pcs'], results[mod]['dates'])
+    #results[mod]['autocorr_wlag'] = ctl.calc_autocorr_wlag(results[mod]['pcs'], results[mod]['dates'])
 
 
 # Qui ci metto: RMS, patcor, significance, optimal_ratio, clus_frequency, clus_persistence

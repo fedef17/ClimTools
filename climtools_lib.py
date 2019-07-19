@@ -430,6 +430,9 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
 
     fh = iris.load(ifile)
 
+    if len(fh) == 0:
+        raise ValueError('ERROR! Empty file: '+ifile)
+
     cudimax = np.argmax([cu.ndim for cu in fh])
     ndim = np.max([cu.ndim for cu in fh])
 
@@ -1689,8 +1692,14 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
     Calculates the daily anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_daily_climat().
     """
     dates_pdh = pd.to_datetime(dates)
+
+    print('DENTRO ANOMALIES DETRENDED: {} {}\n'.format(len(dates), len(dates_pdh)))
+
     if climat_mean is None or dates_climate_mean is None:
         climat_mean, dates_climate_mean = trend_daily_climat(var, dates, window_days = window_days, window_years = window_years, step_year = step_year)
+
+    if len(climat_mean) == 0:
+        raise ValueError('ERROR in calculation of detrended climatology. Too few years? Try lowering wnd_years or set detrending to False')
 
     var_anom_tot = []
     year_ref_all = np.array([dat[0].year for dat in dates_climate_mean])
@@ -1700,6 +1709,10 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
     for yea in np.unique(dates_pdh.year):
         yearef = np.argmin(abs(year_ref_all - yea))
         okye = dates_pdh.year == yea
+        # if np.sum(okye) <= 1:
+        #     print('This year {} has only one day.. If you really want to take it in, change this line\n')
+        #     continue
+
         var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
         var_anom_tot.append(var_anom)
 
@@ -1729,8 +1742,9 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
     :param window: int. Calculate the running mean on N day window.
     """
 
-    if not check_daily(dates):
-        raise ValueError('Not a daily dataset')
+    if len(dates) > 1: # Stupid datasets...
+        if not check_daily(dates):
+            raise ValueError('Not a daily dataset')
 
     if climat_mean is None or dates_climate_mean is None:
         climat_mean, dates_climate_mean, _ = daily_climatology(var, dates, window)
@@ -2224,12 +2238,12 @@ def cutline2_fit(x, y, n_cut = 1, approx_par = None):
     return xcuts, lines
 
 
-def genlatlon(n_lat, n_lon):
+def genlatlon(n_lat, n_lon, lon_limits = (-180., 180.), lat_limits = (-90., 90.)):
     """
     Generates lat and lon arrays, using the number of points n_lat,n_lon and the full range (-90,90), (-180,180).
     """
-    lat = np.linspace(-90., 90., n_lat)
-    lon = np.linspace(-180., 180., n_lon)
+    lat = np.linspace(lat_limits[0], lat_limits[1], n_lat)
+    lon = np.linspace(lon_limits[0], lon_limits[1], n_lon)
 
     return lat, lon
 
@@ -2397,7 +2411,7 @@ def calc_varopt_molt(pcs, centroids, labels):
     return varopt
 
 
-def calc_autocorr_wlag(pcs, dates = None, maxlag = 40):
+def calc_autocorr_wlag(pcs, dates = None, maxlag = 40, out_lag1 = False):
     """
     Calculates the variance ratio of the partition, as defined in Molteni's cluster_sig.
     In Molteni this is defined as: media pesata sulla frequenza del quadrato della norma di ogni cluster centroid Sum(centroid**2) DIVISO media della varianza interna su tutti gli elementi Sum(pc-centroid)**2.
@@ -2420,44 +2434,79 @@ def calc_autocorr_wlag(pcs, dates = None, maxlag = 40):
     if n_seas > 0:
         all_dates_seas = [dates[okju[i]:okju[i+1]] for i in range(n_seas)]
         all_var_seas = [pcs[okju[i]:okju[i+1], ...] for i in range(n_seas)]
+        len_sea = np.array([len(da) for da in all_dates_seas])
+        if np.any(len_sea < maxlag):
+            print('too short season, calc the total autocorr')
+            n_seas = 0
+        else:
+            res_seas = []
+            for pcs_seas in all_var_seas:
+                res = signal.correlate(pcs_seas, pcs_seas)
+                pio = np.argmax(res[:,pcs.shape[1]-1])
+                ini = pio - maxlag
+                if ini < 0: ini = 0
+                fin = pio + maxlag
+                if fin >= len(res): fin = None
+                #print(pio, ini, fin)
+                res_seas.append(res[ini:fin, :])
+            results = np.mean(res_seas, axis = 0)
 
-        # alllags = np.arange(-maxlag, maxlag+1)
-        # results = []
-        # for ilag in alllags:
-        #     res_seas = []
-        #     for pcs_seas in all_var_seas:
-        #         pcs_lag = pcs_seas[maxlag+ilag:-maxlag+ilag, ...]
-        #         pcs_0 = pcs_seas[maxlag:-maxlag, ...]
-        #         res_seas.append(np.correlate(pcs, pcs_lag))
-        #     results.append(np.mean(res_seas, axis = 0))
-        res_seas = []
-        for pcs_seas in all_var_seas:
-            res = signal.correlate(pcs_seas, pcs_seas)
-            pio = np.argmax(res[:,pcs.shape[1]-1])
-            ini = pio - maxlag
-            if ini < 0: ini = 0
-            fin = pio + maxlag
-            if fin >= len(res): fin = None
-            print(pio, ini, fin)
-            res_seas.append(res[ini:fin, :])
-        results = np.mean(res_seas, axis = 0)
-    else:
-        # alllags = np.arange(-maxlag, maxlag+1)
-        # results = []
-        # for ilag in alllags:
-        #     pcs_lag = pcs[maxlag+ilag:-maxlag+ilag-1, ...]
-        #     pcs_0 = pcs[maxlag:-maxlag-1, ...]
-        #     results.append(np.correlate(pcs, pcs_lag))
+    if n_seas == 0:
         res = signal.correlate(pcs, pcs)
         pio = np.argmax(res[:,pcs.shape[1]-1])
         ini = pio - maxlag
         if ini < 0: ini = 0
         fin = pio + maxlag
-        print(pio, ini, fin)
+        #print(pio, ini, fin)
         if fin > len(res): fin = None
         results = res[ini:fin, :]
 
-    return results
+    results = results/np.max(results)
+
+    if out_lag1:
+        res_ok = results[results.shape[0]/2-1, results.shape[1]/2]
+    else:
+        res_ok = results[:, results.shape[1]/2]
+    #res_ok = np.max(results[np.argmax(results, axis = 0)-1])
+
+    return res_ok
+
+
+def calc_trend_climatevar(global_tas, var, var_units = None):
+    """
+    Calculates the trend in some variable with warming. So the trend is in var_units/K.
+    : global_tas : timeseries of the global temperature
+    : var : the variable. The first axis is assumed to be the time axis: var.shape[0] == len(global_tas)
+    """
+
+    if len(global_tas) != var.shape[0]:
+        raise ValueError('Shapes of global_tas and var dont match')
+
+    var_trend = np.zeros(var.shape[1:], dtype = float)
+    var_trend_err = np.zeros(var.shape[1:], dtype = float)
+
+    # for dim in range(1, var.ndim):
+    if var.ndim == 2:
+        dim = 1
+        for j in range(var.shape[dim]):
+            m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, j])
+            var_trend[j] = m
+            var_trend_err[j] = err_m
+    elif var.ndim == 3:
+        for i in range(var.shape[1]):
+            for j in range(var.shape[2]):
+                m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, i, j])
+                var_trend[i, j] = m
+                var_trend_err[i, j] = err_m
+    elif var.ndim == 4:
+        for k in range(var.shape[1]):
+            for i in range(var.shape[2]):
+                for j in range(var.shape[3]):
+                    m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, k, i, j])
+                    var_trend[k, i, j] = m
+                    var_trend_err[k, i, j] = err_m
+
+    return var_trend, var_trend_err
 
 
 def calc_clus_freq(labels, numclus = None):
@@ -4604,10 +4653,11 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     return
 
 
-def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False, eof_axis_lim = None):
+def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False, eof_axis_lim = None, lw = 1):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
     """
+
     if fig_label is None:
         fig_label = 'regime {}'.format(reg)
 
@@ -4631,7 +4681,7 @@ def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, f
     elif levels is not None:
         if type(levels) is not int:
             levels = np.array(levels)*np.max(zi)
-    cont = ax.contour(xi_grid, yi_grid, zi.reshape(xi_grid.shape), levels, cmap = cm.get_cmap(cmappa))
+    cont = ax.contour(xi_grid, yi_grid, zi.reshape(xi_grid.shape), levels, cmap = cm.get_cmap(cmappa), linewidths = lw)
 
     if plot_centroid:
         cent = np.mean(okpc[:,eof_proj], axis = 0)
@@ -4701,7 +4751,7 @@ def custom_alphagradient_cmap(color):
 
 
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
-def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = True):
+def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = True, fix_subplots_shape = None, fac = 1.5):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
 
@@ -4720,8 +4770,14 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     n_clus = np.max(results.values()[0]['labels'])+1
 
     fig = plt.figure(figsize = figsize)
-    nrow = n_clus
-    ncol = len(eof_proj)
+
+    if fix_subplots_shape is None:
+        nrow = n_clus
+        ncol = len(eof_proj)
+    else:
+        nrow, ncol = fix_subplots_shape
+        if nrow*ncol < n_clus*len(eof_proj):
+            raise ValueError('{} not enough for {} subplots needed'.format(fix_subplots_shape, (n_clus, len(eof_proj))))
 
     x0s = []
     x1s = []
@@ -4750,12 +4806,21 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
         (x0, x1) = (np.min(pcs), np.max(pcs))
         x0s.append(x0)
         x1s.append(x1)
-    xss = np.linspace(np.min(x0s), np.max(x1s), n_grid_points)
+
+    if np.min(x0s) < 0 and np.max(x1s) > 0:
+        xss = np.linspace(fac*np.min(x0s), fac*np.max(x1s), n_grid_points)
+    elif np.min(x0s) > 0:
+        xss = np.linspace(0., fac*np.max(x1s), n_grid_points)
+    elif np.max(x1s) < 0:
+        xss = np.linspace(fac*np.min(x0s), 0., n_grid_points)
+
     xi_grid, yi_grid = np.meshgrid(xss, xss)
 
+    ind = 0
     for reg in range(n_clus):
         for i, proj in enumerate(eof_proj):
-            ind = ncol*reg + i+1
+            ind += 1
+            #ind = ncol*reg + i+1
             ax = plt.subplot(nrow, ncol, ind)
             ax.axhline(0, color = 'grey')
             ax.axvline(0, color = 'grey')
@@ -4763,7 +4828,9 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
                 labels = results[mod]['labels']
                 #pcs = results[mod]['pcs']
                 pcs = nu_pcs_set[mod]
-                plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, fig_label = mod, levels = levels, plot_centroid = plot_centroids, eof_axis_lim = eof_axis_lim)
+                lw = 0.8
+                if mod == reference: lw = 2
+                plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = proj, color = col, fig_label = mod, levels = levels, plot_centroid = plot_centroids, eof_axis_lim = eof_axis_lim, lw = lw, xi_grid = xi_grid, yi_grid = yi_grid)
             ax.set_xlabel('EOF {}'.format(proj[0]))
             ax.set_ylabel('EOF {}'.format(proj[1]))
 

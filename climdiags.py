@@ -959,15 +959,16 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 outfil_ens = outfil[:-3] + '_{}.nc'.format(ens_id)
                 iris.save(cubo, outfil_ens)
         else:
+            outfil2 = cart_out + 'regime_index_{}_compressed.npy'.format(mod)
+            np.save(outfil2, var_all.compressed())
             try:
                 time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
+                cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+                iris.save(cubo, outfil)
             except Exception as errrr:
                 print('Error with model {}\n'.format(mod))
-                pickle.dump([mod, models[mod]['time_units'], models[mod]['time_cal'], time], open('error_iris_monotonic.p', 'w'))
-                raise errrr
-
-            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-            iris.save(cubo, outfil)
+                pickle.dump([mod, models[mod]['time_units'], models[mod]['time_cal'], time], open('error_iris_monotonic_{}.p'.format(mod), 'w'))
+                #raise errrr
 
     # monthly clus frequency
     outfil = cart_out + 'clus_freq_monthly_ref.nc'
@@ -1967,7 +1968,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 vmin = np.percentile(model_1-result_obs['trans_matrix'], 5)
                 vmax = np.percentile(model_1-result_obs['trans_matrix'], 95)
                 cos = np.max(abs(np.array([vmin,vmax])))
-                gigi = ax.imshow(model_0-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
+                gigi = ax.imshow(model_1-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
                 ax.set_title('{} vs obs'.format(coup[1]))
                 ax.xaxis.tick_top()
                 ax.set_xticks(np.arange(n_clus), minor = False)
