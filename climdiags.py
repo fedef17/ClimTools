@@ -960,7 +960,11 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 iris.save(cubo, outfil_ens)
         else:
             outfil2 = cart_out + 'regime_index_{}_compressed.npy'.format(mod)
-            np.save(outfil2, var_all.compressed())
+            if type(var_all) is np.ma.core.MaskedArray:
+                np.save(outfil2, var_all.compressed())
+            else:
+                np.save(outfil2, var_all)
+            
             try:
                 time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
                 cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
