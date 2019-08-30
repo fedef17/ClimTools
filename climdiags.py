@@ -386,7 +386,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     return results
 
 
-def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names = None, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
+def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names = None, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'sklearn', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -607,12 +607,12 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
     del va
 
     zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
-    for flun in fluxes_levels.keys():
+    for flun in fluxes_levels:
         fluxes_cross[flun] = np.mean(fluxes_levels[flun], axis = -1)*zonal_factor
         fluxes_maps[flun] = np.zeros(fluxes_levels[flun].shape[1:])
 
     print('Starting vertical integration\n')
-    for seas in press0.keys():
+    for seas in press0:
         for ila in range(len(lat)):
             for ilo in range(len(lon)):
                 #print(lat[ila], lon[ilo])
@@ -637,7 +637,7 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
     print('done\n')
 
     zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
-    for fu in fluxes_maps.keys():
+    for fu in fluxes_maps:
         fluxes_zonal[fu] = np.mean(fluxes_maps[fu], axis = -1)*zonal_factor
 
     results = dict()
@@ -692,11 +692,11 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
             varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnames[0])
         else:
             varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[0])
-            if varuna.keys()[0] not in varnames[0]:
-                raise ValueError('{} is not v. Please give input files in order v,t,z,q.'.format(varuna.keys()[0]))
+            if list(varuna.keys())[0] not in varnames[0]:
+                raise ValueError('{} is not v. Please give input files in order v,t,z,q.'.format(list(varuna.keys())[0]))
 
         # Changing to standard names
-        for varna in varuna.keys():
+        for varna in varuna:
             for varnamok in varnames:
                 if varna in varnamok: vars[varnamok[0]] = varuna.pop(varna)
 
@@ -711,13 +711,13 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
                 varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnamok)
             else:
                 varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i+1])
-                if varuna.keys()[0] not in varnamok:
-                    raise ValueError('{} is not t. Please give input files in order v,t,z,q.'.format(varuna.keys()[0]))
+                if list(varuna.keys())[0] not in varnamok:
+                    raise ValueError('{} is not t. Please give input files in order v,t,z,q.'.format(list(varuna.keys())[0]))
 
-            vars[varname] = varuna.pop(varuna.keys()[0])
+            vars[varname] = varuna.pop(list(varuna.keys())[0])
             del varuna
 
-            if flun == 'PE' and var_units.values()[0] == 'm**2 s**-2':
+            if flun == 'PE' and list(var_units.values())[0] == 'm**2 s**-2':
                 fact = factors['PE']/g
             else:
                 fact = factors[flun]
@@ -731,7 +731,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
     else:
         for i, flun in enumerate(fluxnames):
             varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i])
-            varuna = varuna[varuna.keys()[0]]
+            varuna = varuna[list(varuna.keys())[0]]
 
             if flun == 'PE' and zg_in_ERA_units:
                 fact = factors['PE']/g
@@ -746,13 +746,13 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
 
     if not os.path.exists(cart_out): os.mkdir(cart_out)
 
-    for fu in results.keys():
+    for fu in results:
         filena = cart_out + '{}flux_map_{}_{}seasons.nc'.format(fu, tag, len(seasons))
         vals = [results[fu]['maps'][key] for key in seasons]
         vals.append(results[fu]['maps']['year'])
         ctl.save_N_2Dfields(lat,lon,np.stack(vals), fu, 'W/m', filena)
 
-    # for fu in era_fluxes_zonal.keys():
+    # for fu in era_fluxes_zonal:
     #     #print(lat, era_lat, era_fluxes_zonal[fu])
     #     era_fluxes_zonal_itrp[fu] = np.interp(lat, era_lat[::-1], era_fluxes_zonal[fu][::-1])
     #     print('{:12.3e} - {:12.3e}\n'.format(era_fluxes_zonal_itrp[fu].min(), era_fluxes_zonal_itrp[fu].max()))
@@ -767,7 +767,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
 
     margins = dict()
     for taw in ['zonal', 'maps', 'cross']:
-        for flu in results.keys():
+        for flu in results:
             margins[(flu, taw)] = (1.1*np.min([results[flu][taw][seas] for seas in seasons]), 1.1*np.max([results[flu][taw][seas] for seas in seasons]))
 
     fluxnames = ['SH', 'PE', 'LH']
@@ -806,7 +806,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         plt.ylabel('Integrated Net Heat Flux (W)')
         figures_exp.append(fig)
 
-    pickle.dump(results, open(cart_out+'out_hfc_{}_.p'.format(tag), 'w'))
+    pickle.dump(results, open(cart_out+'out_hfc_{}_.p'.format(tag), 'wb'))
 
     print('Saving figures...\n')
     ctl.plot_pdfpages(figure_file_exp, figures_exp)
@@ -857,12 +857,12 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     units = 'm'
 
     print('obs: ', obs.keys())
-    print('models: ', models.values()[0].keys())
+    print('models: ', list(models.values())[0].keys())
     for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
         obsnam = nam
         modelnam = nam
         if nam == 'model_eofs':
-            if 'model_eofs' not in models.values()[0].keys():
+            if 'model_eofs' not in list(models.values())[0].keys():
                 modelnam = 'eofs' # backward Compatibility
             if 'model_eofs' not in obs.keys():
                 obsnam = 'eofs' # backward Compatibility
@@ -883,7 +883,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
         if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
 
         # for each model
-        for mod in models.keys():
+        for mod in models:
             outfil = cart_out + '{}_{}.nc'.format(nam, mod)
 
             var = models[mod][modelnam]
@@ -921,7 +921,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
     iris.save(cubo, outfil)
 
-    for mod in models.keys():
+    for mod in models:
         outfil = cart_out + 'regime_index_{}.nc'.format(mod)
 
         var = models[mod]['labels']
@@ -964,14 +964,14 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 np.save(outfil2, var_all.compressed())
             else:
                 np.save(outfil2, var_all)
-            
+
             try:
                 time_index = ctl.create_iris_coord(time, 'time', units = models[mod]['time_units'], calendar = models[mod]['time_cal'])
                 cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
                 iris.save(cubo, outfil)
             except Exception as errrr:
                 print('Error with model {}\n'.format(mod))
-                pickle.dump([mod, models[mod]['time_units'], models[mod]['time_cal'], time], open('error_iris_monotonic_{}.p'.format(mod), 'w'))
+                pickle.dump([mod, models[mod]['time_units'], models[mod]['time_cal'], time], open('error_iris_monotonic_{}.p'.format(mod), 'wb'))
                 #raise errrr
 
     # monthly clus frequency
@@ -995,7 +995,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     cubolis = iris.cube.CubeList(cubolis)
     iris.save(cubolis, outfil)
 
-    for mod in models.keys():
+    for mod in models:
         outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
         var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'])
 
@@ -1073,7 +1073,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     cubolis = iris.cube.CubeList(cubolis)
     iris.save(cubolis, outfil)
 
-    for mod in models.keys():
+    for mod in models:
         outfil = cart_out + 'pcs_timeseries_{}.nc'.format(mod)
 
         var = models[mod]['pcs'].T
@@ -1270,7 +1270,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         ctl.newline(filos)
         ctl.printsep(filos)
         for gru in inputs['groups']:
-            if 'RMS' in models.values()[0].keys():
+            if 'RMS' in list(models.values())[0].keys():
                 filos.write('----> group: {}\n'.format(gru))
                 ctl.newline(filos)
                 filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
@@ -1287,7 +1287,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                 stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
                 filos.write(stringa.format(*cosoerr))
 
-            if 'significance' in models.values()[0].keys():
+            if 'significance' in list(models.values())[0].keys():
                 ctl.newline(filos)
                 filos.write('---- Sharpness of regime structure ----\n')
                 sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
@@ -1382,7 +1382,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if n_ens == 1:
             model_names = ['model']
         else:
-            model_names = result_models.keys()
+            model_names = list(result_models.keys())
     if obs_name is None:
         obs_name = 'Obs'
 
@@ -1398,16 +1398,16 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     if groups is not None:
         compare_models = []
         # labels = []
-        for ll in range(len(groups.values()[0])):
-            for k in groups.keys():
-                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
+        for ll in range(len(list(groups.values())[0])):
+            for k in groups:
+                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
                 #labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
 
         labels = model_names
 
-        for k in groups.keys():
+        for k in groups:
             if k != reference_group:
                 compare_models.append((k, reference_group))
     else:
@@ -1433,12 +1433,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     for k, col in zip(groups.keys(), nuko):
         color_dict[k] = col
 
-    if 'significance' in result_models.values()[0].keys():
+    if 'significance' in list(result_models.values())[0].keys():
         wi = 0.6
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             for mod in groups[k]:
                 col = color_dict[mod]
                 ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
@@ -1466,7 +1466,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             sig = np.mean([result_models[mod]['significance'] for mod in groups[k]])
             stddev = np.std([result_models[mod]['significance'] for mod in groups[k]])
             col = color_dict[k]
@@ -1494,9 +1494,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for ll in range(len(groups.values()[0])):
-            for k in groups.keys():
-                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
+        for ll in range(len(list(groups.values())[0])):
+            for k in groups:
+                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
@@ -1520,12 +1520,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         all_figures.append(fig)
 
     nsqr = np.sqrt(result_obs['cluspattern_area'].size)
-    if 'RMS' in result_models.values()[0].keys():
+    if 'RMS' in list(result_models.values())[0].keys():
         wi = 0.6
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             for mod in groups[k]:
                 col = color_dict[mod]
                 rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
@@ -1553,7 +1553,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             rmss = [np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr for mod in groups[k]]
             sig = np.mean(rmss)
             stddev = np.std(rmss)
@@ -1583,9 +1583,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for ll in range(len(groups.values()[0])):
-            for k in groups.keys():
-                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
+        for ll in range(len(list(groups.values())[0])):
+            for k in groups:
+                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
@@ -1608,12 +1608,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig.savefig(cart_out+'RMS_1vs1_{}.pdf'.format(tag))
         all_figures.append(fig)
 
-    if 'patcor' in result_models.values()[0].keys():
+    if 'patcor' in list(result_models.values())[0].keys():
         wi = 0.6
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             for mod in groups[k]:
                 col = color_dict[mod]
                 #rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
@@ -1642,7 +1642,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for k in groups.keys():
+        for k in groups:
             rmss = [np.mean(np.array(result_models[mod]['patcor'])) for mod in groups[k]]
             sig = np.mean(rmss)
             stddev = np.std(rmss)
@@ -1672,9 +1672,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         fig = plt.figure()
         ax = plt.subplot(111)
         i = 0
-        for ll in range(len(groups.values()[0])):
-            for k in groups.keys():
-                if len(groups[k]) < len(groups.values()[0]): continue # groups have unequal lengths
+        for ll in range(len(list(groups.values())[0])):
+            for k in groups:
+                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.mean(np.array(result_models[mod]['patcor']))
@@ -1701,10 +1701,10 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat = result_obs['lat']
     lon = result_obs['lon']
 
-    if patt_ref[0].shape != result_models.values()[0]['cluspattern'][0].shape:
+    if patt_ref[0].shape != list(result_models.values())[0]['cluspattern'][0].shape:
         nupatt_ref = []
-        _, oklats, _ = np.intersect1d(result_obs['lat'], result_models.values()[0]['lat'], assume_unique = True, return_indices = True)
-        _, oklons, _ = np.intersect1d(result_obs['lon'], result_models.values()[0]['lon'], assume_unique = True, return_indices = True)
+        _, oklats, _ = np.intersect1d(result_obs['lat'], list(result_models.values())[0]['lat'], assume_unique = True, return_indices = True)
+        _, oklons, _ = np.intersect1d(result_obs['lon'], list(result_models.values())[0]['lon'], assume_unique = True, return_indices = True)
         for nu in range(n_clus):
             coso = patt_ref[nu][oklats, :]
             coso2 = coso[:, oklons]
@@ -1720,7 +1720,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     # PLOTTIN the frequency histogram
     plot_diffs = True
-    if 'freq_clus' in result_models.values()[0].keys():
+    if 'freq_clus' in list(result_models.values())[0].keys():
         fig = plt.figure()
         ax = plt.subplot(111)
         ax.grid(axis = 'y', zorder = 0)
@@ -1796,12 +1796,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         all_figures.append(fig)
 
     i1 = int(np.ceil(np.sqrt(n_clus)))
-    i2 = n_clus/i1
+    i2 = n_clus//i1
     if i2*i1 < n_clus:
         i2 = i2 + 1
 
     # PLOTTIN the persistence histograms
-    if 'resid_times' in result_models.values()[0].keys():
+    if 'resid_times' in list(result_models.values())[0].keys():
         axes = []
         for lab in labels:
             fig = plt.figure()
@@ -1897,7 +1897,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             ctl.adjust_ax_scale(axes)
 
     # PLOTTIN the transition matrices
-    if 'trans_matrix' in result_models.values()[0].keys():
+    if 'trans_matrix' in list(result_models.values())[0].keys():
         cmapparu = cm.get_cmap('RdBu_r')
         mappe = []
 
@@ -2056,7 +2056,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     if group_symbols is not None:
         markers = []
         for lab in labels:
-            for k in groups.keys():
+            for k in groups:
                 if lab in groups[k]:
                     print(lab, k, group_symbols[k])
                     markers.append(group_symbols[k])
@@ -2132,7 +2132,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     all_figures.append(fig)
 
     # Ellipse plot
-    if 'RMS' in result_models.values()[0].keys():
+    if 'RMS' in list(result_models.values())[0].keys():
         data = dict()
         for cos in ['RMS', 'patcor']:
             fac = 1.
@@ -2140,7 +2140,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             data[cos] = []
             data[cos+'_err'] = []
             data[cos+'_errlarge'] = []
-            for grp in groups.keys():
+            for grp in groups:
                 data[cos].append(np.mean([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
                 data[cos+'_err'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/(fac * np.sqrt(len(groups[grp])-1)))
                 data[cos+'_errlarge'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
@@ -2155,9 +2155,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 ax = fig.add_subplot(i1,i2,j+1)
                 ax.set_title(patnames[j], fontsize = 18, fontweight = 'bold')
 
-                ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = groups.keys(), ax = ax, colors = group_colors, alpha = 0.7)
+                ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = list(groups.keys()), ax = ax, colors = group_colors, alpha = 0.7)
 
-                for grp in groups.keys():
+                for grp in groups:
                     pats = [result_models[mod]['patcor'][j] for mod in groups[grp]]
                     rmss = [result_models[mod]['RMS'][j]/nsqr for mod in groups[grp]]
                     ax.scatter(pats, rmss, color = color_dict[grp], s = 25, marker = group_symbols[grp])

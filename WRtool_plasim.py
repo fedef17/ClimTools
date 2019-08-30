@@ -36,9 +36,9 @@ patnames_short['PNA'] = ['AR', 'PT', 'AL', 'AH']
 #     base = cd.WRtool_from_file(basefile, seas, area, extract_level_4D = 50000., numclus = 4, heavy_output = True, run_significance_calc = False, ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'])
 #     stoc = cd.WRtool_from_file(stocfile, seas, area, extract_level_4D = 50000., numclus = 4, heavy_output = True, run_significance_calc = False, ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'])
 #
-#     pickle.dump([ERA_ref, base, stoc], open(cart_out+'out_WRtool_{}.p'.format(area), 'w'))
+#     pickle.dump([ERA_ref, base, stoc], open(cart_out+'out_WRtool_{}.p'.format(area), 'wb'))
 
-# ERA_ref, base, stoc = pickle.load(open(cart_out+'out_WRtool_{}.p'.format('EAT'), 'r'))
+# ERA_ref, base, stoc = pickle.load(open(cart_out+'out_WRtool_{}.p'.format('EAT'), 'rb'))
 #
 # plt.ion()
 # fig4 = plt.figure()
@@ -64,7 +64,7 @@ clatlo = dict()
 clatlo['EAT'] = (70, 0)
 clatlo['PNA'] = (70, -90)
 for area in areas:
-    ERA_ref, base, stoc = pickle.load(open(cart_out+'out_WRtool_{}.p'.format(area), 'r'))
+    ERA_ref, base, stoc = pickle.load(open(cart_out+'out_WRtool_{}.p'.format(area), 'rb'))
     model = dict()
     model['base'] = base
     model['stoc'] = stoc

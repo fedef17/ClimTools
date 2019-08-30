@@ -5,6 +5,8 @@ import numpy as np
 import sys
 import os
 
+import ctool, ctp
+
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
@@ -28,8 +30,8 @@ import itertools as itt
 import math
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -85,7 +87,7 @@ def openlog(cart_out, tag = None, redirect_stderr = True):
     logfile = open(cart_out+logname,'w') #self.name, 'w', 0)
 
     # re-open stdout without buffering
-    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
     # redirect stdout and stderr to the log file opened above
     os.dup2(logfile.fileno(), sys.stdout.fileno())
@@ -360,7 +362,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     for i, nam in enumerate(coord_names):
         found = False
         if nam == 'time': continue
-        for std_nam in allconames.keys():
+        for std_nam in allconames:
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
                 if std_nam == 'level':
@@ -466,8 +468,8 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
             ens_id += 1
 
     if len(all_vars.keys()) == 1:
-        print('Read variable: {}\n'.format(all_vars.keys()[0]))
-        return all_vars.values()[0]
+        print('Read variable: {}\n'.format(list(all_vars.keys())[0]))
+        return list(all_vars.values())[0]
     else:
         print('Read all variables: {}\n'.format(all_vars.keys()))
         return all_vars
@@ -488,13 +490,13 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
     print('Reading {}\n'.format(ifile))
 
     fh = nc.Dataset(ifile)
-    dimensions = fh.dimensions.keys()
+    dimensions = list(fh.dimensions.keys())
     if verbose: print('Dimensions: {}\n'.format(dimensions))
     ndim = len(dimensions)
 
-    all_variabs = fh.variables.keys()
+    all_variabs = list(fh.variables.keys())
 
-    variab_names = fh.variables.keys()
+    variab_names = list(fh.variables.keys())
     for nam in dimensions:
         if nam in variab_names: variab_names.remove(nam)
     if verbose: print('Variables: {}\n'.format(variab_names))
@@ -586,7 +588,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
 
     print('Dimension of variables is {}\n'.format(true_dim))
     if keep_only_Ndim_vars:
-        for varna in vars.keys():
+        for varna in vars:
             if len(vars[varna].shape) < true_dim:
                 print('Erasing variable {}\n'.format(varna))
                 vars.pop(varna)
@@ -606,17 +608,17 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
                 level = level[0]
                 l_sel = 0
 
-            for varna in vars.keys():
+            for varna in vars:
                 vars[varna] = vars[varna][:,l_sel, ...].squeeze()
             true_dim = true_dim - 1
         else:
             levord = level.argsort()
             level = level[levord]
-            for varna in vars.keys():
+            for varna in vars:
                 vars[varna] = vars[varna][:, levord, ...]
 
     var_units = dict()
-    for varna in vars.keys():
+    for varna in vars:
         try:
             var_units[varna] = fh.variables[varna].units
         except:
@@ -629,8 +631,8 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
 
     print('Returned variables are: {}'.format(vars.keys()))
     if len(vars.keys()) == 1:
-        vars = vars.values()[0]
-        var_units = var_units.values()[0]
+        vars = list(vars.values())[0]
+        var_units = list(var_units.values())[0]
 
     if true_dim == 2:
         return vars, lat, lon, var_units
@@ -790,7 +792,7 @@ def adjust_360day_dates(dates):
     for ci in dates:
         firstday = strindata.format(ci.year, 1, 1)
         num = ci.dayofyr-1
-        add_day = num/72 # salto un giorno ogni 72
+        add_day = num//72 # salto un giorno ogni 72
         okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
         dates_ok.append(okday.to_pydatetime())
 
@@ -1017,7 +1019,7 @@ def save2Dncfield(lats,lons,variab,varname,ofile):
 
     #print('variable:', dataset.variables[varname])
 
-    #for varn in dataset.variables.keys():
+    #for varn in dataset.variables:
     #    print(varn)
     # Variable Attributes
     lat.units='degree_north'
@@ -1065,7 +1067,7 @@ def save3Dncfield(lats, lons, variab, varname, varunits, dates, timeunits, time_
 
     #print('variable:', dataset.variables[varname])
 
-    #for varn in dataset.variables.keys():
+    #for varn in dataset.variables:
     #    print(varn)
     # Variable Attributes
     time.units=timeunits
@@ -1123,7 +1125,7 @@ def save_N_2Dfields(lats,lons,variab,varname,varunits,ofile):
 
     #print('variable:', dataset.variables[varname])
 
-    #for varn in dataset.variables.keys():
+    #for varn in dataset.variables:
     #    print(varn)
     # Variable Attributes
     lat.units='degree_north'
@@ -1202,7 +1204,7 @@ def sel_area(lat, lon, var, area):
         #If 0<lon<360, convert to -180<lon<180
         if lon.min() >= 0:
             lon_new=lon-180
-            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+            var_roll=np.roll(var,int(len(lon)//2),axis=-1)
         else:
             var_roll=var
             lon_new=lon
@@ -1217,7 +1219,7 @@ def sel_area(lat, lon, var, area):
         #If -180<lon<180, convert to 0<lon<360
         if lon.min() < 0:
             lon_new=lon+180
-            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+            var_roll=np.roll(var,int(len(lon)//2),axis=-1)
         else:
             var_roll=var
             lon_new=lon
@@ -1241,7 +1243,7 @@ def sel_area(lat, lon, var, area):
         #If 0<lon<360, convert to -180<lon<180
         if lon.min() >= 0:
             lon_new=lon-180
-            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+            var_roll=np.roll(var,int(len(lon)//2),axis=-1)
         else:
             var_roll=var
             lon_new=lon
@@ -1256,7 +1258,7 @@ def sel_area(lat, lon, var, area):
         if lon.min() >= 0:
             lon_new=lon-180
             print(var.shape)
-            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+            var_roll=np.roll(var,int(len(lon)//2),axis=-1)
         else:
             var_roll=var
             lon_new=lon
@@ -1265,7 +1267,7 @@ def sel_area(lat, lon, var, area):
         print('custom lat {}-{} lon {}-{}'.format(latS, latN, lonW, lonE))
         if lon.min() >= 0:
             lon_new=lon-180
-            var_roll=np.roll(var,int(len(lon)/2),axis=-1)
+            var_roll=np.roll(var,int(len(lon)//2),axis=-1)
         else:
             var_roll=var
             lon_new=lon
@@ -1392,7 +1394,7 @@ def daily_climatology(var, dates, window, refyear = 2001):
         else:
             daysok.append(okday)
 
-    delta = window/2
+    delta = window//2
 
     filt_mean = []
     filt_std = []
@@ -1430,8 +1432,8 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     years = allyears[::step_year]
 
     for yea in years:
-        okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
-        numyea = np.sum((allyears >= yea - window_years/2) & (allyears <= yea + window_years/2))
+        okye = (dates_pdh.year >= yea - window_years//2) & (dates_pdh.year <= yea + window_years//2)
+        numyea = np.sum((allyears >= yea - window_years//2) & (allyears <= yea + window_years//2))
         print(yea, numyea)
         if numyea < window_years:
             print('skipped')
@@ -1455,8 +1457,8 @@ def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     years = allyears[::step_year]
 
     for yea in years:
-        okye = (dates_pdh.year >= yea - window_years/2) & (dates_pdh.year <= yea + window_years/2)
-        numyea = np.sum((allyears >= yea - window_years/2) & (allyears <= yea + window_years/2))
+        okye = (dates_pdh.year >= yea - window_years//2) & (dates_pdh.year <= yea + window_years//2)
+        numyea = np.sum((allyears >= yea - window_years//2) & (allyears <= yea + window_years//2))
         print(yea, numyea)
         if numyea < window_years:
             print('skipped')
@@ -1557,7 +1559,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True):
         all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
         all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
     else:
-        n_seas = len(var_season)/len(season)
+        n_seas = len(var_season)//len(season)
         all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len(season)*i:len(season)*(i+1), ...] for i in range(n_seas)]
 
@@ -1677,10 +1679,10 @@ def running_mean(var, wnd):
     else:
         rollpi_temp = []
         for i in range(len(var)):
-            if i-wnd/2 < 0 or i + wnd/2 > len(var)-1:
+            if i-wnd//2 < 0 or i + wnd//2 > len(var)-1:
                 rollpi_temp.append(np.nan*np.ones(var[0].shape))
             else:
-                rollpi_temp.append(np.mean(var[i-wnd/2:i+wnd/2+1, ...], axis = 0))
+                rollpi_temp.append(np.mean(var[i-wnd//2:i+wnd//2+1, ...], axis = 0))
 
         rollpi_temp = np.stack(rollpi_temp)
 
@@ -1854,7 +1856,7 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
         for i in range(numens):
             for la in range(var_ens[0].shape[1]):
                 for lo in range(var_ens[0].shape[2]):
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(range(var_ens[0].shape[0]),var_ens[i][:,la,lo])
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(list(range(var_ens[0].shape[0])),var_ens[i][:,la,lo])
                     trendmap[la,lo]=slope
             trendmap_ens.append(trendmap)
         varextreme_ens = trendmap_ens
@@ -2464,9 +2466,9 @@ def calc_autocorr_wlag(pcs, dates = None, maxlag = 40, out_lag1 = False):
     results = results/np.max(results)
 
     if out_lag1:
-        res_ok = results[results.shape[0]/2-1, results.shape[1]/2]
+        res_ok = results[results.shape[0]//2-1, results.shape[1]//2]
     else:
-        res_ok = results[:, results.shape[1]/2]
+        res_ok = results[:, results.shape[1]//2]
     #res_ok = np.max(results[np.argmax(results, axis = 0)-1])
 
     return res_ok
@@ -2663,7 +2665,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False):
 
     numclus = pcset_ref.shape[0]
 
-    perms = list(itt.permutations(range(numclus)))
+    perms = list(itt.permutations(list(range(numclus))))
     nperms = len(perms)
 
     mean_rms = []
@@ -3131,7 +3133,7 @@ def count_occurrences(data, num_range = None, convert_to_frequency = True):
         else:
             counts.append(0)
 
-    kiavi = np.array(cosi.keys())
+    kiavi = np.array(list(cosi.keys()))
     pius_keys = kiavi[kiavi > num_range[1]]
     vals_pius = np.sum(np.array([cosi[k] for k in pius_keys]))
     counts.append(vals_pius)
@@ -3202,7 +3204,7 @@ def clus_eval_indexes(PCs, centroids, labels):
     mean_intra_clus_variance = np.sum(inertia_i)/len(labels)
 
     dist_couples = dict()
-    coppie = list(itt.combinations(range(numclus), 2))
+    coppie = list(itt.combinations(list(range(numclus)), 2))
     for (i,j) in coppie:
         dist_couples[(i,j)] = LA.norm(centroids[i]-centroids[j])
 
@@ -3248,7 +3250,7 @@ def clus_eval_indexes(PCs, centroids, labels):
         a = np.sum([LA.norm(okpc - el) for okpc in ok_Pcs])/n_clus[lab]
 
         bs = []
-        others = range(numclus)
+        others = list(range(numclus))
         others.remove(lab)
         for lab_b in others:
             lab_clus = labels == lab_b
@@ -3524,10 +3526,10 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors)
     if add_hatching is not None:
         print('adding hatching')
-        #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','w'))
+        #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','wb'))
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
 
-    nskip = len(clevels)/n_lines - 1
+    nskip = len(clevels)//n_lines - 1
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
@@ -4013,7 +4015,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
 
     if fix_subplots_shape is None:
         num_figs = int(np.ceil(1.0*numens/max_ax_in_fig))
-        numens_ok = int(np.ceil(numens/num_figs))
+        numens_ok = int(np.ceil(numens//num_figs))
         side1 = int(np.ceil(np.sqrt(numens_ok)))
         side2 = int(np.ceil(numens_ok/float(side1)))
     else:
@@ -4359,7 +4361,7 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     labgr = ['{:4.2f}'.format(co) for co in ok_cos]
     anggr = np.rad2deg(np.arccos(ok_cos))
 
-    plt.thetagrids(anggr, labels=labgr, frac = 1.1, zorder = 0)
+    plt.thetagrids(anggr, labels=labgr, zorder = 0)
 
     for sig in [1., 2., 3.]:
         circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
@@ -4523,7 +4525,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     labgr = ['{:4.2f}'.format(co) for co in ok_cos]
     anggr = np.rad2deg(np.arccos(ok_cos))
 
-    ax.set_thetagrids(anggr, labels=labgr, frac = 1.1)
+    ax.set_thetagrids(anggr, labels=labgr)
 
     if relative_std:
         sigma_obs_abs = np.std(observation)
@@ -4758,7 +4760,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     One figure per each regime with all model pdfs.
     """
     if model_names is None:
-        model_names = results.keys()
+        model_names = list(results.keys())
 
     if colors is None:
         colors = color_set(len(model_names))
@@ -4767,7 +4769,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
         else:
             colors[-1] = 'black'
 
-    n_clus = np.max(results.values()[0]['labels'])+1
+    n_clus = np.max(list(results.values())[0]['labels'])+1
 
     fig = plt.figure(figsize = figsize)
 

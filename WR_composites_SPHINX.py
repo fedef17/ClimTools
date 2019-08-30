@@ -175,20 +175,20 @@ all_compos['ERA'] = pickle.load(open(cart_out + 'out_composites_ERA_precERA.p'))
 #
 #         ctl.plot_pdfpages(cart_out + 'temprec_composites_{}.pdf'.format(nam), allfigs)
 #
-#         for k in compos.keys():
+#         for k in compos:
 #             compos[k] = np.stack(compos[k])
 #         all_compos[nam] = compos
 #
 #     compos = dict()
 #     compos_std = dict()
-#     for k in all_compos[nam].keys():
+#     for k in all_compos[nam]:
 #         compos[k] = np.mean([all_compos[cos+'{}'.format(i)][k] for i in range(num[cos])], axis = 0)
 #         compos_std[k] = np.std([all_compos[cos+'{}'.format(i)][k] for i in range(num[cos])], axis = 0)
 #
 #     all_compos[cos] = compos
 #     all_compos[cos+'_std'] = compos_std
 #
-#     pickle.dump([compos, compos_std], open(cart_out + 'out_composites_{}.p'.format(cos), 'w'))
+#     pickle.dump([compos, compos_std], open(cart_out + 'out_composites_{}.p'.format(cos), 'wb'))
 #
 #     for nam in [cos, cos+'_std']:
 #         compos = all_compos[nam]
@@ -230,7 +230,7 @@ area = 'EAT'
 
 area_compos = dict()
 for var in ['temp', 'prec']:
-    for k in all_compos.keys():
+    for k in all_compos:
         if type(all_compos[k][var]) == list:
             all_compos[k][var] = np.stack(all_compos[k][var])
         area_compos[(var, k)], lat_area, lon_area = ctl.sel_area(lat, lon, all_compos[k][var], area)#'Eu')

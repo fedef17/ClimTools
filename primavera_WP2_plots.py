@@ -19,8 +19,8 @@ from scipy import stats
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -31,13 +31,13 @@ import climtools_lib as ctl
 ############ INPUTS #########
 
 cart = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_WP2/'
-results = pickle.load(open(cart+'res_primavera.p','r'))
+results = pickle.load(open(cart+'res_primavera.p','rb'))
 
 cart_ecmwf = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_ECMWF/'
-results_ecmwf = pickle.load(open(cart_ecmwf+'res_primavera.p','r'))
+results_ecmwf = pickle.load(open(cart_ecmwf+'res_primavera.p','rb'))
 
 cart_ecmwf_full = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_ECMWF_full/'
-results_ecmwf_full = pickle.load(open(cart_ecmwf_full+'res_primavera.p','r'))
+results_ecmwf_full = pickle.load(open(cart_ecmwf_full+'res_primavera.p','rb'))
 
 res_tags = ['labels', 'freq_clus', 'patcor', 'cluspattern', 'significance', 'et', 'cluspattern_area']
 
@@ -55,7 +55,7 @@ key_HR = ['HR_{}'.format(ke) for ke in range(1,5)]
 key_LR = ['LR_{}'.format(ke) for ke in range(1,7)]
 sig_HR = [sig_ecmwf[ke] for ke in key_HR]
 sig_LR = [sig_ecmwf[ke] for ke in key_LR]
-plt.scatter(range(len(sig_LR)), sig_LR, color = 'green', s=30, marker = '$L$', label = 'LR')
+plt.scatter(list(range(len(sig_LR))), sig_LR, color = 'green', s=30, marker = '$L$', label = 'LR')
 plt.scatter(6+np.arange(len(sig_HR)), sig_HR, color = 'orange', s=30, marker = '$H$', label = 'HR')
 
 mean_HR = np.mean(sig_HR)
@@ -70,7 +70,7 @@ plt.scatter((len(key_LR)-1)/2., mean_LR, color = 'green', s = 20)
 plt.legend(fontsize = 'small', loc = 1)
 plt.title('Significance of regime structure - ECMWF ensemble')
 keytot = key_LR+key_HR
-plt.xticks(range(len(keytot)), keytot, size='small')
+plt.xticks(list(range(len(keytot))), keytot, size='small')
 plt.ylabel('Significance')
 fig.savefig(cart+'Significance_ECMWF.pdf')
 
@@ -102,7 +102,7 @@ plt.bar(i+1+wi/2, sig['NCEP'],width = wi,  color = colors[-1], label = 'NCEP')
 models2 = models+['Obs']
 plt.legend(fontsize = 'small', loc = 4)
 plt.title('Significance of regime structure - Stream 1')
-plt.xticks(range(len(models2)), models2, size='small')
+plt.xticks(list(range(len(models2))), models2, size='small')
 plt.ylabel('Significance')
 fig.savefig(cart+'Significance.pdf')
 

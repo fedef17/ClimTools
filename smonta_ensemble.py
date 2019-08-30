@@ -19,7 +19,7 @@ cart = '/data-hobbes/fabiano/Medscope/seasonal_forecasts_1d5/'
 #cart = '/home/federico/work/MARS_data/MEDSCOPE_seasonal/'
 
 # Open nc file
-years = range(1993,2018)
+years = list(range(1993,2018))
 nmon = 7
 
 par = 167
@@ -67,7 +67,7 @@ for year in years:
             month_preds = month_preds * convert_factor
             var_units = new_units
 
-        for num, pred in zip(range(len(month_preds)), month_preds):
+        for num, pred in zip(list(range(len(month_preds))), month_preds):
             all_fields[(seas, year, num)] = pred
 
 
@@ -93,7 +93,7 @@ for year in years:
 climat_mean = dict()
 climat_std = dict()
 
-years_clim = range(1993,2017)
+years_clim = list(range(1993,2017))
 
 for seas in ['may','nov']:
     climat_mean[seas] = []

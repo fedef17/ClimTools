@@ -137,7 +137,7 @@ all_stats_choices = dict()
 #     print('multi for {} cases took: {:8.2f} s\n'.format(len(numoks), (t4-t3).total_seconds()))
 #
 #
-# pickle.dump(all_stats_choices, open(cart_out + 'all_stats_ERAvariab.p', 'w'))
+# pickle.dump(all_stats_choices, open(cart_out + 'all_stats_ERAvariab.p', 'wb'))
 
 all_stats_choices = pickle.load(open(cart_out + 'all_stats_ERAvariab.p'))
 

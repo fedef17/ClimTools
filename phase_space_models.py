@@ -54,7 +54,7 @@ allfigs = []
 eof_axis_lim = (-3000., 3000.)
 
 check_for_eofs = False
-results, results_ref = pickle.load(open(filo, 'r'))
+results, results_ref = pickle.load(open(filo, 'rb'))
 results['ERA'] = results_ref
 
 fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, filename = cart_out + 'all_regimes_primacoup_{}_2eofs.pdf'.format(tag), eof_proj = [(0,1)], reference = 'ERA', eof_axis_lim = eof_axis_lim, check_for_eofs = check_for_eofs, colors = colors_wERA, fix_subplots_shape = (2, 2))
@@ -67,7 +67,7 @@ fig = ctl.plot_multimodel_regime_pdfs(results, model_names = model_names_all, fi
 allfigs.append(fig)
 
 # filo = filogen.format('_refEOF')
-# results, results_ref = pickle.load(open(filo, 'r'))
+# results, results_ref = pickle.load(open(filo, 'rb'))
 
 all_mod_stats = dict()
 
@@ -101,7 +101,7 @@ for mod in model_names:
         dist = ctl.distance(results[mod]['centroids'][reg], results_ref['centroids'][reg])
         all_mod_stats[('dist centocen', mod, reg)] = dist
 
-pickle.dump(all_mod_stats, open(cart_out + 'all_stats_models_primacoup_{}.p'.format(tag), 'w'))
+pickle.dump(all_mod_stats, open(cart_out + 'all_stats_models_primacoup_{}.p'.format(tag), 'wb'))
 
 all_mod_stats = pickle.load(open(cart_out + 'all_stats_models_primacoup_{}.p'.format(tag)))
 ERA_ref_thresholds = pickle.load(open(cart_out_ERA + 'ERA_ref_thresholds_allstats.p'))

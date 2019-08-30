@@ -20,8 +20,8 @@ from scipy import stats
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -101,8 +101,8 @@ print('\n')
 
 trans_all = ctl.find_transition_pcs(6, lab_all, dates_all, pcs_all, filter_longer_than = 3, skip_persistence = True)
 #
-# pickle.dump(trans_all, open(cart_out+'trans_all.p','w'))
-# trans_all = pickle.load(open(cart_out+'trans_all.p','r'))
+# pickle.dump(trans_all, open(cart_out+'trans_all.p','wb'))
+# trans_all = pickle.load(open(cart_out+'trans_all.p','rb'))
 
 # PLOT TRANSITIONSS
 pcscon = np.concatenate(pcs_all)

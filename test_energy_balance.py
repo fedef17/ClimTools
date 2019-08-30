@@ -51,7 +51,7 @@ namefi = '{}_mon_{}_{}.nc'
 years = np.arange(1850,2101)
 
 ann = np.arange(1850,2101,10)
-annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+annme = [(a1+a2)//2 for a1,a2 in zip(ann[:-1], ann[1:])]
 print(annme)
 
 nuvars = ['toa_balance', 'toa_balance_land', 'toa_balance_ocean', 'surf_balance', 'surf_balance_land', 'surf_balance_ocean']
@@ -123,7 +123,7 @@ ensmems = ['lcb0', 'lcb1', 'lcb2', 'lcs0', 'lcs1', 'lcs2']
 #     radclim[('zonal', 'base', varna)] = np.mean([radclim[('zonal', exp, varna)] for exp in ensmems if 'lcb' in exp], axis = 0)
 #     radclim[('zonal', 'stoc', varna)] = np.mean([radclim[('zonal', exp, varna)] for exp in ensmems if 'lcs' in exp], axis = 0)
 #
-# pickle.dump(radclim, open(cart_out+'radclim_yearly.p', 'w'))
+# pickle.dump(radclim, open(cart_out+'radclim_yearly.p', 'wb'))
 
 radclim = pickle.load(open(cart_out+'radclim_yearly.p'))
 varniuu, lat, lon, dates, time_units, var_units = ctl.read3Dncfield(cart_in+namefi.format('lcb0',1988,'rsut'))
@@ -157,13 +157,13 @@ carttemp = '/data-hobbes/fabiano/SPHINX/tas_mon/'
 # zonalme['base'] = np.mean([zonalme[exp] for exp in ensmems if 'lcb' in exp], axis = 0)
 # zonalme['stoc'] = np.mean([zonalme[exp] for exp in ensmems if 'lcs' in exp], axis = 0)
 #
-# for key in globalme.keys():
+# for key in globalme:
 #     globalme[key] = globalme[key]-KtoC
-# for key in zonalme.keys():
+# for key in zonalme:
 #     zonalme[key] = zonalme[key]-KtoC
 #
-# pickle.dump([globalme, zonalme], open(carttemp+'global_tasmean_yearly.p', 'w'))
-globalme, zonalme = pickle.load(open(carttemp+'global_tasmean_yearly.p', 'r'))
+# pickle.dump([globalme, zonalme], open(carttemp+'global_tasmean_yearly.p', 'wb'))
+globalme, zonalme = pickle.load(open(carttemp+'global_tasmean_yearly.p', 'rb'))
 
 # figure
 
@@ -251,7 +251,7 @@ plt.close('all')
 
 
 ann = np.arange(1850,2101,10)
-annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+annme = [(a1+a2)//2 for a1,a2 in zip(ann[:-1], ann[1:])]
 annind = np.arange(0,251,10)
 
 figure_file = cart_out+'heat_flux_base_vs_stoc.pdf'

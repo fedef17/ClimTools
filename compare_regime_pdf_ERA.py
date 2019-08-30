@@ -76,9 +76,9 @@ kwar['nrsamp_sig'] = 500
 # results2 = cd.WRtool_core(varseas2, lat, lon, dates2, area, heavy_output = True, **kwar)
 # results_all['period2_assigntoclosest'] = results2
 #
-# #pickle.dump([results_ref, results1, results2], open(cart_out+'out_test.p', 'w'))
+# #pickle.dump([results_ref, results1, results2], open(cart_out+'out_test.p', 'wb'))
 # # [results_ref, results1, results2] = pickle.load(open(cart_out+'out_test.p'))
-# pickle.dump(results_all, open(cart_out+'out_test_all.p', 'w'))
+# pickle.dump(results_all, open(cart_out+'out_test_all.p', 'wb'))
 results_all = pickle.load(open(cart_out+'out_test_all.p'))
 ######################################################
 

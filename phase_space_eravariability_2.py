@@ -85,7 +85,7 @@ n_bootstrap = 1000
 #     t1 = datetime.now()
 #     print('{} yr - {:6.2f}'.format(n_choice, (t1-t0).total_seconds()))
 #
-# pickle.dump([all_KS_stat, all_cent_dist, all_cent_std, all_refcent_KS_dist], open(cart_out + 'KS_stat_1000.p', 'w'))
+# pickle.dump([all_KS_stat, all_cent_dist, all_cent_std, all_refcent_KS_dist], open(cart_out + 'KS_stat_1000.p', 'wb'))
 
 # all_centtocent_dist = dict()
 #
@@ -105,7 +105,7 @@ n_bootstrap = 1000
 #     t1 = datetime.now()
 #     print('{} yr - {:6.2f}'.format(n_choice, (t1-t0).total_seconds()))
 #
-# pickle.dump(all_centtocent_dist, open(cart_out + 'centocen_stat_1000.p', 'w'))
+# pickle.dump(all_centtocent_dist, open(cart_out + 'centocen_stat_1000.p', 'wb'))
 all_centtocent_dist = pickle.load(open(cart_out + 'centocen_stat_1000.p'))
 
 results_ref, _ = pickle.load(open(cart_ERAvar + 'res_bootstrap_5yr_1000.p'))
@@ -179,4 +179,4 @@ for stat, nam, tit in zip(all_stats, stat_nams, titles):
     fig = ctl.custom_legend(fig, colors, ['{} yr'.format(yr) for yr in yrcho])
     fig.savefig(cart_out + '_'.join(nam.split())+'_ERA_allyears.pdf')
 
-pickle.dump(ERA_ref_thresholds, open(cart_out + 'ERA_ref_thresholds_allstats.p', 'w'))
+pickle.dump(ERA_ref_thresholds, open(cart_out + 'ERA_ref_thresholds_allstats.p', 'wb'))

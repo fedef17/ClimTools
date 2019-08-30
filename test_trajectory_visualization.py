@@ -15,8 +15,8 @@ import netCDF4 as nc
 from netCDF4 import Dataset, num2date
 import cartopy.crs as ccrs
 
-import Tkinter
-import tkMessageBox
+import tkinter
+import tkinter.messagebox
 from copy import deepcopy as cp
 
 import matplotlib.cm as cm

@@ -98,7 +98,7 @@ ref_period = ctl.range_years(1850,1900)
 #
 
 # LEGGO DAL PICKLE
-# pickle.dump([lat, lon, years, zonal_anom_ens, global_anom_ens, yearly_anom_ens], open(cart+'temp_proj.p','w'))
+# pickle.dump([lat, lon, years, zonal_anom_ens, global_anom_ens, yearly_anom_ens], open(cart+'temp_proj.p','wb'))
 lat, lon, years, zonal_anom_ens, global_anom_ens, yearly_anom_ens = pickle.load(open(cart+'temp_proj.p'))
 
 

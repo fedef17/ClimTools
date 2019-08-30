@@ -19,8 +19,8 @@ from scipy import stats
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -174,4 +174,4 @@ for fil, tag in zip(filenames, tags):
     print('----------------------\n')
     # e qui i plotssss
 
-pickle.dump(results, open(cart_out+'res_primavera.p', 'w'))
+pickle.dump(results, open(cart_out+'res_primavera.p', 'wb'))

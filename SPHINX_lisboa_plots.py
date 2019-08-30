@@ -19,8 +19,8 @@ from scipy import stats
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -36,7 +36,7 @@ cart = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/WRtool/'
 dates = pickle.load(open(cart+'dates.p'))
 
 cart2 = '/home/fabiano/Research/lavori/WP2_deliverable_Oct2018/Results_WP2/'
-results_prima2 = pickle.load(open(cart2+'res_primavera.p','r'))
+results_prima2 = pickle.load(open(cart2+'res_primavera.p','rb'))
 
 pat_era = results_prima2['cluspattern_area']['ERA']
 lab_era = results_prima2['labels']['ERA']
@@ -52,7 +52,7 @@ patnames_short = dict()
 patnames_short['EAT'] = ['NP', 'BL', 'NN', 'AR']
 patnames_short['PNA'] = ['AR', 'PT', 'AH']
 
-# results = pickle.load(open(cart+'results_SPHINX_10yr.p','r'))
+# results = pickle.load(open(cart+'results_SPHINX_10yr.p','rb'))
 # years1 = np.arange(1850,2071,10)
 # years2 = np.arange(1880,2101,10)
 #
@@ -128,9 +128,9 @@ patnames_short['PNA'] = ['AR', 'PT', 'AH']
 #         filename = cart + 'Clus_{}{}_all_1850-2005.pdf'.format(area,num)
 #         ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = 'polar', central_lat_lon = (90.,0.), cmap = 'RdBu_r', title = 'Regime {} on {}'.format(num, area), subtitles = ensmem, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), fix_subplots_shape = (2,3), number_subplots = False, figsize = (15,15))
 
-results_fullp = pickle.load(open(cart+'results_SPHINX_fullperiod_detrended.p','r'))
+results_fullp = pickle.load(open(cart+'results_SPHINX_fullperiod_detrended.p','rb'))
 
-results = pickle.load(open(cart+'results_SPHINX_new_oksig.p','r'))
+results = pickle.load(open(cart+'results_SPHINX_new_oksig.p','rb'))
 years1 = np.arange(1850,2071,5)
 years2 = np.arange(1880,2101,5)
 yr_ranges = []
@@ -390,7 +390,7 @@ for area in ['EAT', 'PNA']:
             plt.bar(clu+wi/2, freq[('stoc', area, ran)][clu], width = wi, color = 'orange', label = lab2)
 
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)), pts, size='small')
+        plt.xticks(list(range(len(pts))), pts, size='small')
         plt.title('Regime frequency - base vs stoc')
         plt.legend()
         plt.xlabel('Regime')
@@ -412,7 +412,7 @@ for area in ['EAT', 'PNA']:
             plt.bar(clu+wi, freq[('stoc', area, ran)][clu], width = wi, color = 'orange', label = lab2)
 
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)), pts, size='small')
+        plt.xticks(list(range(len(pts))), pts, size='small')
         plt.title('Regime frequency - base vs stoc')
         plt.legend()
         plt.xlabel('Regime')
@@ -432,7 +432,7 @@ for area in ['EAT', 'PNA']:
             plt.bar(clu+wi/2, freq[(exp, area, futran)][clu], width = wi, color = 'orange', label = lab2)
 
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)), pts, size='small')
+        plt.xticks(list(range(len(pts))), pts, size='small')
         plt.title('Regime frequency - hist vs future')
         plt.legend()
         plt.xlabel('Regime')
@@ -454,7 +454,7 @@ for area in ['EAT', 'PNA']:
         plt.bar(clu+1-wi/2, freq[('base', area, ran, 'filt80')][-1], width = wi, color = 'green', label = lab1)
         plt.bar(clu+1+wi/2, freq[('stoc', area, ran, 'filt80')][-1], width = wi, color = 'orange', label = lab2)
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)+1), pts+['W'], size='small')
+        plt.xticks(list(range(len(pts)+1)), pts+['W'], size='small')
         plt.title('Regime frequency - base vs stoc')
         plt.legend()
         plt.xlabel('Regime')
@@ -476,9 +476,9 @@ for area in ['EAT', 'PNA']:
         plt.bar(clu+1-wi/2, freq[('base', area, histran, 'filt80')][-1], width = wi, color = 'green', label = lab1)
         plt.bar(clu+1+wi/2, freq[('stoc', area, futran, 'filt80')][-1], width = wi, color = 'orange', label = lab2)
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)+1), pts+['W'], size='small')
+        plt.xticks(list(range(len(pts)+1)), pts+['W'], size='small')
         pts = patnames_short[area]
-        plt.xticks(range(len(pts)), pts, size='small')
+        plt.xticks(list(range(len(pts))), pts, size='small')
         plt.title('Regime frequency - hist vs future')
         plt.legend()
         plt.xlabel('Regime')

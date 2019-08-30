@@ -138,12 +138,12 @@ dates = coords['dates']
 #     highfrvar[mod] = highfr_variab
 #     stat_eddy_all[mod] = stat_eddy
 
-# pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var.p', 'w'))
+# pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var.p', 'wb'))
 
-# # pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var_hlm.p', 'w'))
-# # mf, lf, hf, se = pickle.load(open(cart_out + 'out_lowhighstat_var_hlm.p', 'r'))
+# # pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var_hlm.p', 'wb'))
+# # mf, lf, hf, se = pickle.load(open(cart_out + 'out_lowhighstat_var_hlm.p', 'rb'))
 
-mean_field_all, lowfrvar, highfrvar, stat_eddy_all = pickle.load(open(cart_out + 'out_lowhighstat_var.p', 'r'))
+mean_field_all, lowfrvar, highfrvar, stat_eddy_all = pickle.load(open(cart_out + 'out_lowhighstat_var.p', 'rb'))
 
 # #
 # # mean_field_all.update(mf)
@@ -151,7 +151,7 @@ mean_field_all, lowfrvar, highfrvar, stat_eddy_all = pickle.load(open(cart_out +
 # # highfrvar.update(hf)
 # # stat_eddy_all.update(se)
 # #
-# # pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var.p', 'w'))
+# # pickle.dump([mean_field_all, lowfrvar, highfrvar, stat_eddy_all], open(cart_out + 'out_lowhighstat_var.p', 'wb'))
 # # sys.exit()
 
 lat = np.arange(-90, 90.1, 2.5)

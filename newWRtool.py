@@ -55,7 +55,7 @@ logname = 'log_WRtool_{}.log'.format(ctl.datestamp())
 logfile = open(logname,'w') #self.name, 'w', 0)
 
 # re-open stdout without buffering
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
 # redirect stdout and stderr to the log file opened above
 os.dup2(logfile.fileno(), sys.stdout.fileno())
@@ -110,14 +110,14 @@ defaults['wnd_days'] = 20
 defaults['wnd_years'] = 30
 
 inputs = ctl.read_inputs(file_input, keys, n_lines = None, itype = itype, defaults = defaults)
-for ke in inputs.keys():
+for ke in inputs:
     print('{} : {}\n'.format(ke, inputs[ke]))
 
 if inputs['area'] == 'custom':
     if inputs['custom_area'] is None:
         raise ValueError('Set custom_area or specify a default area')
     else:
-        inputs['custom_area'] = map(float, inputs['custom_area'])
+        inputs['custom_area'] = list(map(float, inputs['custom_area']))
         area = inputs['custom_area']
 else:
     area = inputs['area']
@@ -202,7 +202,7 @@ print('model names: ', inputs['model_names'])
 
 print(inputs['groups'])
 if inputs['group_symbols'] is not None:
-    for k in inputs['group_symbols'].keys():
+    for k in inputs['group_symbols']:
         inputs['group_symbols'][k] = inputs['group_symbols'][k][0]
 print(inputs['group_symbols'])
 
@@ -213,15 +213,15 @@ else:
     print('Considering pcs to explain {}% of variance\n'.format(inputs['perc']))
 
 if inputs['groups'] is not None and inputs['reference_group'] is None:
-    print('Setting default reference group to: {}\n'.format(inputs['groups'].keys()[0]))
-    inputs['reference_group'] = inputs['groups'].keys()[0]
+    print('Setting default reference group to: {}\n'.format(list(inputs['groups'].keys())[0]))
+    inputs['reference_group'] = list(inputs['groups'].keys())[0]
 
 if not os.path.exists(inputs['cart_out_general']): os.mkdir(inputs['cart_out_general'])
 inputs['cart_out'] = inputs['cart_out_general'] + inputs['exp_name'] + '/'
 if not os.path.exists(inputs['cart_out']): os.mkdir(inputs['cart_out'])
 
 if inputs['year_range'] is not None:
-    inputs['year_range'] = map(int, inputs['year_range'])
+    inputs['year_range'] = list(map(int, inputs['year_range']))
 # dictgrp = dict()
 # dictgrp['all'] = inputs['dictgroup']
 # inputs['dictgroup'] = dictgrp
@@ -246,7 +246,7 @@ print('patnames', inputs['patnames'])
 print('patnames_short', inputs['patnames_short'])
 
 if inputs['plot_margins'] is not None:
-    inputs['plot_margins'] = map(float, inputs['plot_margins'])
+    inputs['plot_margins'] = list(map(float, inputs['plot_margins']))
 
 outname = 'out_' + std_outname(inputs['exp_name'], inputs) + '.p'
 nomeout = inputs['cart_out'] + outname
@@ -259,10 +259,10 @@ if not os.path.exists(nomeout):
     print('{} not found, this is the first run. Setting up the computation..\n'.format(nomeout))
     if not os.path.exists(ERA_ref_out):
         ERA_ref = cd.WRtool_from_file(inputs['ERA_ref_orig'], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = True, run_significance_calc = inputs['run_sig_calc'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], netcdf4_read = inputs['netcdf4_read'], wnd_days = inputs['wnd_days'], wnd_years = inputs['wnd_years'])
-        pickle.dump(ERA_ref, open(ERA_ref_out, 'w'))
+        pickle.dump(ERA_ref, open(ERA_ref_out, 'wb'))
     else:
         print('Reference calculation already performed, reading from {}\n'.format(ERA_ref_out))
-        ERA_ref = pickle.load(open(ERA_ref_out, 'r'))
+        ERA_ref = pickle.load(open(ERA_ref_out, 'rb'))
 
     model_outs = dict()
     for modfile, modname in zip(inputs['filenames'], inputs['model_names']):
@@ -275,7 +275,7 @@ if not os.path.exists(nomeout):
         # else:
         #     model_outs[modname] = cd.WRtool_from_file(inputs['ensemble_filenames'][modname], inputs['season'], area, extract_level_hPa = inputs['level'], numclus = inputs['numclus'], heavy_output = inputs['heavy_output'], run_significance_calc = inputs['run_sig_calc'], ref_solver = ERA_ref['solver'], ref_patterns_area = ERA_ref['cluspattern_area'], sel_yr_range = inputs['year_range'], numpcs = inputs['numpcs'], perc = inputs['perc'], detrended_eof_calculation = inputs['detrended_eof_calculation'], detrended_anom_for_clustering = inputs['detrended_anom_for_clustering'], use_reference_eofs = inputs['use_reference_eofs'], use_reference_clusters = inputs['use_reference_clusters'], ref_clusters_centers = ERA_ref['centroids'], netcdf4_read = inputs['netcdf4_read'])
 
-    pickle.dump([model_outs, ERA_ref], open(nomeout, 'w'))
+    pickle.dump([model_outs, ERA_ref], open(nomeout, 'wb'))
     try:
         io.savemat(nomeout[:-2]+'.mat', mdict = {'models': model_outs, 'reference': ERA_ref})
     except Exception as caos:
@@ -283,7 +283,7 @@ if not os.path.exists(nomeout):
         print('Unable to produce .mat OUTPUT!!')
 else:
     print('Computation already performed. Reading output from {}\n'.format(nomeout))
-    [model_outs, ERA_ref] = pickle.load(open(nomeout, 'r'))
+    [model_outs, ERA_ref] = pickle.load(open(nomeout, 'rb'))
 
 os.system('cp {} {}'.format(file_input, inputs['cart_out'] + std_outname(inputs['exp_name'], inputs) + '.in'))
 
@@ -317,3 +317,4 @@ print(ctl.datestamp()+'\n')
 print('Ended successfully!\n')
 
 os.system('cp {} {}'.format(logname, inputs['cart_out']))
+logfile.close()

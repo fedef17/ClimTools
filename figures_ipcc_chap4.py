@@ -142,7 +142,7 @@ convunits['pr'] = 'kg m-2 day-1'
 #
 #             all_res[(var, scen, futperiod)] = [mod_anoms, mod_mean_state, mod_stddev, varanom, varstd, varmeanstate]
 
-# pickle.dump(all_res, open(cart_out + 'all_res_map.p', 'w'))
+# pickle.dump(all_res, open(cart_out + 'all_res_map.p', 'wb'))
 all_res = pickle.load(open(cart_out + 'all_res_map.p'))
 
 eracub, cords, _ = ctl.transform_iris_cube(ref_cube)
@@ -175,7 +175,7 @@ for futperiod in futperiods_all:
         mod_anoms, mod_mean_state, mod_stddev, varanom, varstd, varmeanstate = all_res[(var, scen, futperiod)]
         #mod_anoms, varmean, varstd = all_res[var]
         stpl_mask = dict()
-        for ke in varanom.keys():
+        for ke in varanom:
             stpl_mask[ke] = np.zeros(varanom[ke].shape)
             oksig = abs(varanom[ke]) > 2*varstd[ke]
             stpl_mask[ke][oksig] = 1
@@ -223,7 +223,7 @@ for futperiod in futperiods_all:
         stpl_mask = dict()
         var_perc = dict()
         std_perc = dict()
-        for ke in varanom.keys():
+        for ke in varanom:
             allvp = np.array([modan/modme for modan, modme in zip(mod_anoms[ke], mod_mean_state[ke])])
             var_perc[ke] = 100*np.mean(allvp, axis = 0)
             allvst = np.array([mostd/modme for mostd, modme in zip(mod_stddev[ke], mod_mean_state[ke])])

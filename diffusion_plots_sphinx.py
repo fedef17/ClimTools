@@ -40,9 +40,9 @@ rad_file = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/radiation_balance/ra
 cloud_file = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/cloud_cover/cloudcover_yearly.p'
 tas_file = '/data-hobbes/fabiano/SPHINX/tas_mon/global_tasmean_yearly.p'
 
-radclim = pickle.load(open(rad_file, 'r'))
-cloudclim = pickle.load(open(cloud_file, 'r'))
-globalme, zonalme = pickle.load(open(tas_file, 'r'))
+radclim = pickle.load(open(rad_file, 'rb'))
+cloudclim = pickle.load(open(cloud_file, 'rb'))
+globalme, zonalme = pickle.load(open(tas_file, 'rb'))
 
 cart_out = '/home/fabiano/Research/lavori/SPHINX_for_lisboa/diffusion_plots/'
 if not os.path.exists(cart_out): os.mkdir(cart_out)
@@ -76,7 +76,7 @@ temp_horiz = [(13.5, 14.5), (14.5, 15.5), (15.5, 16.5), (16.5, 17.5)]
 
 #for coso in ['base', 'stoc']:
 for coso in ensmems:
-    for th in time_horiz.keys():
+    for th in time_horiz:
         yok = (years >= time_horiz[th][0]) & (years <= time_horiz[th][1])
         for varna in radvars:
             zonals[(varna, th, coso)] = np.mean(radclim[('zonal', coso, varna)][yok, ...], axis = 0)
@@ -92,12 +92,12 @@ for coso in ensmems:
         zonals[('tas', th, coso)] = np.mean(zonalme[coso][yok, ...], axis = 0)
 
 
-for th in temp_horiz+time_horiz.keys():
+for th in temp_horiz + list(time_horiz.keys()):
     for varna in allvars:
         zonals[(varna, th, 'base')] = np.mean([zonals[(varna, th, ens)] for ens in ensmems[:3]], axis = 0)
         zonals[(varna, th, 'stoc')] = np.mean([zonals[(varna, th, ens)] for ens in ensmems[3:]], axis = 0)
 
-for ky in zonals.keys():
+for ky in zonals:
     if 'toa_balance' in ky:
         ky2 = ('toa_balance*cos(lat)', ky[1], ky[2])
         zonals[ky2] = zonals[ky]*np.cos(np.deg2rad(lat))
@@ -116,7 +116,7 @@ for coso in ['base', 'stoc']+ensmems:
         print('ueue', lat[ind], laok)
         serie[('heat_flux', lb, coso)] = radclim[('zonal', coso, 'heat_flux')][:, ind]
         print(np.mean(serie[('heat_flux', lb, coso)]))
-    for lb in lat_bands.keys():
+    for lb in lat_bands:
         for varna in radvars[:-1]:
             serie[(varna, lb, coso)] = ctl.band_mean_from_zonal(radclim[('zonal', coso, varna)], lat, lat_bands[lb][0], lat_bands[lb][1])
         for varna in cloudvars:
@@ -124,7 +124,7 @@ for coso in ['base', 'stoc']+ensmems:
         serie[('tas', lb, coso)] = ctl.band_mean_from_zonal(zonalme[coso], lat, lat_bands[lb][0], lat_bands[lb][1])
 
 # faccio i plots
-#for th in time_horiz.keys():
+#for th in time_horiz:
 figure_file = cart_out+'all_zonals_timeave.pdf'
 figures = []
 
@@ -132,7 +132,7 @@ for var in allvarsbl:
     fig = plt.figure()
     plt.title('{} mean - stoc-base diff'.format(var))
     mea = np.max(abs(zonals[(var, 'pi', 'base')]))
-    for th in time_horiz.keys():
+    for th in time_horiz:
         plt.plot(lat, 100.*(zonals[(var, th, 'stoc')]-zonals[(var, th, 'base')])/mea, label = th, linewidth = 1.5)
     plt.xlabel('Latitude')
     plt.ylabel('Diff (% of var abs max)')
@@ -169,7 +169,7 @@ figures = []
 for var, varunits in zip(allvarsbl, allvarunitsbl):
     fig = plt.figure()
     plt.title('{} mean - stoc-base diff'.format(var))
-    for th in time_horiz.keys():
+    for th in time_horiz:
         plt.plot(lat, (zonals[(var, th, 'stoc')]-zonals[(var, th, 'base')]), label = th, linewidth = 1.5)
     plt.xlabel('Latitude')
     plt.ylabel(varunits)
@@ -238,7 +238,7 @@ for var, varunits in zip(allvarsbl, allvarunitsbl):
 ctl.plot_pdfpages(figure_file, figures)
 plt.close('all')
 
-for lb in lat_bands.keys():
+for lb in lat_bands:
     figure_file = cart_out+'all_serie_{}.pdf'.format(lb)
     figures = []
 

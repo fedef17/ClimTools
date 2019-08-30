@@ -100,7 +100,7 @@ all_res = dict()
 #
 #        all_res[mod].append(results)
 #
-#    pickle.dump(all_res[mod], open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}_{}.p'.format(n_choice, n_bootstrap, mod), 'w'))
+#    pickle.dump(all_res[mod], open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}_{}.p'.format(n_choice, n_bootstrap, mod), 'wb'))
 
 for mod in ['base', 'stoc', 'era']:
     all_res[mod] = pickle.load(open(cart_out + 'res_bootstrap_Sphinx_{}yr_{}_{}.p'.format(n_choice, n_bootstrap, mod)))
@@ -108,7 +108,7 @@ for mod in ['base', 'stoc', 'era']:
 ens_mean = dict()
 ens_std = dict()
 
-for mod in all_res.keys():
+for mod in all_res:
     max_days = 29
     numclus = kwar['numclus']
     for i in range(len(all_res[mod])):
@@ -117,7 +117,7 @@ for mod in all_res.keys():
             numarr, histoco = ctl.count_occurrences(all_res[mod][i]['resid_times'][j], num_range = (0, max_days))
             all_res[mod][i]['histo_resid_times'].append(histoco)
 
-    for key in all_res[mod][0].keys():
+    for key in all_res[mod][0]:
         try:
             mea = np.mean([koso[key] for koso in all_res[mod]], axis = 0)
             st = np.std([koso[key] for koso in all_res[mod]], axis = 0)
@@ -127,7 +127,7 @@ for mod in all_res.keys():
             print(key, repr(prro))
             pass
 
-for mod in all_res.keys():
+for mod in all_res:
     print(mod, all_res[mod][17].keys())
 
 all_figures = []
@@ -165,7 +165,7 @@ all_figures.append(fig)
 
 
 # plot resid times w std dev
-for mod in all_res.keys():
+for mod in all_res:
     axes = []
     fig = plt.figure()
 

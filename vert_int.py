@@ -11,7 +11,7 @@ file_out = sys.argv[2] # Name of input file (relative path)
 src = nc.Dataset(file_in, 'r')
 dst = nc.Dataset(file_out, 'w')
 
-variab_names = src.variables.keys()
+variab_names = list(src.variables.keys())
 lev_names = ['level', 'lev', 'pressure', 'plev', 'plev8']
 for levna in lev_names:
     if levna in variab_names:
@@ -24,12 +24,12 @@ field = src.variables[variab_names[-1]][:]
 intfi = np.trapz(field, x=levels, axis=1).squeeze()
 print(intfi.shape)
 
-for name, dimension in src.dimensions.iteritems():
+for name, dimension in src.dimensions.items():
     if name == oklevname:
         continue
     dst.createDimension(name, len(dimension) if not dimension.isunlimited() else None)
 
-for name, variable in src.variables.iteritems():
+for name, variable in src.variables.items():
     print(name, variable.datatype, variable.dimensions)
     if name != variab_names[-1] and name != oklevname:
         x = dst.createVariable(name, variable.datatype, variable.dimensions)

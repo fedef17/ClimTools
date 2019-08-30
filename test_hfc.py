@@ -42,7 +42,7 @@ print(vars.keys())
 fi = 'northward_water_flux.nc'
 var2, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(cart_in_ref+fi)
 print(var2.keys())
-vars[var2.keys()[0]] = L*var2[var2.keys()[0]]
+vars[list(var2.keys())[0]] = L*var2[list(var2.keys())[0]]
 
 era_zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
 
@@ -58,13 +58,13 @@ for flun in fluxnames:
         era_fluxes_maps[(flun, seas)] = np.mean(ctl.sel_season(vars[eraname[flun]], dates, seas, cut = False)[0], axis = 0)
     era_fluxes_maps[(flun, 'year')] = np.mean(vars[eraname[flun]], axis = 0)
 
-for fu in era_fluxes_maps.keys():
+for fu in era_fluxes_maps:
      era_fluxes_zonal[fu] = np.mean(era_fluxes_maps[fu], axis = 1)*era_zonal_factor
 
 ###################################################################################
 
 ann = np.arange(1950,2101,10)
-annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+annme = [(a1+a2)//2 for a1,a2 in zip(ann[:-1], ann[1:])]
 print(annme)
 
 cart_out_results = cart_out + 'out_flux_calc_NEW/'
@@ -83,13 +83,13 @@ for ens in ['lcb0', 'lcs0']:
             tag = '{}_{}'.format(ens, yea)
             results_year.append(cd.heat_flux_calc(filist, psfile, cart_out_results, tag, zg_in_ERA_units = False, full_calculation = False, seasons = seasons, netcdf_level_units = 'Pa'))
 
-        am = (a+b)/2
+        am = (a+b)//2
         for flun in fluxnames:
             for seas in seasons+['year']:
                 for taw in ['zonal', 'maps', 'cross']:
                     fluxes_model[(ens, flun, seas, taw, am)] = np.mean([coso[flun][taw][seas] for coso in results_year], axis = 0)
 
-pickle.dump(fluxes_model, open(cart_out+'out_hfc_NEW_lcb0vslcs0.p', 'w'))
+pickle.dump(fluxes_model, open(cart_out+'out_hfc_NEW_lcb0vslcs0.p', 'wb'))
 
 seasonsall = ['year']+seasons
 
@@ -145,7 +145,7 @@ ctl.plot_pdfpages(figure_file, figures)
 # #results = cd.heat_flux_calc(file_list, file_ps, cart_out, tag, zg_in_ERA_units = True, full_calculation = False)
 #
 # mrgegegeg = [-3.5e16, 4.5e16]
-# results = pickle.load(open(cart_out+'out_hfc_{}_.p'.format(tag), 'r'))
+# results = pickle.load(open(cart_out+'out_hfc_{}_.p'.format(tag), 'rb'))
 # seasons = ['year', 'JJA', 'DJF']
 # print('ejajaajajajajajaj')
 #

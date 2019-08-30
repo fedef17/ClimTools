@@ -46,7 +46,7 @@ for nam in ['significance', 'varopt', 'autocorr']:
     allsigs = [np.mean(bootstri[mod][nam]) for mod in model_names_all]
     allerrs = [np.std(bootstri[mod][nam]) for mod in model_names_all]
     allp90 = [(np.percentile(bootstri[mod][nam], 10), np.percentile(bootstri[mod][nam], 90)) for mod in model_names_all]
-    plt.scatter(range(nmods), allsigs, c = colors, s = 20)
+    plt.scatter(list(range(nmods)), allsigs, c = colors, s = 20)
     for imod, sig, err, errp9, col in zip(range(nmods), allsigs, allerrs, allp90, colors):
         #plt.errorbar(imod, sig, yerr = err, ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 10)
         plt.errorbar([imod], [sig], yerr = [[sig - errp9[0]], [errp9[1]-sig]], ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 10)
@@ -68,7 +68,7 @@ for nam in ['freq', 'dist_cen', 'resid_times_av', 'resid_times_90']:
         allsigs = [np.mean([cos[ii] for cos in bootstri[mod][nam]]) for mod in model_names_all]
         allerrs = [np.std([cos[ii] for cos in bootstri[mod][nam]]) for mod in model_names_all]
         allp90 = [(np.percentile([cos[ii] for cos in bootstri[mod][nam]], 10), np.percentile([cos[ii] for cos in bootstri[mod][nam]], 90)) for mod in model_names_all]
-        plt.scatter(range(nmods), allsigs, c = colors, s = 20)
+        plt.scatter(list(range(nmods)), allsigs, c = colors, s = 20)
         for imod, sig, err, errp9, col in zip(range(nmods), allsigs, allerrs, allp90, colors):
             #plt.errorbar(imod, sig, yerr = err, ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 10)
             plt.errorbar([imod], [sig], yerr = [[sig - errp9[0]], [errp9[1]-sig]], ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 5)
@@ -99,7 +99,7 @@ for ireg, reg in enumerate(regnam):
         allsigs = [np.mean([cos[ireg, ii] for cos in bootstri[mod][nam]]) for mod in model_names_all]
         allerrs = [np.std([cos[ireg, ii] for cos in bootstri[mod][nam]]) for mod in model_names_all]
         allp90 = [(np.percentile([cos[ireg, ii] for cos in bootstri[mod][nam]], 10), np.percentile([cos[ireg, ii] for cos in bootstri[mod][nam]], 90)) for mod in model_names_all]
-        plt.scatter(range(nmods), allsigs, c = colors, s = 20)
+        plt.scatter(list(range(nmods)), allsigs, c = colors, s = 20)
         for imod, sig, err, errp9, col in zip(range(nmods), allsigs, allerrs, allp90, colors):
             #plt.errorbar(imod, sig, yerr = err, ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 10)
             plt.errorbar([imod], [sig], yerr = [[sig - errp9[0]], [errp9[1]-sig]], ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 5)
@@ -143,7 +143,7 @@ for ireg, reg in enumerate(regnam):
         allsigs = [np.mean(np.array([cos[ireg, ii] for cos in bootstri[mod][nam]])/normpers[mod]) for mod in model_names_all]
         allerrs = [np.std(np.array([cos[ireg, ii] for cos in bootstri[mod][nam]])/normpers[mod]) for mod in model_names_all]
         allp90 = [(np.percentile(np.array([cos[ireg, ii] for cos in bootstri[mod][nam]])/normpers[mod], 10), np.percentile(np.array([cos[ireg, ii] for cos in bootstri[mod][nam]])/normpers[mod], 90)) for mod in model_names_all]
-        plt.scatter(range(nmods), allsigs, c = colors, s = 20)
+        plt.scatter(list(range(nmods)), allsigs, c = colors, s = 20)
         for imod, sig, err, errp9, col in zip(range(nmods), allsigs, allerrs, allp90, colors):
             #plt.errorbar(imod, sig, yerr = err, ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 10)
             plt.errorbar([imod], [sig], yerr = [[sig - errp9[0]], [errp9[1]-sig]], ecolor = col, linestyle = 'None', elinewidth = 2, capsize = 5)

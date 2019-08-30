@@ -123,4 +123,4 @@ for reg in range(kwar['numclus']):
 
 ctl.plot_pdfpages(cart_out + 'temprec_composites_wERA.pdf', allfigs)
 
-pickle.dump(compos, open(cart_out + 'out_composites_ERA_precERA.p', 'w'))
+pickle.dump(compos, open(cart_out + 'out_composites_ERA_precERA.p', 'wb'))

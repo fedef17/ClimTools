@@ -39,7 +39,7 @@ regnam = ['NAO +', 'Sc. BL', 'AR', 'NAO -']
 
 ################################################################################
 
-results, results_ref = pickle.load(open(filogen, 'r'))
+results, results_ref = pickle.load(open(filogen, 'rb'))
 results['ERA'] = results_ref
 
 ref_cen = results['ERA']['centroids']
@@ -71,7 +71,7 @@ for mod in model_names_all:
     for i in range(n_bootstrap):
         #if i % 10 == 0:
         print(i)
-        ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
+        ok_yea = np.sort(np.random.choice(list(range(n_seas)), n_choice))
         pcs = np.concatenate(pcs_seas_set[ok_yea])
         labels = np.concatenate(labels_seas_set[ok_yea])
         dates = np.concatenate(dates_seas_set[ok_yea])

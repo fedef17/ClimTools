@@ -66,7 +66,7 @@ results_ref = cd.WRtool_core(var_season, lat, lon, dates_season, area, heavy_out
 kwar['ref_solver'] = results_ref['solver']
 kwar['ref_patterns_area'] = results_ref['cluspattern_area']
 kwar['use_reference_eofs'] = True
-pickle.dump(results_ref, open(cart_out + 'res_bootstrap_v2_ref.p', 'w'))
+pickle.dump(results_ref, open(cart_out + 'res_bootstrap_v2_ref.p', 'wb'))
 
 #results_ref = pickle.load(open(cart_out + 'res_bootstrap_v2_ref.p'))
 
@@ -85,7 +85,7 @@ for n_choice in [5, 10, 15, 20, 25, 30, 40, 50, 60]:
     for iblo in range(numblo):
         all_res = []
         for i in range(n_bootstrap/numblo):
-            ok_yea = np.sort(np.random.choice(range(n_seas), n_choice))
+            ok_yea = np.sort(np.random.choice(list(range(n_seas)), n_choice))
             print(i, years_set[ok_yea])
             var_ok = np.concatenate(var_seas_set[ok_yea])
             dat_ok = np.concatenate(dates_seas_set[ok_yea])
@@ -127,7 +127,7 @@ for n_choice in [5, 10, 15, 20, 25, 30, 40, 50, 60]:
     #
     # ens_mean = dict()
     # ens_std = dict()
-    # for key in all_res[0].keys():
+    # for key in all_res[0]:
     #     try:
     #         mea = np.mean([koso[key] for koso in all_res], axis = 0)
     #         st = np.std([koso[key] for koso in all_res], axis = 0)

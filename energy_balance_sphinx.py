@@ -32,7 +32,7 @@ varnames = ['rlds', 'rlut', 'rlus', 'rsdt', 'rsut', 'rsds', 'rsus']
 namefi = '{}_mon_{}_{}.nc'
 
 ann = np.arange(1850,2101,10)
-annme = [(a1+a2)/2 for a1,a2 in zip(ann[:-1], ann[1:])]
+annme = [(a1+a2)//2 for a1,a2 in zip(ann[:-1], ann[1:])]
 print(annme)
 
 radclim = dict()
@@ -57,7 +57,7 @@ ensmems = ['lcb0', 'lcb1', 'lcb2', 'lcs0', 'lcs1', 'lcs2']
 #         vardict['toa_balance'] = vardict['rsdt']-vardict['rsut']-vardict['rlut']
 #         vardict['surf_balance'] = vardict['rsds']+vardict['rlds']-vardict['rsus']-vardict['rlus']
 #
-#         for key in vardict.keys():
+#         for key in vardict:
 #             print(vardict[key].shape)
 #             radclim[(exp, 'map', key, am)] = np.mean(vardict[key], axis = 0)
 #             radclim[(exp, 'map_std', key, am)] = np.std(vardict[key], axis = 0)
@@ -66,7 +66,7 @@ ensmems = ['lcb0', 'lcb1', 'lcb2', 'lcs0', 'lcs1', 'lcs2']
 #             radclim[(exp, 'global', key, am)] = ctl.global_mean(radclim[(exp, 'map', key, am)], lat)
 #             radclim[(exp, 'global_std', key, am)] = ctl.global_mean(radclim[(exp, 'map_std', key, am)], lat)
 
-# pickle.dump(radclim, open(cart_out+'radclim_allens.p', 'w'))
+# pickle.dump(radclim, open(cart_out+'radclim_allens.p', 'wb'))
 
 radclim = pickle.load(open(cart_out+'radclim_allens.p'))
 varniuu, lat, lon, dates, time_units, var_units = ctl.read3Dncfield(cart_in+namefi.format('lcb0',1988,'rsut'))
@@ -95,7 +95,7 @@ titlevar['surf_balance'] = 'rad balance at surface'
 
 #figure_file = cart_out+'rad_forcing_TOA_lcb0_vs_lcs0.pdf'
 figure_file = cart_out+'rad_forcing_TOA_base_vs_stoc.pdf'
-for varna in titlevar.keys():
+for varna in titlevar:
     figures = []
     figure_file = cart_out+'rad_{}_base_vs_stoc.pdf'.format(varna)
 

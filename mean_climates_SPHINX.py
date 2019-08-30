@@ -20,8 +20,8 @@ from scipy import interpolate as itrp
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -155,13 +155,13 @@ globalme = dict()
 #         cross3d[('base', varna, seas)] = np.mean([cross3d[(ens, varna, seas)] for ens in ensmem[:3]], axis = 0)
 #         cross3d[('stoc', varna, seas)] = np.mean([cross3d[(ens, varna, seas)] for ens in ensmem[3:]], axis = 0)
 #
-# for key in globalme.keys():
+# for key in globalme:
 #     if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
 #         globalme[key] = globalme[key]-KtoC
 #     if 'pr' in key:
 #         globalme[key] = globalme[key]*tommday
 #
-# for key in climat.keys():
+# for key in climat:
 #     if 'tas' in key or 'tasmax' in key or 'tasmin' in key:
 #         climat[key] = climat[key]-KtoC
 #         zonal[key] = zonal[key]-KtoC
@@ -169,12 +169,12 @@ globalme = dict()
 #         climat[key] = climat[key]*tommday
 #         zonal[key] = zonal[key]*tommday
 #
-# for key in cross3d.keys():
+# for key in cross3d:
 #     if 'ta' in key:
 #         cross3d[key] = cross3d[key]-KtoC
 #
-# pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX_v2.p','w'))
-globalme, zonal, climat, cross3d = pickle.load(open(cart_out+'out_meanclim_SPHINX_v2.p','r'))
+# pickle.dump([globalme, zonal, climat, cross3d], open(cart_out+'out_meanclim_SPHINX_v2.p','wb'))
+globalme, zonal, climat, cross3d = pickle.load(open(cart_out+'out_meanclim_SPHINX_v2.p','rb'))
 
 figures = []
 #varlabels = ['tas (K)', 'pr ()']

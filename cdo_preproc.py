@@ -29,7 +29,7 @@ cart_ins['EC-Earth-3-LR'] = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/gws/nopw/j
 
 cart_out_general = '/data-hobbes/fabiano/PRIMAVERA/hist_1950/'
 
-for model_name in cart_ins.keys():
+for model_name in cart_ins:
     cart_in = cart_ins[model_name]
     cart_out = cart_out_general + model_name + '/'
     if skip_existing:

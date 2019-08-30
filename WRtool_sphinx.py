@@ -19,8 +19,8 @@ from scipy import stats
 import itertools as itt
 
 from sklearn.cluster import KMeans
-import ctool
-import ctp
+
+
 
 from datetime import datetime
 import pickle
@@ -99,4 +99,4 @@ resu = cd.WRtool_core_ensemble(6, var_season_all, lat, lon, dates_season_all, ar
 results[area] = resu
 
 
-pickle.dump(results, open(cart_out+'results_SPHINX_definitivo.p','w'))
+pickle.dump(results, open(cart_out+'results_SPHINX_definitivo.p','wb'))

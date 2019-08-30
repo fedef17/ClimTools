@@ -42,7 +42,7 @@ wi = 0.6
 #regnam = ['NAO +', 'Sc. BL', 'NAO -', 'AR']
 regnam = ['NAO +', 'Sc. BL', 'AR', 'NAO -']
 
-results, results_ref = pickle.load(open(filogen, 'r'))
+results, results_ref = pickle.load(open(filogen, 'rb'))
 results['ERA'] = results_ref
 
 for mod in results:

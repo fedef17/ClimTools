@@ -80,7 +80,7 @@ for var2 in ['NetTOA', 'rlut', 'rsut']:
         x = []
         y = []
         time = []
-        for gg in range(len(time_mon)/12):
+        for gg in range(len(time_mon)//12):
             time.append(np.mean(time_mon[12*gg:12*gg+12]))
             x.append(np.mean(x_mon[12*gg:12*gg+12]))
             y.append(np.mean(y_mon[12*gg:12*gg+12]))
@@ -97,16 +97,16 @@ for var2 in ['NetTOA', 'rlut', 'rsut']:
         xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
         #ylin = np.linspace(min(y)-0.05*(max(y)-min(y)),max(y)+0.05*(max(y)-min(y)),11)
 
-        coso10x = np.array([np.mean(x[10*j:10*(j+1)]) for j in range(len(x)/10)])
-        coso10y = np.array([np.mean(y[10*j:10*(j+1)]) for j in range(len(y)/10)])
+        coso10x = np.array([np.mean(x[10*j:10*(j+1)]) for j in range(len(x)//10)])
+        coso10y = np.array([np.mean(y[10*j:10*(j+1)]) for j in range(len(y)//10)])
 
         line3 = ctl.linear_regre_witherr(coso10x, coso10y)
         line3first = ctl.linear_regre_witherr(coso10x[:5], coso10y[:5])
         line3_y = ctl.linear_regre_witherr(coso10y, coso10x)
         line3first_y = ctl.linear_regre_witherr(coso10y[:5], coso10x[:5])
 
-        coso25x = np.array([np.mean(x[25*j:25*(j+1)]) for j in range(len(x)/25)])
-        coso25y = np.array([np.mean(y[25*j:25*(j+1)]) for j in range(len(y)/25)])
+        coso25x = np.array([np.mean(x[25*j:25*(j+1)]) for j in range(len(x)//25)])
+        coso25y = np.array([np.mean(y[25*j:25*(j+1)]) for j in range(len(y)//25)])
         line4 = ctl.linear_regre_witherr(coso25x, coso25y)
         line4_y = ctl.linear_regre_witherr(coso25y, coso25x)
 
