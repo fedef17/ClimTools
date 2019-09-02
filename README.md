@@ -3,15 +3,15 @@
 ClimTools is a library of tools for the analysis and visualization of climate datasets.
 
 It is constituted by two modules:
-1) **climtools_lib.py** -> a miscellaneous library of basic functions that perform the following operations:
+1) **climtools_lib.py**: a miscellaneous library of basic functions that perform the following operations:
      - reading and saving of netcdf files (.nc), either using the python netCDF4 package or the python iris package;
      - basic computations: daily/monthly anomalies, trends, seasonal statistics, ...;
      - EOF calculation using the python eofs module;
-     - a set of functions used for the calculation of Weather Regimes (see WRtool -> https://github.com/fedef17/WRtool): clustering (using Kmeans), operations on clusters, projections/rotations in the EOF space, ...;
+     - a set of functions used for the calculation of Weather Regimes (see WRtool, https://github.com/fedef17/WRtool): clustering (using Kmeans), operations on clusters, projections/rotations in the EOF space, ...;
      - visualization: single/multiplot contour maps, Taylor plot, animations..
 
-2) **climdiags.py** -> a higher level library that contains some more complex tools. Currently the following tools are included:
-     - WRtool : a tool for the computation of Weather Regimes and related statistics, see WRtool -> https://github.com/fedef17/WRtool;
+2) **climdiags.py**: a higher level library that contains some more complex tools. Currently the following tools are included:
+     - WRtool : a tool for the computation of Weather Regimes and related statistics (see WRtool, https://github.com/fedef17/WRtool);
      - heat_flux_calc : a tool for the computation of meridional heat fluxes starting from 3D high frequency wind, humidity and temperature fields.
 
 ## How to install and use ClimTools
