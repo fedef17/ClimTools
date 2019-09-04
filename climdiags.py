@@ -856,29 +856,30 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     std_name = 'geopotential_height_anomaly'
     units = 'm'
 
-    print('obs: ', obs.keys())
+    # print('obs: ', obs.keys())
     print('models: ', list(models.values())[0].keys())
     for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
         obsnam = nam
         modelnam = nam
-        if nam == 'model_eofs':
-            if 'model_eofs' not in list(models.values())[0].keys():
-                modelnam = 'eofs' # backward Compatibility
-            if 'model_eofs' not in obs.keys():
-                obsnam = 'eofs' # backward Compatibility
+        # if nam == 'model_eofs':
+        #     if 'model_eofs' not in list(models.values())[0].keys():
+        #         modelnam = 'eofs' # backward Compatibility
+        #     if 'model_eofs' not in obs.keys():
+        #         obsnam = 'eofs' # backward Compatibility
 
-        outfil = cart_out + '{}_ref.nc'.format(nam)
-        var = obs[obsnam]
-        lat = obs['lat_area']
-        lon = obs['lon_area']
-        if nam == 'cluspattern':
-            lat = obs['lat']
-            lon = obs['lon']
-        index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
-        colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
-        colist = [index] + colist
-        cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
-        iris.save(cubo, outfil)
+        if obs is not None:
+            outfil = cart_out + '{}_ref.nc'.format(nam)
+            var = obs[obsnam]
+            lat = obs['lat_area']
+            lon = obs['lon_area']
+            if nam == 'cluspattern':
+                lat = obs['lat']
+                lon = obs['lon']
+            index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
+            colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
+            colist = [index] + colist
+            cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
+            iris.save(cubo, outfil)
 
         if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
 
@@ -900,26 +901,27 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
             iris.save(cubo, outfil)
 
     # Salvo time series: labels, pcs, dist_centroid?
-    outfil = cart_out + 'regime_index_ref.nc'
     long_name = 'cluster index (ranges from 0 to {})'.format(inputs['numclus']-1)
     std_name = None
     units = '1'
+    if obs is not None:
+        outfil = cart_out + 'regime_index_ref.nc'
 
-    var = obs['labels']
-    dates_all = obs['dates_allyear']
-    dates_season = obs['dates']
+        var = obs['labels']
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
 
-    if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
-        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
-    else:
-        var_all = var
-        da = dates_season
+        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+            var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        else:
+            var_all = var
+            da = dates_season
 
-    time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
-    time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
+        time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
+        time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
 
-    cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-    iris.save(cubo, outfil)
+        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+        iris.save(cubo, outfil)
 
     for mod in models:
         outfil = cart_out + 'regime_index_{}.nc'.format(mod)
@@ -975,25 +977,26 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 #raise errrr
 
     # monthly clus frequency
-    outfil = cart_out + 'clus_freq_monthly_ref.nc'
     std_name = None
     units = '1'
+    if obs is not None:
+        outfil = cart_out + 'clus_freq_monthly_ref.nc'
 
-    var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
 
-    cubolis = []
-    for i, fre in enumerate(var):
-        long_name = 'clus {} frequency'.format(i)
-        var_all, datesall = ctl.complete_time_range(fre, datesmon)
+        cubolis = []
+        for i, fre in enumerate(var):
+            long_name = 'clus {} frequency'.format(i)
+            var_all, datesall = ctl.complete_time_range(fre, datesmon)
 
-        time = nc.date2num(datesall, units = obs['time_units'], calendar = obs['time_cal'])
-        time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
+            time = nc.date2num(datesall, units = obs['time_units'], calendar = obs['time_cal'])
+            time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
 
-        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-        cubolis.append(cubo)
+            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+            cubolis.append(cubo)
 
-    cubolis = iris.cube.CubeList(cubolis)
-    iris.save(cubolis, outfil)
+        cubolis = iris.cube.CubeList(cubolis)
+        iris.save(cubolis, outfil)
 
     for mod in models:
         outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
@@ -1047,31 +1050,32 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
             iris.save(cubolis, outfil)
 
     # pcs
-    outfil = cart_out + 'pcs_timeseries_ref.nc'
     std_name = None
     units = 'm'
+    if obs is not None:
+        outfil = cart_out + 'pcs_timeseries_ref.nc'
 
-    var = obs['pcs'].T
-    dates_all = obs['dates_allyear']
-    dates_season = obs['dates']
+        var = obs['pcs'].T
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
 
-    cubolis = []
-    for i, fre in enumerate(var):
-        long_name = 'pcs {}'.format(i)
-        if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
-            var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
-        else:
-            var_all = fre
-            da = dates_season
+        cubolis = []
+        for i, fre in enumerate(var):
+            long_name = 'pcs {}'.format(i)
+            if not inputs['is_ensemble'] or (inputs['is_ensemble'] and inputs['ens_option'] == 'member'):
+                var_all, da = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            else:
+                var_all = fre
+                da = dates_season
 
-        time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
-        time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
+            time = nc.date2num(da, units = obs['time_units'], calendar = obs['time_cal'])
+            time_index = ctl.create_iris_coord(time, 'time', units = obs['time_units'], calendar = obs['time_cal'])
 
-        cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
-        cubolis.append(cubo)
+            cubo = ctl.create_iris_cube(var_all, std_name, units, [time_index], long_name = long_name)
+            cubolis.append(cubo)
 
-    cubolis = iris.cube.CubeList(cubolis)
-    iris.save(cubolis, outfil)
+        cubolis = iris.cube.CubeList(cubolis)
+        iris.save(cubolis, outfil)
 
     for mod in models:
         outfil = cart_out + 'pcs_timeseries_{}.nc'.format(mod)
@@ -1145,61 +1149,63 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
     ctl.newline(filos)
     ctl.printsep(filos)
 
-    nsqr = np.sqrt(obs['cluspattern_area'].size)
+    nsqr = np.sqrt(models[inputs['model_names'][0]]['cluspattern_area'].size)
 
-    # OUT for the observations
-    filos.write('----> observed: {}\n'.format(inputs['obs_name']))
+    if obs is not None:
+        # OUT for the observations
+        filos.write('----> observed: {}\n'.format(inputs['obs_name']))
 
-    if 'significance' in obs.keys():
+        if 'significance' in obs.keys():
+            ctl.newline(filos)
+            filos.write('---- Sharpness of regime structure ----\n')
+            filos.write('{:8.3f}'.format(obs['significance']))
+
         ctl.newline(filos)
-        filos.write('---- Sharpness of regime structure ----\n')
-        filos.write('{:8.3f}'.format(obs['significance']))
+        filos.write('---- Optimal ratio of regime structure ----\n')
+        varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
+        filos.write('{:10.4f}'.format(varopt))
 
-    ctl.newline(filos)
-    filos.write('---- Optimal ratio of regime structure ----\n')
-    varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
-    filos.write('{:10.4f}'.format(varopt))
+        ctl.newline(filos)
+        filos.write('---- Regimes frequencies ----\n')
+        stringa = inputs['numclus']*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*obs['freq_clus']))
 
-    ctl.newline(filos)
-    filos.write('---- Regimes frequencies ----\n')
-    stringa = inputs['numclus']*'{:8.2f}'+'\n'
-    filos.write(stringa.format(*obs['freq_clus']))
+        if inputs['show_transitions']:
+            ctl.newline(filos)
+            filos.write('---- Transition matrix ----\n')
+            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+            for i, cen in enumerate(obs['trans_matrix']):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
 
-    ctl.newline(filos)
-    filos.write('---- Transition matrix ----\n')
-    stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
-    filos.write(stringa.format(*(['']+inputs['patnames_short'])))
-    for i, cen in enumerate(obs['trans_matrix']):
-        stringa = len(cen)*'{:11.2e}' + '\n'
-        filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+        ctl.newline(filos)
+        filos.write('---- Centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(obs['centroids']):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
 
-    ctl.newline(filos)
-    filos.write('---- Centroids coordinates (in pc space) ----\n')
-    for i, cen in enumerate(obs['centroids']):
-        stringa = len(cen)*'{:10.2f}' + '\n'
-        filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+        ctl.newline(filos)
+        if 'model_eofs_varfrac' in obs.keys():
+            oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.sqrt(obs['eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:10.3e}'+'\n'
+        filos.write(stringa.format(*oks))
 
-    ctl.newline(filos)
-    if 'model_eofs_varfrac' in obs.keys():
-        oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
-        filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
-    else:
-        oks = np.sqrt(obs['eofs_eigenvalues'][:10])
-        filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
-    stringa = len(oks)*'{:10.3e}'+'\n'
-    filos.write(stringa.format(*oks))
-
-    ctl.newline(filos)
-    if 'model_eofs_varfrac' in obs.keys():
-        oks = np.cumsum(obs['model_eofs_varfrac'][:10])
-        filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
-    else:
-        oks = np.cumsum(obs['eofs_varfrac'][:10])
-        filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
-    stringa = len(oks)*'{:8.2f}'+'\n'
-    filos.write(stringa.format(*oks))
-    ctl.newline(filos)
-    ctl.printsep(filos)
+        ctl.newline(filos)
+        if 'model_eofs_varfrac' in obs.keys():
+            oks = np.cumsum(obs['model_eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.cumsum(obs['eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*oks))
+        ctl.newline(filos)
+        ctl.printsep(filos)
 
     # NOw for each model
 
@@ -1230,13 +1236,14 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
         stringa = inputs['numclus']*'{:8.2f}'+'\n'
         filos.write(stringa.format(*models[mod]['freq_clus']))
 
-        ctl.newline(filos)
-        filos.write('---- Transition matrix ----\n')
-        stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
-        filos.write(stringa.format(*(['']+inputs['patnames_short'])))
-        for i, cen in enumerate(models[mod]['trans_matrix']):
-            stringa = len(cen)*'{:11.2e}' + '\n'
-            filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+        if inputs['show_transitions']:
+            ctl.newline(filos)
+            filos.write('---- Transition matrix ----\n')
+            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+            for i, cen in enumerate(models[mod]['trans_matrix']):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
 
         ctl.newline(filos)
         filos.write('---- Centroids coordinates (in pc space) ----\n')
@@ -1312,21 +1319,22 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
             filos.write(stringa.format(*std))
 
-            ctl.newline(filos)
-            filos.write('---- Transition matrix ----\n')
-            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
-            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+            if inputs['show_transitions']:
+                ctl.newline(filos)
+                filos.write('---- Transition matrix ----\n')
+                stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+                filos.write(stringa.format(*(['']+inputs['patnames_short'])))
 
-            coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
-            std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
-            for i, cen in enumerate(coso):
-                stringa = len(cen)*'{:11.2e}' + '\n'
-                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+                coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+                std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+                for i, cen in enumerate(coso):
+                    stringa = len(cen)*'{:11.2e}' + '\n'
+                    filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
 
-            filos.write('---- Std dev of transition matrix ----\n')
-            for i, cen in enumerate(std):
-                stringa = len(cen)*'{:11.2e}' + '\n'
-                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+                filos.write('---- Std dev of transition matrix ----\n')
+                for i, cen in enumerate(std):
+                    stringa = len(cen)*'{:11.2e}' + '\n'
+                    filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
 
             ctl.newline(filos)
             coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
@@ -1357,7 +1365,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls'):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', show_transitions = False):
     """
     Plot the results of WRtool.
 
@@ -1445,7 +1453,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 i+=0.7
             i+=0.5
 
-        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        if 'significance' in result_obs.keys():
+            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
@@ -1473,7 +1482,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
             i+=1.2
 
-        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+        if 'significance' in result_obs.keys():
+            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
         if len(groups.keys()) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
@@ -1502,7 +1512,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
                 i+=0.7
             i+=0.5
-        ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+
+        if 'significance' in result_obs.keys():
+            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
@@ -1897,7 +1909,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             ctl.adjust_ax_scale(axes)
 
     # PLOTTIN the transition matrices
-    if 'trans_matrix' in list(result_models.values())[0].keys():
+    if 'trans_matrix' in list(result_models.values())[0].keys() and show_transitions:
         cmapparu = cm.get_cmap('RdBu_r')
         mappe = []
 
@@ -2176,6 +2188,140 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             fig.savefig(cart_out + 'ellipse_plot_{}.pdf'.format(tag))
             all_figures.append(fig)
 
+
+    filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)
+    ctl.plot_pdfpages(filename, all_figures)
+
+    return
+
+
+def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False):
+    """
+    Plot the results of WRtool.
+
+    < results > : dict, output of WRtool, either for single or multiple member analysis
+    < model_name > : str.
+    < central_lat_lon > : tuple. Latitude and longitude of the central point in the maps. Usually (70,0) for EAT, (70,-90) per PNA.
+    """
+    cart_out = cart_out + tag + '/'
+    if not os.path.exists(cart_out): os.mkdir(cart_out)
+
+    n_clus = len(results['cluspattern'])
+
+    if model_name is None:
+        model_name = 'model'
+
+    all_figures = []
+    color = 'blue'
+
+    patt_ref = results['cluspattern']
+    lat = results['lat']
+    lon = results['lon']
+
+    if patnames is None:
+        patnames = ['clus_{}'.format(i) for i in range(len(patt_ref))]
+    if patnames_short is None:
+        patnames_short = ['c{}'.format(i) for i in range(len(patt_ref))]
+
+    # PLOTTIN the frequency histogram
+    if 'freq_clus' in results.keys():
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        ax.grid(axis = 'y', zorder = 0)
+        wi = 0.8
+        for j in range(n_clus):
+            ax.bar(j, results['freq_clus'][j], width = wi,  color = color, zorder = 5)
+
+        ax.legend(fontsize = 'small', loc = 1)
+        ax.set_title('Regimes frequencies')
+        ax.set_xticks([j for j in range(n_clus)], minor = False)
+        ax.set_xticklabels(patnames_short, size='small')
+        ax.set_ylabel('Frequency')
+        fig.savefig(cart_out+'Regime_frequency_{}.pdf'.format(tag))
+        all_figures.append(fig)
+
+    i1 = int(np.ceil(np.sqrt(n_clus)))
+    i2 = n_clus//i1
+    if i2*i1 < n_clus:
+        i2 = i2 + 1
+
+    # PLOTTIN the persistence histograms
+    if 'resid_times' in results.keys():
+        axes = []
+        fig = plt.figure()
+        # binzzz = np.arange(0,36,5)
+        for j in range(n_clus):
+            ax = fig.add_subplot(i1,i2,j+1)
+            ax.set_title(patnames[j])
+
+            max_days = 29
+            numarr, frek_obs = ctl.count_occurrences(results['resid_times'][j], num_range = (0, max_days))
+            ax.bar(numarr, frek_obs, alpha = 0.5, label = model_name, color = 'indianred')
+            coso_obs = ctl.running_mean(frek_obs[:-1], 3)
+            ax.plot(numarr[:-1], coso_obs, color = 'indianred')
+            ax.legend()
+            ax.set_xlim(0, max_days+2)
+            tics = np.arange(0,max_days+2,5)
+            labs = ['{}'.format(ti) for ti in tics[:-1]]
+            labs.append('>{}'.format(max_days))
+            ax.set_xticks(tics, minor = False)
+            ax.set_xticklabels(labs, size='small')
+            ax.set_xlabel('Days')
+            ax.set_ylabel('Frequency')
+            axes.append(ax)
+
+        plt.suptitle('Residence times - {}'.format(model_name))
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.88)
+
+        ctl.adjust_ax_scale(axes)
+        all_figures.append(fig)
+
+
+    if 'trans_matrix' in results.keys() and show_transitions:
+        cmapparu = cm.get_cmap('RdBu_r')
+        mappe = []
+
+        fig = plt.figure(figsize=(16,6))
+        ax = fig.add_subplot(121)
+        gigi = ax.imshow(results[lab]['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
+        ax.xaxis.tick_top()
+        #ax.invert_yaxis()
+        # ax.set_xticks(np.arange(n_clus)+0.5, minor=False)
+        # ax.set_yticks(np.arange(n_clus)+0.5, minor=False)
+        ax.set_xticks(np.arange(n_clus), minor = False)
+        ax.set_xticklabels(patnames_short, size='small')
+        ax.set_yticks(np.arange(n_clus), minor = False)
+        ax.set_yticklabels(patnames_short, size='small')
+        cb = plt.colorbar(gigi)
+        cb.set_label('Transition probability')
+
+        ax = fig.add_subplot(122)
+        numat = results['trans_matrix'][:]
+        for i in range(numat.shape[0]):
+            numat[i,i] = np.nan
+        gigi = ax.imshow(numat, vmin = 0.01, vmax = 0.1, cmap = cmapparu)
+        ax.xaxis.tick_top()
+        ax.set_xticks(np.arange(n_clus), minor = False)
+        ax.set_xticklabels(patnames_short, size='small')
+        ax.set_yticks(np.arange(n_clus), minor = False)
+        ax.set_yticklabels(patnames_short, size='small')
+        cb = plt.colorbar(gigi)
+        cb.set_label('Transitions only'.format(lab, obs_name))
+        mappe.append(gigi)
+
+        fig.suptitle(model_name)
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.88)
+        all_figures.append(fig)
+
+    patt = results['cluspattern']
+    lat = results['lat']
+    lon = results['lon']
+    filename = cart_out+'Allclus_{}.pdf'.format(model_name)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area)
+    all_figures += figs
+    figs[0].savefig(filename)
 
     filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)
     ctl.plot_pdfpages(filename, all_figures)

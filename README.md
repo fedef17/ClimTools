@@ -1,8 +1,8 @@
 # ClimTools
 
-ClimTools is a library of tools for the analysis and visualization of climate datasets.
+ClimTools is a library of tools for the analysis and visualization of climate datasets. It is written in Python3 and contains a couple of Fortran routines.
 
-It is constituted by two modules:
+It is made of two modules:
 1) **climtools_lib.py**: a miscellaneous library of basic functions that perform the following operations:
      - reading and saving of netcdf files (.nc), either using the python netCDF4 package or the python iris package;
      - basic computations: daily/monthly anomalies, trends, seasonal statistics, ...;

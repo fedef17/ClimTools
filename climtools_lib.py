@@ -3640,9 +3640,9 @@ def def_projection(visualization, central_lat_lon):
     elif visualization == 'Spolar' or visualization == 'spolar':
         proj = ccrs.Orthographic(central_longitude = clon, central_latitude = -90)
     elif visualization == 'Nstereo' or visualization == 'stereo' or visualization == 'nstereo':
-        proj = ccrs.NorthPolarStereo()#central_longitude=clon)
+        proj = ccrs.NorthPolarStereo()#central_longitude = clon) BUG IN CARTOPY
     elif visualization == 'Sstereo' or visualization == 'sstereo':
-        proj = ccrs.SouthPolarStereo()#central_longitude=clon)
+        proj = ccrs.SouthPolarStereo()#central_longitude = clon) BUG IN CARTOPY
     elif visualization == 'Robinson' or visualization == 'robinson':
         proj = ccrs.Robinson(central_longitude = clon)
     else:
