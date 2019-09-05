@@ -43,6 +43,10 @@ from cf_units import Unit
 mpl.rcParams['hatch.linewidth'] = 0.1
 #mpl.rcParams['hatch.color'] = 'black'
 
+###############  Parameters  #######################
+
+Rearth = 6371.0e3
+
 #######################################################
 #
 ###     INPUTs reading
@@ -3624,7 +3628,7 @@ def adjust_color_scale(color_maps):
 
     return
 
-def def_projection(visualization, central_lat_lon):
+def def_projection(visualization, central_lat_lon, bounding_lat = None):
     """
     Defines projection for the map plot.
     """
@@ -3640,11 +3644,14 @@ def def_projection(visualization, central_lat_lon):
     elif visualization == 'Spolar' or visualization == 'spolar':
         proj = ccrs.Orthographic(central_longitude = clon, central_latitude = -90)
     elif visualization == 'Nstereo' or visualization == 'stereo' or visualization == 'nstereo':
-        proj = ccrs.NorthPolarStereo()#central_longitude = clon) BUG IN CARTOPY
+        proj = ccrs.NorthPolarStereo(central_longitude = clon)
     elif visualization == 'Sstereo' or visualization == 'sstereo':
-        proj = ccrs.SouthPolarStereo()#central_longitude = clon) BUG IN CARTOPY
+        proj = ccrs.SouthPolarStereo(central_longitude = clon)
     elif visualization == 'Robinson' or visualization == 'robinson':
         proj = ccrs.Robinson(central_longitude = clon)
+    elif visualization == 'nearside':
+        sat_height = Rearth + max(0, Rearth/np.cos(np.deg2rad(abs(clat - bounding_lat))))
+        proj = ccrs.NearsidePerspective(central_longitude = clon, central_latitude = clat, satellite_height = sat_height)
     else:
         raise ValueError('visualization {} not recognised. Only standard, Npolar (or polar), Spolar, Nstereo (or stereo), Sstereo accepted'.format(visualization))
 
@@ -3667,9 +3674,9 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     if bounding_lat is not None:
         if (isinstance(proj, ccrs.Orthographic) or isinstance(proj, ccrs.Stereographic)):
             if bounding_lat > 0:
-                ax.set_extent((-180, 180, bounding_lat, 90), crs = ccrs.PlateCarree())
+                ax.set_extent((-179.9, 179.9, bounding_lat, 90), crs = ccrs.PlateCarree())
             else:
-                ax.set_extent((-180, 180, -90, bounding_lat), crs = ccrs.PlateCarree())
+                ax.set_extent((-179.9, 179.9, -90, bounding_lat), crs = ccrs.PlateCarree())
 
     # theta = np.linspace(0, 2*np.pi, 100)
     # center, radius = [0.5, 0.5], 0.2
@@ -3704,7 +3711,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     #if filename is None:
         #plt.ion()
 
-    proj = def_projection(visualization, central_lat_lon)
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
     # Plotting figure
     fig4 = plt.figure(figsize = figsize)
@@ -3782,7 +3789,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    proj = def_projection(visualization, central_lat_lon)
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3877,7 +3884,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     #if filename is None:
     #    plt.ion()
 
-    proj = def_projection(visualization, central_lat_lon)
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -3988,7 +3995,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
 
     """
 
-    proj = def_projection(visualization, central_lat_lon)
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -4222,7 +4229,7 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     if labels is None:
         labels = np.arange(len(maps))
 
-    proj = def_projection(visualization, central_lat_lon)
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
