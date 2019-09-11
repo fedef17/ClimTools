@@ -255,6 +255,8 @@ def check_increasing_latlon(var, lat, lon):
     """
     Checks that the latitude and longitude are in increasing order. Returns ordered arrays.
 
+    Added: puts longitudes in (-180, 180) format.
+
     Assumes that lat and lon are the second-last and last dimensions of the array var.
     """
     lat = np.array(lat)
@@ -266,20 +268,25 @@ def check_increasing_latlon(var, lat, lon):
     if lat[1] < lat[0]:
         revlat = True
         print('Latitude is in reverse order! Ordering..\n')
-    if lon[1] < lon[0]:
+
+    lon = convert_lon_std(lon)
+    if np.any(np.diff(lon) < 0):
         revlon = True
-        print('Longitude is in reverse order! Ordering..\n')
+        nuord = np.argsort(lon)
+        print('Longitude is not ordered! Ordering..\n')
 
     if revlat and not revlon:
         var = var[..., ::-1, :]
         lat = lat[::-1]
     elif revlon and not revlat:
-        var = var[..., :, ::-1]
-        lon = lon[::-1]
+        var = var[..., :, nuord]
+        lon = lon[nuord]
     elif revlat and revlon:
-        var = var[..., ::-1, ::-1]
+        var = var[..., ::-1, nuord]
         lat = lat[::-1]
-        lon = lon[::-1]
+        lon = lon[nuord]
+    else:
+        print('lat/lon already OK\n')
 
     return var, lat, lon
 
@@ -380,11 +387,12 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     print(datetime.now())
     if 'level' in datacoords.keys() and extract_level_hPa is not None:
         okind = datacoords['level'] == extract_level_hPa
-        if np.any(okind):
+        if len(datacoords['level']) == 1:
+            data = data.squeeze()
+            print('File contains only level {}'.format(datacoords['level'][0]))
+        elif np.any(okind):
             datacoords['level'] = datacoords['level'][okind]
             data = data.take(first(okind), axis = ax_coord['level'])
-        elif len(datacoords['level']) == 1:
-            data = data.squeeze()
         else:
             raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
 
@@ -1190,7 +1198,8 @@ def sel_area_translate(area):
 
     return [lonW, lonE, latS, latN]
 
-def sel_area(lat, lon, var, area):
+
+def sel_area_old(lat, lon, var, area):
     '''
     GOAL
         Selecting the area of interest from a nc dataset.
@@ -1294,6 +1303,70 @@ def sel_area(lat, lon, var, area):
         raise ValueError('Variable has {} dimensions, should have 2 or 3.'.format(var.ndim))
 
     return var_area, lat[latidx], lon_new[lonidx]
+
+
+def convert_lon_std(lon, lon_type = '0-360'):
+    """
+    Converts longitudes to -180, 180 format.
+    """
+    if lon_type == 'W-E':
+        lon360 = lon % 360
+        if type(lon) in [float, int]:
+            if lon360 <= 180.:
+                lon = lon360
+            else:
+                lon = -180. + lon360 % 180.
+        else:
+            lon[lon360 < 180.] = lon360[lon360 < 180.]
+            lon[lon360 >= 180.] = -180. + lon360[lon360 >= 180.] % 180.
+    elif lon_type == '0-360':
+        lon = lon % 360
+
+    return lon
+
+
+def sel_area(lat, lon, var, area, lon_type = '0-360'):
+    '''
+    GOAL
+        Selecting the area of interest from a nc dataset.
+    USAGE
+        var_area, lat_area, lon_area = sel_area(lat,lon,var,area)
+
+    :param area: str or list. If str: 'EAT', 'PNA', 'NH', 'Eu' or 'Med'. If list: a custom set can be defined. Order is (lonW, lonE, latS, latN).
+    '''
+
+    (lonW, lonE, latS, latN) = sel_area_translate(area)
+
+    var, lat, lon = check_increasing_latlon(var, lat, lon)
+
+    if lon_type == 'W-E':
+        lon_border = 180.
+    elif lon_type == '0-360':
+        lon_border = 360.
+
+    lonW = convert_lon_std(lonW)
+    lonE = convert_lon_std(lonE)
+    print('Area: ', lonW, lonE, latS, latN)
+
+    latidx = (lat >= latS) & (lat <= latN)
+    lat_new = lat[latidx]
+
+    if lonW < lonE: # Area does not cross lon_border
+        lonidx = (lon >= lonW) & (lon <= lonE)
+        var_area = var[..., latidx, :][..., lonidx] # the double slicing is necessary here
+
+        lon_new = lon[lonidx]
+    else: # it does :/
+        lonidx1 = (lon >= lonW) & (lon < lon_border)
+        lonidx2 = (lon >= lon_border - 360.) & (lon <= lonE)
+
+        var_area_1 = var[..., latidx, :][..., lonidx1] # the double slicing is necessary here
+        var_area_2 = var[..., latidx, :][..., lonidx2] # the double slicing is necessary here
+        var_area = np.concatenate([var_area_1, var_area_2], axis = -1)
+
+        lon_new = np.concatenate([lon[lonidx1], lon[lonidx2]])
+
+    return var_area, lat_new, lon_new
 
 
 def sel_season(var, dates, season, cut = True):
@@ -3429,14 +3502,23 @@ def change_of_base_matrix(old_basis, new_basis):
 def color_brightness(color):
     return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
 
-def makeRectangle(area, npo = 20):
+def makeRectangle(area, npo = 40, lon_type = '0-360'):
     """
     Produces a shapely polygon to properly plot a lat/lon rectangle on a map.
     lonW, lonE, latS, latN = area
     """
+    if lon_type == '0-360':
+        lon_border = 360.
+    elif lon_type == 'W-E':
+        lon_border = 180.
+
     lonW, lonE, latS, latN = area
-    rlons = np.concatenate([np.tile(lonW, npo), np.linspace(lonW, lonE, npo), np.tile(lonE, npo), np.linspace(lonE, lonW, npo)])
     rlats = np.concatenate([np.linspace(latS,latN,npo), np.tile(latN, npo), np.linspace(latN,latS,npo), np.tile(latS, npo)])
+    if lonW < lonE:
+        rlons = np.concatenate([np.tile(lonW, npo), np.linspace(lonW, lonE, npo), np.tile(lonE, npo), np.linspace(lonE, lonW, npo)])
+    else:
+        rlons = np.concatenate([np.tile(lonW, npo), np.linspace(lonW, lon_border, npo//2), np.linspace(lon_border-360., lonE, npo-npo//2), np.tile(lonE, npo), np.linspace(lonE, lon_border-360., npo//2), np.linspace(lon_border, lonW, npo-npo//2)])
+
     ring = LinearRing(list(zip(rlons, rlats)))
 
     return ring
