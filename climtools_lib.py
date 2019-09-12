@@ -5,7 +5,10 @@ import numpy as np
 import sys
 import os
 
-import ctool, ctp
+try:
+    import ctool, ctp
+except ModuleNotFoundError:
+    print('WARNING: ctool, ctp modules not found. Some functions may raise errors. Run the compiler in the cluster_fortran/ routine to avoid this.\n')
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -2413,6 +2416,9 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
         centroids = clus.cluster_centers_
         labels = clus.labels_
     elif algorithm == 'molteni':
+        if 'ctool' not in sys.modules:
+            raise ValueError('ctool module not loaded. Run the compiler in the cluster_fortran/ directory')
+
         pc = np.transpose(PCs)
         nfcl, labels, centroids, varopt, iseed = ctool.cluster_toolkit.clus_opt(numclus, npart_molt, pc)
         centroids = np.array(centroids)
@@ -2446,6 +2452,8 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     < dates > : the dates.
     < nrsamp > : the number of synthetic datasets used to calculate the significance.
     """
+    if 'ctp' not in sys.modules:
+        raise ValueError('ctp module not loaded. Run the compiler in the cluster_fortran/ directory')
 
     #PCunscal = solver.pcs()[:,:numpcs]
     pc_trans = np.transpose(pcs)
