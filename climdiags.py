@@ -70,9 +70,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     print('Running precompute\n')
     if type(ifile) not in [list, np.ndarray]:
         if netcdf4_read:
-            var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            # print(type(var))
-            # print(var.shape)
+            #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
         else:
             var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
             lat = coords['lat']
@@ -89,7 +91,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         for fil in ifile:
             # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
             if netcdf4_read:
-                var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+                var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+                # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
             else:
                 var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
                 lat = coords['lat']
@@ -689,9 +695,17 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         vars = dict()
         # leggo v
         if type(file_list) is str:
-            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnames[0])
+            # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnames[0])
+            varuna, coords, aux_info = ctl.readxDncfield(ifile, select_var = varnames[0])
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
         else:
-            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[0])
+            # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[0])
+            varuna, coords, aux_info = ctl.readxDncfield(file_list[0])
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
             if list(varuna.keys())[0] not in varnames[0]:
                 raise ValueError('{} is not v. Please give input files in order v,t,z,q.'.format(list(varuna.keys())[0]))
 
@@ -708,9 +722,17 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
             print('Extracting {}\n'.format(varname))
 
             if type(file_list) is str:
-                varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnamok)
+                # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnamok)
+                varuna, coords, aux_info = ctl.readxDncfield(file_list, select_var = varnamok)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
             else:
-                varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i+1])
+                varuna, coords, aux_info = ctl.readxDncfield(file_list[i+1])
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+                # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i+1])
                 if list(varuna.keys())[0] not in varnamok:
                     raise ValueError('{} is not t. Please give input files in order v,t,z,q.'.format(list(varuna.keys())[0]))
 
@@ -730,7 +752,11 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         del vars
     else:
         for i, flun in enumerate(fluxnames):
-            varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i])
+            varuna, coords, aux_info = ctl.readxDncfield(file_list[i])
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
+            # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list[i])
             varuna = varuna[list(varuna.keys())[0]]
 
             if flun == 'PE' and zg_in_ERA_units:

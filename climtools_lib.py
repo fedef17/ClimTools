@@ -604,10 +604,15 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
 
     print('Dimension of variables is {}\n'.format(true_dim))
     if keep_only_Ndim_vars:
+        vars_ok = dict()
         for varna in vars:
             if len(vars[varna].shape) < true_dim:
                 print('Erasing variable {}\n'.format(varna))
-                vars.pop(varna)
+                #vars.pop(varna)
+            else:
+                vars_ok[varna] = vars[varna]
+
+        vars = vars_ok
 
     if true_dim == 4:
         if extract_level is not None:
@@ -650,12 +655,28 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
         vars = list(vars.values())[0]
         var_units = list(var_units.values())[0]
 
-    if true_dim == 2:
-        return vars, lat, lon, var_units
-    elif true_dim == 3:
-        return vars, lat, lon, dates, time_units, var_units, time_cal
-    elif true_dim == 4:
-        return vars, level, lat, lon, dates, time_units, var_units, time_cal
+    datacoords = dict()
+    aux_info = dict()
+
+    datacoords['lat'] = lat
+    datacoords['lon'] = lon
+
+    if true_dim >= 3:
+        datacoords['dates'] = dates
+        aux_info['time_units'] = time_units
+        aux_info['time_calendar'] = time_cal
+    elif true_dim >= 4:
+        datacoords['level'] = level
+        aux_info['level_units'] = level_units
+
+    return vars, datacoords, aux_info
+
+    # if true_dim == 2:
+    #     return vars, lat, lon, var_units
+    # elif true_dim == 3:
+    #     return vars, lat, lon, dates, time_units, var_units, time_cal
+    # elif true_dim == 4:
+    #     return vars, level, lat, lon, dates, time_units, var_units, time_cal
 
 
 def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True, increasing_plev = True):
@@ -799,18 +820,34 @@ def adjust_outofbound_dates(dates):
 
 def adjust_360day_dates(dates):
     """
-    When the time_calendar is 360_day (please not!), nc.num2date() returns a cftime array which is not convertible to datetime (obviously)(and to pandas DatetimeIndex). This fixes this problem in a completely arbitrary way, missing one day each two months. Returns the usual datetime array.
+    When the time_calendar is 360_day (please not!), nc.num2date() returns a cftime array which is not convertible to datetime (obviously)(and to pandas DatetimeIndex).
+    # NO MORE: This fixes this problem in a completely arbitrary way, missing one day each two months.
+    # Fixed calendar: the only 31-day months are january and august, february is 28 day.
+    Returns the usual datetime array.
     """
     dates_ok = []
     #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
     strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
 
+    #print(len(dates))
+    num = 0
     for ci in dates:
-        firstday = strindata.format(ci.year, 1, 1)
-        num = ci.dayofyr-1
-        add_day = num//72 # salto un giorno ogni 72
-        okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
+        if ci.month == 1 and ci.day == 1:
+            firstday = strindata.format(ci.year, 1, 1)
+            num = 0
+        #num = ci.dayofyr-1
+        # add_day = num//72 # salto un giorno ogni 72
+        # okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
+        okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num))
+        if okday.month == 2 and okday.day == 29: # skip 29 feb
+            okday = okday + pd.Timedelta('1 days')
+            num += 1
+        if okday.month in [3,5,7,10,12] and okday.day == 31: # skip 31 of these months
+            okday = okday + pd.Timedelta('1 days')
+            num += 1
+
         dates_ok.append(okday.to_pydatetime())
+        num += 1
 
     dates_ok = np.array(dates_ok)
 
@@ -1361,7 +1398,7 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
         lon_new = lon[lonidx]
     else: # it does :/
         lonidx1 = (lon >= lonW) & (lon < lon_border)
-        lonidx2 = (lon >= lon_border - 360.) & (lon <= lonE)
+        lonidx2 = (lon > lon_border - 360.) & (lon <= lonE)
 
         var_area_1 = var[..., latidx, :][..., lonidx1] # the double slicing is necessary here
         var_area_2 = var[..., latidx, :][..., lonidx2] # the double slicing is necessary here
@@ -1631,7 +1668,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True):
 
     if check_daily(dates):
         dates_diff = dates_season[1:] - dates_season[:-1]
-        jump = dates_diff > pd.Timedelta('2 days')
+        jump = dates_diff > pd.Timedelta('3 days')
         okju = np.where(jump)[0] + 1
         okju = np.append([0], okju)
         okju = np.append(okju, [len(dates_season)])
