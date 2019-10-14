@@ -365,8 +365,15 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     results['labels'] = labels
     results['centroids'] = centroids
     results['dist_centroid'] = dist_centroid
-
     results['pcs'] = PCs
+
+    effcen = []
+    for clus in range(numclus):
+        oklabs = labels == clus
+        effcen.append(np.mean(PCs[oklabs], axis = 0))
+
+    results['eff_centroids'] = np.stack(effcen) # mean of the PCs for each cluster
+
     if 'use_reference_eofs' and ref_solver is not None:
         results['eofs_ref_pcs'] = ref_solver.eofs()[:numpcs]
     else:
