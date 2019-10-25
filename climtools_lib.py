@@ -490,6 +490,31 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
         return all_vars
 
 
+def read_ensemble_xD(file_list, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
+    """
+    Reads an ensemble of files and concatenates the variables along time. (like cdo mergetime)
+
+    !!!! Assumes the order given by file_list.sort() is the correct time ordering. !!!!
+    """
+    file_list.sort()
+
+    vars_all = []
+    dates_all = []
+    for fi in file_list:
+        vars, datacoords, aux_info = readxDncfield(fi, extract_level = extract_level, select_var = select_var, pressure_in_Pa = pressure_in_Pa, force_level_units = force_level_units, verbose = verbose, keep_only_Ndim_vars = keep_only_Ndim_vars)
+
+        if isinstance(vars, dict):
+            raise ValueError('More variables not implemented!')
+
+        vars_all.append(vars)
+        dates_all.append(datacoords['dates'])
+
+    vars_all = np.concatenate(vars_all, axis = 0)
+    datacoords['dates'] = np.concatenate(dates_all)
+
+    return vars_all, datacoords, aux_info
+
+
 def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):
     """
     Read a netCDF file as it is, preserving all dimensions and multiple variables.
@@ -516,7 +541,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
         if nam in variab_names: variab_names.remove(nam)
     if verbose: print('Variables: {}\n'.format(variab_names))
     nvars = len(variab_names)
-    print('Field as {} dimensions and {} vars. All keys: {}'.format(ndim, nvars, fh.variables.keys()))
+    print('Field has {} dimensions and {} vars. All keys: {}'.format(ndim, nvars, fh.variables.keys()))
 
     try:
         lat_o         = fh.variables['lat'][:]
@@ -561,7 +586,10 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
             if time_cal == '365_day' or time_cal == 'noleap':
                 dates = adjust_noleap_dates(dates)
             elif time_cal == '360_day':
-                dates = adjust_360day_dates(dates)
+                if check_daily(dates):
+                    dates = adjust_360day_dates(dates)
+                else:
+                    dates = adjust_noleap_dates(dates)
 
             print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
 
@@ -829,16 +857,14 @@ def adjust_360day_dates(dates):
     #for ci in dates: dates_ok.append(datetime.strptime(ci.strftime(), '%Y-%m-%d %H:%M:%S'))
     strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
 
-    #print(len(dates))
+    month = []
+    day = []
+
+    firstday = strindata.format(2000, 1, 1)
     num = 0
-    for ci in dates:
-        if ci.month == 1 and ci.day == 1:
-            firstday = strindata.format(ci.year, 1, 1)
-            num = 0
-        #num = ci.dayofyr-1
-        # add_day = num//72 # salto un giorno ogni 72
-        # okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num+add_day))
+    for ii in range(360):
         okday = pd.Timestamp(firstday)+pd.Timedelta('{} days'.format(num))
+
         if okday.month == 2 and okday.day == 29: # skip 29 feb
             okday = okday + pd.Timedelta('1 days')
             num += 1
@@ -846,8 +872,15 @@ def adjust_360day_dates(dates):
             okday = okday + pd.Timedelta('1 days')
             num += 1
 
-        dates_ok.append(okday.to_pydatetime())
+        month.append(okday.month)
+        day.append(okday.day)
         num += 1
+
+    for ci in dates:
+        okdaystr = strindata.format(ci.year, month[ci.dayofyr-1], day[ci.dayofyr-1])
+        okday = pd.Timestamp(okdaystr)
+
+        dates_ok.append(okday.to_pydatetime())
 
     dates_ok = np.array(dates_ok)
 
@@ -1779,10 +1812,23 @@ def check_daily(dates, allow_diff_HH = True):
 
     if delta == daydelta:
         return True
-    elif allow_diff_HH and (daydelta >= pd.Timedelta('12 hours') and daydelta <= pd.Timedelta('36 hours')):
+    elif allow_diff_HH and (delta >= pd.Timedelta('12 hours') and delta <= pd.Timedelta('36 hours')):
         return True
     else:
         return False
+
+
+def extract_common_dates(dates1, dates2, arr1, arr2):
+    """
+    Given two dates series and two correspondent arrays, selects the common part of the two, returning common dates and corresponding arr1 and arr2 values.
+    """
+
+    dates_common, okinds1, okinds2 = np.intersect1d(dates1, dates2, assume_unique = True, return_indices = True)
+
+    arr1_ok = arr1[okinds1, ...]
+    arr2_ok = arr2[okinds2, ...]
+
+    return arr1_ok, arr2_ok, dates_common
 
 
 def running_mean(var, wnd):
@@ -2099,16 +2145,36 @@ def first(condition):
     return ind
 
 
-def Rcorr(x, y, latitude = None):
+def Rcorr(x, y, latitude = None, masked = False):
     """
     Returns correlation coefficient between two array of arbitrary shape.
+
+    If masked, treats x and y as masked arrays (with the same mask!).
     """
+
+    if masked:
+        if np.any(x.mask != y.mask):
+            raise ValueError('x and y masks should be equal!')
+        xok = x.compressed()
+        yok = y.compressed()
+    else:
+        xok = x.flatten()
+        yok = y.flatten()
+
     if latitude is not None:
         weights_u = abs(np.cos(np.deg2rad(latitude)))
-        weights = np.tile(weights_u, (x.shape[1], 1)).T.flatten()
-        corrcoef = np.cov(x.flatten(), y.flatten(), aweights = weights)/np.sqrt(np.cov(x.flatten(), x.flatten(), aweights = weights) * np.cov(y.flatten(), y.flatten(), aweights = weights))
+        weights = np.tile(weights_u, (x.shape[1], 1)).T
+        if not masked:
+            weights = weights.flatten()
+            corrcoef = np.cov(xok, yok, aweights = weights)/np.sqrt(np.cov(xok, xok, aweights = weights) * np.cov(yok, yok, aweights = weights))
+        else:
+            weights = np.ma.masked_array(weights, mask = x.mask).compressed()
+            corrcoef = np.cov(xok, yok, aweights = weights)/np.sqrt(np.cov(xok, xok, aweights = weights) * np.cov(yok, yok, aweights = weights))
     else:
-        corrcoef = np.corrcoef(x.flatten(), y.flatten())
+        if not masked:
+            corrcoef = np.corrcoef(xok, yok)
+        else:
+            corrcoef = np.corrcoef(xok, yok)
 
     return corrcoef[1,0]
 
@@ -2130,12 +2196,14 @@ def distance(x, y, latitude = None):
         return LA.norm(x-y)
 
 
-def E_rms(x, y, latitude = None):
+def E_rms(x, y, latitude = None, masked = False):
     """
     Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
     < latitude > : if given, weights with the cosine of latitude (FIRST axis of the array).
     """
     n = x.size
+    if masked:
+        n = len(x.compressed())
     n_lons = x.shape[1]
 
     if latitude is not None:
@@ -2143,12 +2211,20 @@ def E_rms(x, y, latitude = None):
         n_norm = 0.
         sum_norm = 0.
         for i, w in enumerate(weights):
-            sum_norm += w*np.sum((x[i,:]-y[i,:])**2)
-            n_norm += n_lons*w
+            if not masked:
+                sum_norm += w*np.sum((x[i,:]-y[i,:])**2)
+                n_norm += n_lons*w
+            else:
+                sum_norm += w*np.sum((x[i,:].compressed()-y[i,:].compressed())**2)
+                n_norm += len(x[i,:].compressed())*w
+                #print(i, n_norm, sum_norm, np.mean(x[i,:].compressed()))
 
         E = np.sqrt(sum_norm/n_norm)
     else:
-        E = 1/np.sqrt(n) * LA.norm(x-y)
+        if not masked:
+            E = 1/np.sqrt(n) * LA.norm(x-y)
+        else:
+            E = 1/np.sqrt(n) * LA.norm(x.compressed()-y.compressed())
 
     return E
 
@@ -2358,7 +2434,7 @@ def cutline2_fit(x, y, n_cut = 1, approx_par = None):
     return xcuts, lines
 
 
-def genlatlon(n_lat, n_lon, lon_limits = (-180., 180.), lat_limits = (-90., 90.)):
+def genlatlon(n_lat, n_lon, lon_limits = (0., 360.), lat_limits = (-90., 90.)):
     """
     Generates lat and lon arrays, using the number of points n_lat,n_lon and the full range (-90,90), (-180,180).
     """
@@ -2771,11 +2847,13 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = False):
+def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'RMS_sum'):
     """
     Find the best possible match between two sets of PCs.
 
     Given two sets of PCs, finds the combination of PCs that minimizes the mean total squared error. If the input PCs represent cluster centroids, the results then correspond to the best unique match between the two sets of cluster centroids.
+
+    : bad_matching_rule : Defines the metric to be used in case of bad matching. Three metrics are used to evaluate the matching -> RMS_sum (sum of centroid-to-centroid distance among all clusters), RMS_mean (mean of ""), patcor_mean (mean of pattern correlation among reference centroids and centroids pcs)
 
     The first set of PCs is left in the input order and the second set of PCs is re-arranged.
     Output:
@@ -2793,6 +2871,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False):
 
     mean_rms = []
     mean_patcor = []
+    sum_rms = []
     for p in perms:
         all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
         all_patcor = [Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)]
@@ -2802,16 +2881,35 @@ def match_pc_sets(pcset_ref, pcset, verbose = False):
             print(all_patcor)
         mean_patcor.append(np.mean(all_patcor))
         mean_rms.append(np.mean(all_rms))
+        sum_rms.append(np.sum(all_rms))
 
     mean_rms = np.array(mean_rms)
-    jmin = mean_rms.argmin()
     mean_patcor = np.array(mean_patcor)
+    sum_rms = np.array(sum_rms)
+
+    jmin = mean_rms.argmin()
     jmin2 = mean_patcor.argmax()
+    jmin3 = sum_rms.argmin()
 
-    if jmin != jmin2:
-        print('WARNING: bad matching. Best permutation with RMS is {}, with patcor is {}'.format(perms[jmin], perms[jmin2]))
+    jok = jmin3
 
-    return np.array(perms[jmin])
+    if len(np.unique([jmin, jmin2, jmin3])) > 1:
+        print('WARNING: bad matching. Best permutation with mean RMS is {}, with mean patcor is {}, with RMS sum is {}'.format(perms[jmin], perms[jmin2], perms[jmin3]))
+        print('Using the rule: {}\n'.format(bad_matching_rule))
+
+        if bad_matching_rule == 'RMS_sum':
+            jok = jmin3
+        elif bad_matching_rule == 'RMS_mean':
+            jok = jmin
+        elif bad_matching_rule == 'patcor_mean':
+            jok = jmin2
+        # rules = np.array(['RMS_mean', 'patcor_mean', 'RMS_sum'])
+        # jarr = np.array([jmin, jmin2, jmin3])
+        #
+        # rulok = rules == bad_matching_rule
+        # jok = jarr[rulok][0]
+
+    return np.array(perms[jok])
 
 
 def calc_RMS_and_patcor(clusters_1, clusters_2):
@@ -3003,7 +3101,7 @@ def calc_days_event(labels, resid_times, regime_nums):
                 imi = imi2
             #print('p', ind, ok_nums[imi, :])
             if ok_nums[imi,0] <= ind and ok_nums[imi,1] > ind:
-                print(ok_nums[imi,0], ind, ok_nums[imi,1])
+                #print(ok_nums[imi,0], ind, ok_nums[imi,1])
                 days_event[ind] = ind-ok_nums[imi,0]+1
                 length_event[ind] = ok_times[imi]
 
@@ -3613,7 +3711,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False):
     """
     Plots field contours on the axis of a figure.
 
@@ -3633,8 +3731,10 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     if clevels is None:
         clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
-    print(clevels)
-    print(np.min(data), np.max(data))
+
+    if verbose:
+        print(clevels)
+        print(np.min(data), np.max(data))
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
@@ -3642,28 +3742,40 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
 
     cyclic = False
-    if max(lon)+10. > 360 and min(lon)-10. < 0.:
-        print('Adding cyclic point\n')
-        cyclic = True
-        #lon = np.append(lon, 360)
-        #data = np.c_[data,data[:,0]]
-        lon_o = lon
-        data, lon = cutil.add_cyclic_point(data, coord = lon)
 
-        if add_hatching is not None:
-            add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
+    grid_step = np.unique(np.diff(lon))
+    if len(grid_step) == 1: # lon grid equally spaced
+        if (lon[0]-lon[-1]) % 360 == grid_step[0]: # global longitudes
+            if verbose: print('Adding cyclic point\n')
+            cyclic = True
+            #lon = np.append(lon, 360)
+            #data = np.c_[data,data[:,0]]
+            lon_o = lon
+            data, lon = cutil.add_cyclic_point(data, coord = lon)
+
+            if add_hatching is not None:
+                add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
 
     xi,yi = np.meshgrid(lon,lat)
 
-    map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors, alpha = alphamap)
+    if plot_type == 'filled_contour':
+        map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors, alpha = alphamap)
+        nskip = len(clevels)//n_lines - 1
+        if draw_contour_lines:
+            map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
+    elif plot_type == 'pcolormesh':
+        map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree())
+    elif plot_type == 'contour':
+        nskip = len(clevels)//n_lines - 1
+        map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
+    else:
+        raise ValueError('plot_type <{}> not recognised. Only available: filled_contour, pcolormesh, contour'.format(plot_type))
+
     if add_hatching is not None:
-        print('adding hatching')
+        if verbose: print('adding hatching')
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','wb'))
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
 
-    nskip = len(clevels)//n_lines - 1
-    if draw_contour_lines:
-        map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidth = 0.5)
 
     if isinstance(proj, ccrs.PlateCarree):
         if plot_margins is not None:
@@ -3816,7 +3928,66 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False):
+def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers, ens_names, ens_colors, wi = 0.6):
+    i = 0
+    for iii, (mod, col, vv, mcol) in enumerate(zip(model_names, colors, vers, edge_colors)):
+        if mod == 'ERA':
+            i_era = i
+            i += 0.3
+
+        boxlist = []
+        box = {'med': allpercs['p50'][iii], 'q1': allpercs['p25'][iii], 'q3': allpercs['p75'][iii], 'whislo': allpercs['p10'][iii], 'whishi': allpercs['p90'][iii], 'showfliers' : False}
+        boxlist.append(box)
+
+        boxprops = {'edgecolor' : mcol, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
+        whiskerprops = {'color': mcol, 'linewidth': 2}
+        medianprops = {'color': mcol, 'linewidth': 4}
+        capprops = {'color': mcol, 'linewidth': 2}
+        bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+
+        boxplo = ax.bxp(boxlist, [i], [wi], **bxp_kwargs)
+        ax.scatter(i, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
+        if allpercs['ens_std'][iii] > 0.:
+            ax.scatter(i, allpercs['ens_min'][iii], color = mcol, marker = 'v', s = 20)
+            ax.scatter(i, allpercs['ens_max'][iii], color = mcol, marker = '^', s = 20)
+
+        i += 0.7
+        if vv == 'HR': i += 0.4
+
+    ax.axvline(i_era - 0.35, color = 'grey', alpha = 0.6, zorder = -1)
+    i += 0.2
+
+    mean_vals = dict()
+    for kak, col in zip(ens_names, ens_colors):
+        for cos in allpercs.keys():
+            mean_vals[(cos, kak)] = np.mean([val for val, vv in zip(allpercs[cos], vers) if vv == kak])
+        mean_vals[('ens_min', kak)] = np.min([val for val, vv in zip(allpercs['ens_min'], vers) if vv == kak])
+        mean_vals[('ens_max', kak)] = np.max([val for val, vv in zip(allpercs['ens_max'], vers) if vv == kak])
+
+        boxlist = []
+        box = {'med': mean_vals[('p50', kak)], 'q1': mean_vals[('p25', kak)], 'q3': mean_vals[('p75', kak)], 'whislo': mean_vals[('p10', kak)], 'whishi': mean_vals[('p90', kak)], 'showfliers' : False}
+        boxlist.append(box)
+
+        boxprops = {'edgecolor' : col, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
+        whiskerprops = {'color': col, 'linewidth': 2}
+        medianprops = {'color': col, 'linewidth': 4}
+        capprops = {'color': col, 'linewidth': 2}
+        bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+
+        boxplo = ax.bxp(boxlist, [i], [wi], **bxp_kwargs)
+        ax.scatter(i, mean_vals[('mean', kak)], color = col, marker = 'o', s = 20)
+        ax.scatter(i, mean_vals[('ens_min', kak)], color = col, marker = 'v', s = 20)
+        ax.scatter(i, mean_vals[('ens_max', kak)], color = col, marker = '^', s = 20)
+
+        i+=0.7
+
+    ax.set_xticks([])
+    #ax.grid(color = 'lightslategray', alpha = 0.5)
+
+    return
+
+
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False):
     """
     Plots a single map to a figure.
 
@@ -3865,7 +4036,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -3891,7 +4062,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     return fig4
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -3954,12 +4125,12 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 2, 1, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 2, 2, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
     ax.set_title(stitle_2, fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -3986,7 +4157,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False):
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -4049,12 +4220,12 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 3, 1, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, data1, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
     ax.set_title(stitle_1, fontsize = 25)
 
     ax = plt.subplot(1, 3, 2, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, data2, lat2, lon2, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
     ax.set_title(stitle_2, fontsize = 25)
 
     if use_different_grids:
@@ -4064,7 +4235,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     ax = plt.subplot(1, 3, 3, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
     ax.set_title('Diff', fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -4091,7 +4262,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', verbose = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -4185,7 +4356,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose)
 
             if number_subplots:
                 subtit = nens
@@ -4390,13 +4561,13 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
         lab = labels[num]
         mapa = maps[num]
 
-        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+        plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type)
         showdate.set_text('{}'.format(lab))
 
         return
 
     mapa = maps[0]
-    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid)
+    map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type)
 
     showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight = 'bold', color = 'black', bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
 
@@ -4987,8 +5158,8 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 10, bottom_margin = 0.08):
-    plt.subplots_adjust(bottom = bottom_margin)
+def custom_legend(fig, colors, labels, loc = 'lower center', ncol = 6, fontsize = 10, bottom_margin_per_line = 0.04):
+    plt.subplots_adjust(bottom = bottom_margin_per_line*np.ceil(len(labels)/ncol))
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
     proxy = [plt.Rectangle((0,0),1,1, fc = col) for col in colors]
