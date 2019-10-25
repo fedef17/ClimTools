@@ -2811,7 +2811,7 @@ def clus_order_by_frequency(centroids, labels):
     return centroids, labels
 
 
-def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_AREA, solver_ref, numpcs):
+def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_AREA, solver_ref, numpcs, bad_matching_rule = 'rms_mean', matching_hierarchy = None):
     """
     Compares a set of patterns with a reference set, after projecting on the reference base. This is done to calculate the differences in a reduced space.
     Returns the patterns ordered in the best match to the reference ones and the RMS distance and the pattern correlation between the two sets.
@@ -2825,7 +2825,7 @@ def clus_compare_projected(centroids, labels, cluspattern_AREA, cluspattern_ref_
     pcs_ref = np.stack(pcs_ref)
     pcs = np.stack(pcs)
 
-    perm = match_pc_sets(pcs_ref, pcs)
+    perm = match_pc_sets(pcs_ref, pcs, bad_matching_rule = bad_matching_rule, matching_hierarchy = matching_hierarchy)
     centroids, labels = change_clus_order(centroids, labels, perm)
 
     et, patcor = calc_RMS_and_patcor(pcs_ref, pcs[perm, ...])
@@ -2847,13 +2847,17 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'RMS_sum'):
+def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_hierarchy', matching_hierarchy = None):
     """
     Find the best possible match between two sets of PCs.
 
     Given two sets of PCs, finds the combination of PCs that minimizes the mean total squared error. If the input PCs represent cluster centroids, the results then correspond to the best unique match between the two sets of cluster centroids.
 
-    : bad_matching_rule : Defines the metric to be used in case of bad matching. Three metrics are used to evaluate the matching -> RMS_sum (sum of centroid-to-centroid distance among all clusters), RMS_mean (mean of ""), patcor_mean (mean of pattern correlation among reference centroids and centroids pcs)
+    : bad_matching_rule : Defines the metric to be used in case of bad matching. Four metrics are used to evaluate the matching ->
+    - "rms_mean" (mean of centroid-to-centroid distance among all clusters);
+    - "patcor_mean" (mean of pattern correlation among reference centroids and centroids pcs);
+    - "rms_hierarchy" (matches the clusters with c-to-c dist following a hierarchy (matches the first, than the second, ...). The hierarchy can be specified by matching_hierarchy, defaults to reference cluster order [0, 1, 2, ...]);
+    - "patcor_hierarchy" (same for pattern correlation);
 
     The first set of PCs is left in the input order and the second set of PCs is re-arranged.
     Output:
@@ -2865,13 +2869,16 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'RMS_su
         raise ValueError('the PC sets must have the same dimensionality')
 
     numclus = pcset_ref.shape[0]
+    if matching_hierarchy is None:
+        matching_hierarchy = np.arange(numclus)
+    else:
+        matching_hierarchy = np.array(matching_hierarchy)
 
     perms = list(itt.permutations(list(range(numclus))))
     nperms = len(perms)
 
     mean_rms = []
     mean_patcor = []
-    sum_rms = []
     for p in perms:
         all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
         all_patcor = [Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)]
@@ -2881,33 +2888,59 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'RMS_su
             print(all_patcor)
         mean_patcor.append(np.mean(all_patcor))
         mean_rms.append(np.mean(all_rms))
-        sum_rms.append(np.sum(all_rms))
 
     mean_rms = np.array(mean_rms)
     mean_patcor = np.array(mean_patcor)
-    sum_rms = np.array(sum_rms)
 
     jmin = mean_rms.argmin()
     jmin2 = mean_patcor.argmax()
-    jmin3 = sum_rms.argmin()
 
-    jok = jmin3
+    # Differential coupling (first cluster first)
+    all_match = np.arange(numclus)
+    patcor_hi_best_perm = np.empty(numclus)
+    for clus in matching_hierarchy:
+        all_patcor = np.array([Rcorr(pcset_ref[clus], pcset[mat]) for mat in all_match])
+        mat_ok = all_match[all_patcor.argmax()]
+        print(clus, all_patcor, all_match, mat_ok)
+        all_match = all_match[all_match != mat_ok]
+        patcor_hi_best_perm[clus] = mat_ok
 
-    if len(np.unique([jmin, jmin2, jmin3])) > 1:
-        print('WARNING: bad matching. Best permutation with mean RMS is {}, with mean patcor is {}, with RMS sum is {}'.format(perms[jmin], perms[jmin2], perms[jmin3]))
-        print('Using the rule: {}\n'.format(bad_matching_rule))
+    print(patcor_hi_best_perm)
+    jpathi = [perms.index(p) for p in perms if p == tuple(patcor_hi_best_perm)][0]
 
-        if bad_matching_rule == 'RMS_sum':
-            jok = jmin3
-        elif bad_matching_rule == 'RMS_mean':
+    all_match = np.arange(numclus)
+    rms_hi_best_perm = np.empty(numclus)
+    for clus in matching_hierarchy:
+        all_rms = np.array([LA.norm(pcset_ref[clus] - pcset[mat]) for mat in all_match])
+        mat_ok = all_match[all_rms.argmin()]
+        print(clus, all_rms, all_match, mat_ok)
+        all_match = all_match[all_match != mat_ok]
+        rms_hi_best_perm[clus] = mat_ok
+
+    print(rms_hi_best_perm)
+    jrmshi = [perms.index(p) for p in perms if p == tuple(rms_hi_best_perm)][0]
+
+    jok = jmin
+
+    if len(np.unique([jmin, jmin2, jpathi, jrmshi])) > 1:
+        print('WARNING: bad matching. Best permutation with rule rms_mean is {}, with patcor_mean is {}, with rms_hierarchy is {}, with patcor_hierarchy is {}'.format(perms[jmin], perms[jmin2], perms[jrmshi], perms[jpathi]))
+
+        if bad_matching_rule == 'rms_mean':
             jok = jmin
         elif bad_matching_rule == 'patcor_mean':
             jok = jmin2
-        # rules = np.array(['RMS_mean', 'patcor_mean', 'RMS_sum'])
-        # jarr = np.array([jmin, jmin2, jmin3])
-        #
-        # rulok = rules == bad_matching_rule
-        # jok = jarr[rulok][0]
+        elif bad_matching_rule == 'rms_hierarchy':
+            jok = jrmshi
+        elif bad_matching_rule == 'patcor_hierarchy':
+            jok = jpathi
+
+        for jii, rule in zip([jmin, jmin2, jrmshi, jpathi], ['rms_mean', 'patcor_mean', 'rms_hierarchy', 'patcor_hierarchy']):
+            all_rms = [LA.norm(pcset_ref[i] - pcset[perms[jii][i]]) for i in range(numclus)]
+            all_patcor = [Rcorr(pcset_ref[i], pcset[perms[jii][i]]) for i in range(numclus)]
+            print('All RMS with rule {}: {}'.format(rule, all_rms))
+            print('All patcor with rule {}: {}\n'.format(rule, all_patcor))
+
+        print('Using the rule: {}\n'.format(bad_matching_rule))
 
     return np.array(perms[jok])
 
@@ -4262,7 +4295,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (5,95), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', verbose = False):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', verbose = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
