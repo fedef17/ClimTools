@@ -2048,10 +2048,10 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         ctl.adjust_color_scale(mappe)
 
     patt = result_obs['cluspattern']
-    lat = result_obs['lat']
-    lon = result_obs['lon']
+    lat_ref = result_obs['lat']
+    lon_ref = result_obs['lon']
     filename = cart_out+'Allclus_OBSERVED.pdf'
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid)
+    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -2077,7 +2077,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
                 nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
                 print(nunam)
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, [lat, lat_ref], [lon, lon_ref], filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, use_different_grids = True)
                 all_figures.append(fig)
 
     if compare_models is not None and not out_only_main_figs:

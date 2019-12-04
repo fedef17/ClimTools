@@ -45,6 +45,8 @@ from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
 #mpl.rcParams['hatch.color'] = 'black'
+# plt.rcParams['xtick.labelsize'] = 30
+# plt.rcParams['ytick.labelsize'] = 30
 
 ###############  Parameters  #######################
 
@@ -1505,7 +1507,7 @@ def sel_season(var, dates, season, cut = True):
 
     #print(var_season.shape)
 
-    if season in mesi_short or len(dates) <= 12:
+    if season in mesi_short or len(np.unique(['{}{:02d}'.format(da.year,da.month) for da in dates])) <= 12:
         cut = False
 
     if cut:
@@ -1695,12 +1697,13 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
     return seas_mean, seas_std
 
 
-def seasonal_set(var, dates, season, dates_range = None, cut = True):
+def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_average = False):
     """
     Cuts var and dates, creating a list of variables relative to each season and a list of dates.
     Works both on monthly and daily datasets.
 
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    < seasonal_average > : if True, outputs a single average field for each season.
     """
 
     if dates_range is not None:
@@ -1728,7 +1731,45 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True):
         all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len(season)*i:len(season)*(i+1), ...] for i in range(n_seas)]
 
-    return np.array(all_var_seas), np.array(all_dates_seas)
+    all_vars = np.array(all_var_seas)
+    all_dates = np.array(all_dates_seas)
+
+    if not seasonal_average:
+        return all_vars, all_dates
+    else:
+        return np.mean(all_vars, axis = 1), [dat[0] for dat in all_dates]
+
+
+def bootstrap(var, dates, season, y = None, apply_func = None, n_choice = 30, n_bootstrap = 100):
+    """
+    Performs a bootstrapping picking a set of n_choice seasons, n_bootstrap times. Optionally add a second variable y which has the same dates. apply_func is an external function that performs some operation on the bootstrapped quantities and takes var as input. If y is set, the function needs 2 inputs: var and y.
+    """
+
+    var_set, dates_set = seasonal_set(var, dates, season)
+    if y is not None: y_set, _ = seasonal_set(y, dates, season)
+
+    n_seas = len(var_set)
+    bootstr = []
+
+    t0 = datetime.now()
+    for i in range(n_bootstrap):
+        print(i)
+        ok_yea = np.sort(np.random.choice(list(range(n_seas)), n_choice))
+        var_ok = np.concatenate(var_set[ok_yea])
+        if y is not None: y_ok = np.concatenate(y_set[ok_yea])
+        dates = np.concatenate(dates_set[ok_yea])
+
+        if apply_func is not None:
+            if y is None:
+                cos = apply_func(var_ok)
+            else:
+                cos = apply_func(var_ok, y_ok)
+        else:
+            cos = var_ok
+
+        bootstr.append(cos)
+
+    return np.array(bootstr)
 
 
 def range_years(year1, year2):
@@ -1832,12 +1873,33 @@ def check_daily(dates, allow_diff_HH = True):
         return False
 
 
-def extract_common_dates(dates1, dates2, arr1, arr2):
+def set_HHMM(dates, HH = 12, MM = 0):
+    """
+    Sets hours and minutes to all dates. Defaults to 12:00.
+    """
+    strindata = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00'
+
+    dates_nohour = []
+    for ci in dates:
+        okdaystr = strindata.format(ci.year, ci.month, ci.day, HH, MM)
+        okday = pd.Timestamp(okdaystr)
+        dates_nohour.append(okday.to_pydatetime())
+
+    return np.array(dates_nohour)
+
+
+def extract_common_dates(dates1, dates2, arr1, arr2, ignore_HHMM = True):
     """
     Given two dates series and two correspondent arrays, selects the common part of the two, returning common dates and corresponding arr1 and arr2 values.
     """
 
-    dates_common, okinds1, okinds2 = np.intersect1d(dates1, dates2, assume_unique = True, return_indices = True)
+    if ignore_HHMM:
+        dates1_nohour = set_HHMM(dates1)
+        dates2_nohour = set_HHMM(dates2)
+
+        dates_common, okinds1, okinds2 = np.intersect1d(dates1_nohour, dates2_nohour, assume_unique = True, return_indices = True)
+    else:
+        dates_common, okinds1, okinds2 = np.intersect1d(dates1, dates2, assume_unique = True, return_indices = True)
 
     arr1_ok = arr1[okinds1, ...]
     arr2_ok = arr2[okinds2, ...]
@@ -4020,7 +4082,7 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
-def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers, ens_names, ens_colors, wi = 0.6):
+def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers, ens_names, ens_colors, wi = 0.6, plot_mean = True):
     i = 0
 
     for iii, (mod, col, vv, mcol) in enumerate(zip(model_names, colors, vers, edge_colors)):
@@ -4068,7 +4130,7 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
         bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
 
         boxplo = ax.bxp(boxlist, [i], [wi], **bxp_kwargs)
-        ax.scatter(i, mean_vals[('mean', kak)], color = col, marker = 'o', s = 20)
+        if plot_mean: ax.scatter(i, mean_vals[('mean', kak)], color = col, marker = 'o', s = 20)
         ax.scatter(i, mean_vals[('ens_min', kak)], color = col, marker = 'v', s = 20)
         ax.scatter(i, mean_vals[('ens_max', kak)], color = col, marker = '^', s = 20)
 
@@ -4322,13 +4384,20 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     ax.set_title(stitle_2, fontsize = 25)
 
     if use_different_grids:
-        raise ValueError('To be implemented')
+        if (lat1[1]-lat1[0]) == (lat2[1]-lat2[0]):
+            lat_ok, la1, la2 = np.intersect1d(lat1, lat2, assume_unique = True, return_indices = True)
+            lon_ok, lo1, lo2 = np.intersect1d(lon1, lon2, assume_unique = True, return_indices = True)
+            diff = data1[la1,:][:,lo1]-data2[la2,:][:,lo2]
+        else:
+            raise ValueError('To be implemented')
     else:
+        lat_ok = lat
+        lon_ok = lon
         diff = data1-data2
 
     ax = plt.subplot(1, 3, 3, projection=proj)
 
-    map_plot = plot_mapc_on_ax(ax, diff, lat1, lon1, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour)
+    map_plot = plot_mapc_on_ax(ax, diff, lat_ok, lon_ok, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour)
     ax.set_title('Diff', fontsize = 25)
 
     cax = plt.axes([0.1, 0.06, 0.8, 0.03])
@@ -5255,7 +5324,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, loc = 'lower center', ncol = 6, fontsize = 10, bottom_margin_per_line = 0.04):
+def custom_legend(fig, colors, labels, loc = 'lower center', ncol = 6, fontsize = 15, bottom_margin_per_line = 0.05):
     plt.subplots_adjust(bottom = bottom_margin_per_line*np.ceil(len(labels)/ncol))
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
