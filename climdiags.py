@@ -343,6 +343,8 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
         results['significance'] = significance
 
+    results['var_ratio'] = ctl.calc_varopt_molt(PCs, centroids, labels)
+
     if ref_solver is not None and ref_patterns_area is not None:
         print('Running compare\n')
         perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs, bad_matching_rule = bad_matching_rule, matching_hierarchy = matching_hierarchy)
