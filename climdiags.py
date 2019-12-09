@@ -910,10 +910,13 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
             if nam == 'cluspattern':
                 lat = obs['lat']
                 lon = obs['lon']
+
+            var_ok, lat_ok, lon_ok = ctl.check_increasing_latlon(var, lat, lon)
+
             index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
-            colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
+            colist = ctl.create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
             colist = [index] + colist
-            cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
+            cubo = ctl.create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
             iris.save(cubo, outfil)
 
         if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
@@ -928,10 +931,13 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
             if nam == 'cluspattern':
                 lat = models[mod]['lat']
                 lon = models[mod]['lon']
+
+            var_ok, lat_ok, lon_ok = ctl.check_increasing_latlon(var, lat, lon)
+
             index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
-            colist = ctl.create_iris_coord_list([lat, lon], ['latitude', 'longitude'])
+            colist = ctl.create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
             colist = [index] + colist
-            cubo = ctl.create_iris_cube(var, std_name, units, colist, long_name = long_name)
+            cubo = ctl.create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
 
             iris.save(cubo, outfil)
 

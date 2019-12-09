@@ -1090,7 +1090,12 @@ def create_iris_coord(points, std_name, long_name = None, units = None, circular
         raise ValueError('No calendar/units given for time!')
         units = Unit(units, calendar = calendar)
 
-    coord = iris.coords.DimCoord(points, standard_name = std_name, long_name = long_name, units = units, circular = circular)
+    try:
+        coord = iris.coords.DimCoord(points, standard_name = std_name, long_name = long_name, units = units, circular = circular)
+    except Exception as stron:
+        print('Problem in creating DimCoord: {}\n'.format(stron))
+        print('Creating AuxCoord instead..')
+        coord = iris.coords.AuxCoord(points, standard_name = std_name, long_name = long_name, units = units)
 
     return coord
 
