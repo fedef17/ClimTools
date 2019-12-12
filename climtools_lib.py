@@ -88,6 +88,10 @@ def str_to_bool(s):
     else:
          raise ValueError('Not a boolean value')
 
+def mkdir(cart):
+    if not os.path.exists(cart): os.mkdir(cart)
+    return
+
 def openlog(cart_out, tag = None, redirect_stderr = True):
     if tag is None:
         tag = datetime.strftime(datetime.now(), format = '%d%m%y_h%H%M')
@@ -1932,6 +1936,43 @@ def running_mean(var, wnd):
         rollpi_temp = np.stack(rollpi_temp)
 
     return rollpi_temp
+
+
+
+def apply_recursive_1D(arr, func, *args, **kwargs):
+    if arr.ndim > 1:
+        res = np.empty_like(arr)
+        for ii in range(arr.shape[-1]):
+            res[..., ii] = apply_recursive_1D(arr[..., ii], func, *args, **kwargs)
+    else:
+        res = func(arr, *args, **kwargs)
+
+    return res
+
+
+def conv2(a, b, mode = 'same'):
+    return np.convolve(b, a, mode = mode)
+
+
+def lowpass_lanczos(var, wnd):
+    """
+    Applies a lowpass Lanczos filter at wnd days (or months/years depending on the time units of var) on the first axis.
+    """
+
+    if wnd == 1: return var
+
+    cose = np.linspace(-2, 2, (2*wnd)+1)
+    lanc20 = np.sinc(cose)*np.sinc(cose/2.)
+    lanc20 = lanc20/np.sum(lanc20)
+
+    # low_var_2 = np.empty_like(var)
+    # for ii in range(var.shape[1]):
+    #     for jj in range(var.shape[2]):
+    #         low_var_2[:, ii, jj] = np.convolve(lanc20, var[:, ii, jj], mode = 'same')
+
+    low_var = apply_recursive_1D(var, conv2, lanc20, mode = 'same')
+
+    return low_var
 
 
 def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_days = 5, window_years = 20, step_year = 5):
