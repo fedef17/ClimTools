@@ -2686,16 +2686,18 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     """
 
     start = datetime.now()
+
+    if algorithm == 'molteni' and 'ctool' not in sys.modules:
+        print('WARNING!!! ctool module not loaded, using algorithm <sklearn> instead of <molteni>. Try rerunning the compiler in the cluster_fortran/ directory.')
+        algorithm = 'sklearn'
+
     if algorithm == 'sklearn':
         clus = KMeans(n_clusters=numclus, n_init = n_init_sk, max_iter = max_iter_sk)
-
         clus.fit(PCs)
         centroids = clus.cluster_centers_
         labels = clus.labels_
     elif algorithm == 'molteni':
-        if 'ctool' not in sys.modules:
-            raise ValueError('ctool module not loaded. Run the compiler in the cluster_fortran/ directory')
-
+        #raise ValueError('ctool module not loaded. Run the compiler in the cluster_fortran/ directory')
         pc = np.transpose(PCs)
         nfcl, labels, centroids, varopt, iseed = ctool.cluster_toolkit.clus_opt(numclus, npart_molt, pc)
         centroids = np.array(centroids)
@@ -2730,7 +2732,9 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     < nrsamp > : the number of synthetic datasets used to calculate the significance.
     """
     if 'ctp' not in sys.modules:
-        raise ValueError('ctp module not loaded. Run the compiler in the cluster_fortran/ directory')
+        print('WARNING!!! ctp module not loaded, significance calculation can not be performed. Try rerunning the compiler in the cluster_fortran/ directory.')
+        return np.nan
+        #raise ValueError('ctp module not loaded. Run the compiler in the cluster_fortran/ directory')
 
     #PCunscal = solver.pcs()[:,:numpcs]
     pc_trans = np.transpose(pcs)
