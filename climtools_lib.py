@@ -1467,7 +1467,7 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     return var_area, lat_new, lon_new
 
 
-def sel_season(var, dates, season, cut = True):
+def sel_season(var, dates, season, cut = True, remove_29feb = False):
     """
     Selects the desired seasons from the dataset.
 
@@ -1504,6 +1504,9 @@ def sel_season(var, dates, season, cut = True):
         mask = (dates_pdh.month == mesi_short.index(season)+1)
     else:
         raise ValueError('season not understood, should be in DJF, JJA, ND,... format or the short 3 letters name of a month (Jan, Feb, ...)')
+
+    if 'F' in season and remove_29feb:
+        mask = (mask) & ((dates_pdh.month != 2) | (dates_pdh.day != 29))
 
     var_season = var[mask, ...]
     dates_season = dates[mask]
@@ -1621,6 +1624,40 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
+def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', print_trend = False):
+    """
+    Subtracts the linear trend calculated on some regional (or global) average from the timeseries.
+    Area defaults to global, but can assume each area allowed by sel_area.
+
+    Returns var detrended and selected for the season (not for area).
+    """
+
+    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
+    var_set_avg = np.mean(var_set, axis = 1)
+    years = np.array([da[0].year for da in dates_set])
+
+    if area != 'global':
+        var_area, lat_area, lon_area = sel_area(lat, lon, var_set_avg, area)
+        var_regional = global_mean(var_area, lat_area)
+    else:
+        var_regional = global_mean(var_set_avg, lat)
+
+    m, c, err_m, err_c = linear_regre_witherr(years, var_regional)
+    if print_trend:
+        print('Trend: {:7.2e} +/- {:7.1e}\n'.format(m, err_m))
+        print('Intercept: {:7.2e} +/- {:7.1e}\n'.format(c, err_c))
+
+    var_set_notr = []
+    for va, ye in zip(var_set, years):
+        cos = c + m*ye
+        print(ye, cos)
+        var_set_notr.append(va - cos)
+
+    var_set_notr = np.concatenate(var_set_notr, axis = 0)
+
+    return var_set_notr
+
+
 def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     """
     Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
@@ -1705,6 +1742,21 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
 
     return seas_mean, seas_std
 
+def find_point(data, lat, lon, lat_ok, lon_ok):
+    """
+    Finds closest point in data to lat_ok, lon_ok. Extracts the corresponding slice.
+
+    Lat, lon are the secondlast and last coordinates of the data array.
+    """
+
+    lon = convert_lon_std(lon)
+    lon_ok = convert_lon_std(lon_ok)
+
+    indla = np.argmin(abs(lat-lat_ok))
+    indlo = np.argmin(abs(lon-lon_ok))
+
+    return data[..., indla, indlo]
+
 
 def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_average = False):
     """
@@ -1723,7 +1775,12 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
 
     dates_pdh = pd.to_datetime(dates)
 
-    var_season, dates_season = sel_season(var, dates, season, cut = cut)
+    if season is not None:
+        var_season, dates_season = sel_season(var, dates, season, cut = cut, remove_29feb = True)
+    else:
+        # the season has already been selected
+        var_season = var
+        dates_season = dates
 
     if check_daily(dates):
         dates_diff = dates_season[1:] - dates_season[:-1]
@@ -1740,8 +1797,9 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len(season)*i:len(season)*(i+1), ...] for i in range(n_seas)]
 
-    all_vars = np.array(all_var_seas)
+    all_vars = np.stack(all_var_seas)
     all_dates = np.array(all_dates_seas)
+    print(np.shape(all_vars))
 
     if not seasonal_average:
         return all_vars, all_dates
@@ -2852,7 +2910,9 @@ def calc_trend_climatevar(global_tas, var, var_units = None):
         raise ValueError('Shapes of global_tas and var dont match')
 
     var_trend = np.zeros(var.shape[1:], dtype = float)
+    var_intercept = np.zeros(var.shape[1:], dtype = float)
     var_trend_err = np.zeros(var.shape[1:], dtype = float)
+    var_intercept_err = np.zeros(var.shape[1:], dtype = float)
 
     # for dim in range(1, var.ndim):
     if var.ndim == 2:
@@ -2861,12 +2921,16 @@ def calc_trend_climatevar(global_tas, var, var_units = None):
             m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, j])
             var_trend[j] = m
             var_trend_err[j] = err_m
+            var_intercept[j] = c
+            var_intercept_err[j] = err_c
     elif var.ndim == 3:
         for i in range(var.shape[1]):
             for j in range(var.shape[2]):
                 m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, i, j])
                 var_trend[i, j] = m
                 var_trend_err[i, j] = err_m
+                var_intercept[i, j] = c
+                var_intercept_err[i, j] = err_c
     elif var.ndim == 4:
         for k in range(var.shape[1]):
             for i in range(var.shape[2]):
@@ -2874,8 +2938,10 @@ def calc_trend_climatevar(global_tas, var, var_units = None):
                     m, c, err_m, err_c = linear_regre_witherr(global_tas, var[:, k, i, j])
                     var_trend[k, i, j] = m
                     var_trend_err[k, i, j] = err_m
+                    var_intercept[k, i, j] = c
+                    var_intercept_err[k, i, j] = err_c
 
-    return var_trend, var_trend_err
+    return var_trend, var_intercept, var_trend_err, var_intercept_err
 
 
 def calc_clus_freq(labels, numclus = None):

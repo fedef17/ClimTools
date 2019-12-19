@@ -186,7 +186,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -204,6 +204,8 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
 
     < detrended_eof_calculation > : Calculates a 20-year running mean for the geopotential before calculating the eofs.
     < detrended_anom_for_clustering > : Calculates the anomalies for clustering using the same detrended running mean.
+
+    < detrend_only_global > : detrends only the global tendencies over area <area_dtr>, which defaults to global.
 
     Note on the anomaly calculation: it is suggested to calculate the climatological mean (climat_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
     """
@@ -279,6 +281,10 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
                 PCs = ref_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
     else:
         # No detrending
+        if detrend_only_global:
+            print('Detrending global tendencies over area {}'.format(area_dtr))
+            var_season = ctl.trend_climate_linregress(lat, lon, var_season, dates_season, None, area_dtr)
+
         if is_daily:
             if climat_mean is None:
                 climat_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
