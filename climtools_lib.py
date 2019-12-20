@@ -1770,20 +1770,18 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
     if dates_range is not None:
         var, dates = sel_time_range(var, dates, dates_range)
 
-    if len(var) <= len(season):
-        cut = False
-
     dates_pdh = pd.to_datetime(dates)
 
     if season is not None:
+        if len(var) <= len(season): cut = False
         var_season, dates_season = sel_season(var, dates, season, cut = cut, remove_29feb = True)
     else:
         # the season has already been selected
         var_season = var
         dates_season = dates
 
+    dates_diff = dates_season[1:] - dates_season[:-1]
     if check_daily(dates):
-        dates_diff = dates_season[1:] - dates_season[:-1]
         jump = dates_diff > pd.Timedelta('3 days')
         okju = np.where(jump)[0] + 1
         okju = np.append([0], okju)
@@ -1793,9 +1791,14 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
         all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
     else:
-        n_seas = len(var_season)//len(season)
-        all_dates_seas = [dates_season[len(season)*i:len(season)*(i+1)] for i in range(n_seas)]
-        all_var_seas = [var_season[len(season)*i:len(season)*(i+1), ...] for i in range(n_seas)]
+        jump = dates_diff > pd.Timedelta('40 days')
+        maxjump = int(np.round(np.max([ju.days for ju in dates_diff])/30.))
+        len_seas = 12 - maxjump + 1
+        if season is not None:
+            if len_seas != len(season): raise ValueError('BUG in calculation of season length: {} vs {}'.format(len_seas, len(season)))
+        n_seas = len(var_season)//len_seas
+        all_dates_seas = [dates_season[len_seas*i:len_seas*(i+1)] for i in range(n_seas)]
+        all_var_seas = [var_season[len_seas*i:len_seas*(i+1), ...] for i in range(n_seas)]
 
     all_vars = np.stack(all_var_seas)
     all_dates = np.array(all_dates_seas)
