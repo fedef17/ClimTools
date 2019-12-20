@@ -1523,6 +1523,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = False):
         cut = False
 
     if cut:
+        #print('cut!', indxs)
         if (12 in indxs) and (1 in indxs):
             #REMOVING THE FIRST MONTHS (for the first year) because there is no previuos december
             start_cond = (dates_season_pdh.year == dates_pdh.year[0]) & (dates_season_pdh.month == indxs[0])
@@ -1531,16 +1532,22 @@ def sel_season(var, dates, season, cut = True, remove_29feb = False):
             else:
                 start = 0
 
+            #print(start)
+
             #REMOVING THE LAST MONTHS (for the last year) because there is no following january
-            end_cond = (dates_season_pdh.year == dates_pdh.year[-1]) & (dates_season_pdh.month == indxs[0])
+            end_cond = (dates_season_pdh.year == dates_pdh.year[-1]) & (dates_season_pdh.month == indxs[0]) # 0 is ok, I look for the beginning of the next (incomplete) season!
             if np.sum(end_cond):
                 end = np.argmax(end_cond)
             else:
                 end = None
 
+            #print(end, len(var_season))
+            #print(dates_season[start], dates_season[end])
+
             var_season = var_season[start:end, ...]
             dates_season = dates_season[start:end]
 
+    #print(len(var_season), dates_season[0], dates_season[-1])
     #print(var_season.shape)
 
     return var_season, dates_season
@@ -1650,7 +1657,7 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
     var_set_notr = []
     for va, ye in zip(var_set, years):
         cos = c + m*ye
-        print(ye, cos)
+        #print(ye, cos)
         var_set_notr.append(va - cos)
 
     var_set_notr = np.concatenate(var_set_notr, axis = 0)
@@ -1800,9 +1807,10 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_dates_seas = [dates_season[len_seas*i:len_seas*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len_seas*i:len_seas*(i+1), ...] for i in range(n_seas)]
 
+    #for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
     all_vars = np.stack(all_var_seas)
     all_dates = np.array(all_dates_seas)
-    print(np.shape(all_vars))
+    #print(np.shape(all_vars))
 
     if not seasonal_average:
         return all_vars, all_dates

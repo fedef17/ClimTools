@@ -81,6 +81,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             lon = coords['lon']
             dates = coords['dates']
 
+        if sel_yr_range is not None:
+            print('Selecting year range: {}'.format(sel_yr_range))
+            var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
         var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb = remove_29feb)
     else:
         print('Concatenating {} input files..\n'.format(len(ifile)))
@@ -102,6 +105,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 lon = coords['lon']
                 dates = coords['dates']
 
+            if sel_yr_range is not None:
+                var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
             dates_full.append(dates)
             var_full.append(var)
 
@@ -131,16 +136,16 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             print('Calculating detrended climatology')
             climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
 
-    if sel_yr_range is not None:
-        print('Selecting date range {}\n'.format(sel_yr_range))
-        dates_season_pdh = pd.to_datetime(dates_season)
-        okdat = (dates_season_pdh.year >= sel_yr_range[0]) & (dates_season_pdh.year <= sel_yr_range[1])
-        var_season = var_season[okdat, ...]
-        dates_season = dates_season[okdat]
-
-        dates_pdh = pd.to_datetime(dates)
-        okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
-        dates = dates[okdat]
+    # if sel_yr_range is not None:
+    #     print('Selecting date range {}\n'.format(sel_yr_range))
+    #     dates_season_pdh = pd.to_datetime(dates_season)
+    #     okdat = (dates_season_pdh.year >= sel_yr_range[0]) & (dates_season_pdh.year <= sel_yr_range[1])
+    #     var_season = var_season[okdat, ...]
+    #     dates_season = dates_season[okdat]
+    #
+    #     dates_pdh = pd.to_datetime(dates)
+    #     okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
+    #     dates = dates[okdat]
 
     results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, climat_mean_dtr = climat_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, **kwargs)
 
