@@ -48,7 +48,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -81,7 +81,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             lon = coords['lon']
             dates = coords['dates']
 
-        var_season, dates_season = ctl.sel_season(var, dates, season)
+        var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb = remove_29feb)
     else:
         print('Concatenating {} input files..\n'.format(len(ifile)))
         var_sel = []
@@ -105,7 +105,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             dates_full.append(dates)
             var_full.append(var)
 
-            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False)
+            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
             var_sel.append(var_season)
             dates_sel.append(dates_season)
 
