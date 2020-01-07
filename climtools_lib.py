@@ -309,7 +309,8 @@ def check_increasing_latlon(var, lat, lon):
         lat = lat[::-1]
         lon = lon[nuord]
     else:
-        print('lat/lon already OK\n')
+        pass
+        #print('lat/lon already OK\n')
 
     return var, lat, lon
 
@@ -356,18 +357,18 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
     < force_level_units > : str. Sometimes level units are not set inside the netcdf file. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
     """
-    print('INIZIO')
+    #print('INIZIO')
     ndim = cube.ndim
     datacoords = dict()
     aux_info = dict()
     ax_coord = dict()
 
-    print(datetime.now())
+    #print(datetime.now())
 
     if regrid_to_reference is not None:
         cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
 
-    print(datetime.now())
+    #print(datetime.now())
 
     if convert_units_to:
         if cube.units.name != convert_units_to:
@@ -378,9 +379,9 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             else:
                 cube.convert_units(convert_units_to)
 
-    print(datetime.now())
+    #print(datetime.now())
     data = cube.data
-    print(datetime.now())
+    #print(datetime.now())
     aux_info['var_units'] = cube.units.name
 
     coord_names = [cord.name() for cord in cube.coords()]
@@ -391,7 +392,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     allconames['lon'] = np.array(['longitude', 'lon'])
     allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
 
-    print(datetime.now())
+    #print(datetime.now())
 
     for i, nam in enumerate(coord_names):
         found = False
@@ -407,7 +408,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         if not found:
             print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
 
-    print(datetime.now())
+    #print(datetime.now())
     if 'level' in datacoords.keys() and extract_level_hPa is not None:
         okind = datacoords['level'] == extract_level_hPa
         if len(datacoords['level']) == 1:
@@ -419,7 +420,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         else:
             raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
 
-    print(datetime.now())
+    #print(datetime.now())
     if 'time' in coord_names:
         time = cube.coord('time').points
         time_units = cube.coord('time').units
@@ -440,11 +441,11 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         aux_info['time_units'] = time_units.name
         aux_info['time_calendar'] = time_cal
 
-    print(datetime.now())
+    #print(datetime.now())
     data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
     datacoords['lat'] = lat
     datacoords['lon'] = lon
-    print('FINE')
+    #print('FINE')
 
     return data, datacoords, aux_info
 
@@ -1631,7 +1632,7 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
-def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', print_trend = False):
+def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', print_trend = True):
     """
     Subtracts the linear trend calculated on some regional (or global) average from the timeseries.
     Area defaults to global, but can assume each area allowed by sel_area.
@@ -1657,10 +1658,12 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
     var_set_notr = []
     for va, ye in zip(var_set, years):
         cos = c + m*ye
-        #print(ye, cos)
+        #print(ye, np.nanmean(va), np.sum(np.isnan(va)), cos)
         var_set_notr.append(va - cos)
 
     var_set_notr = np.concatenate(var_set_notr, axis = 0)
+
+    #print('Detrended series: {:8.2e} {:8.2e}'.format(np.nanmean(var_set_notr), np.nanstd(var_set_notr)))
 
     return var_set_notr
 
@@ -1807,7 +1810,10 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_dates_seas = [dates_season[len_seas*i:len_seas*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len_seas*i:len_seas*(i+1), ...] for i in range(n_seas)]
 
-    #for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
+    lengths = np.unique([len(coso) for coso in all_dates_seas])
+    if len(lengths) > 1:
+        for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
+
     all_vars = np.stack(all_var_seas)
     all_dates = np.array(all_dates_seas)
     #print(np.shape(all_vars))

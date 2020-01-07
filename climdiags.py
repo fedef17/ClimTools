@@ -48,7 +48,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -75,15 +75,32 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
+
         else:
             var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
 
+        cond = np.abs(var) > thres_inf
+        if np.any(cond):
+            if np.sum(cond) > np.size(var)/100:
+                raise ValueError('Too many values larger than thres_inf = {:8.2e}. Check the threshold or the data file.'.format(thres_inf))
+            print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found an average of {:5.2f} points per time slice.'.format(thres_inf, 1.0*np.sum(cond)/np.shape(var)[0]))
+            var[cond] = np.nan
+
         if sel_yr_range is not None:
             print('Selecting year range: {}'.format(sel_yr_range))
             var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+
+        all_ye = np.arange(dates[0].year, dates[-1].year + 1)
+        all_ye_data = np.unique([da.year for da in dates])
+        if len(all_ye) > len(all_ye_data):
+            missing_ye = []
+            for ye in all_ye:
+                if ye not in all_ye_data: missing_ye.append(ye)
+            print('WARNING! Missing years in model: {}'.format(missing_ye))
+
         var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb = remove_29feb)
     else:
         print('Concatenating {} input files..\n'.format(len(ifile)))
@@ -214,6 +231,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
 
     Note on the anomaly calculation: it is suggested to calculate the climatological mean (climat_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
     """
+
     is_daily = ctl.check_daily(dates_season)
     if is_daily:
         print('Analyzing a set of daily data..\n')
@@ -289,6 +307,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         if detrend_only_global:
             print('Detrending global tendencies over area {}'.format(area_dtr))
             var_season = ctl.trend_climate_linregress(lat, lon, var_season, dates_season, None, area_dtr)
+            climat_mean = None # need to recalculate climate_mean
 
         if is_daily:
             if climat_mean is None:
@@ -330,6 +349,9 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
             labels.append(np.argmin(distcen))
             dist_centroid.append(np.min(distcen))
         labels = np.array(labels)
+
+        if len(np.unique(labels)) == 1:
+            raise ValueError('Problem in assignment: all points assigned to cluster {}!!'.format(np.unique(labels)))
         dist_centroid = np.array(dist_centroid)
 
     if detrended_anom_for_clustering:
