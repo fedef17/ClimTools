@@ -14,6 +14,7 @@ import iris
 import netCDF4 as nc
 import pandas as pd
 from datetime import datetime
+import cftime
 import pickle
 from copy import deepcopy as copy
 
@@ -69,6 +70,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     print('Running precompute\n')
     if type(ifile) not in [list, np.ndarray]:
+        is_ensemble = False
         if netcdf4_read:
             #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
             var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
@@ -86,7 +88,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         if np.any(cond):
             if np.sum(cond) > np.size(var)/100:
                 raise ValueError('Too many values larger than thres_inf = {:8.2e}. Check the threshold or the data file.'.format(thres_inf))
-            print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found an average of {:5.2f} points per time slice.'.format(thres_inf, 1.0*np.sum(cond)/np.shape(var)[0]))
+            print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found {:5d} points.'.format(thres_inf, np.sum(cond)))
             var[cond] = np.nan
 
         if sel_yr_range is not None:
@@ -103,6 +105,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
         var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb = remove_29feb)
     else:
+        is_ensemble = True
         print('Concatenating {} input files..\n'.format(len(ifile)))
         var_sel = []
         var_full = []
@@ -130,6 +133,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
             var_sel.append(var_season)
             dates_sel.append(dates_season)
+
+        ens_lengths_sel = [len(vau) for vau in var_sel]
+        ens_lengths_full = [len(vau) for vau in var_full]
 
         var_season = np.concatenate(var_sel)
         dates_season = np.concatenate(dates_sel)
@@ -175,11 +181,104 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         results['time_units'] = aux_info['time_units']
 
     var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season)
-    results['monthly_freq'] = dict()
-    results['monthly_freq']['freq'] = var
-    results['monthly_freq']['dates'] = pd.to_datetime(datesmon)
+    results['freq_clus_monthly'] = var
+    results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
+
+    # separare qui gli ensembles? sì
+    if is_ensemble:
+        results['is_ensemble'] = True
+        results['ens_lengths_sel'] = ens_lengths_sel
+        results['ens_lengths_full'] = ens_lengths_full
 
     return results
+
+
+def extract_ensemble_results(results, ens_names):
+    """
+    Separates results from ens_members, assigning a key to each member.
+    """
+    nures = copy(results)
+
+    for mod in results.keys():
+        tot_len = len(results[mod]['labels'])
+        for ke in results[mod]:
+            if type(results[mod][ke]) in [list, np.ndarray]:
+                if len(results[mod][ke]) == tot_len:
+                    # split
+                    res = results[mod][ke]
+                    nures[mod][ke] = dict()
+
+                    i = 0
+                    for nam, lensel in zip(ens_names[mod], results[mod]['ens_lengths_sel']):
+                        nures[mod][ke][nam] = res[i:i+lensel]
+                        i += lensel
+
+        res = results[mod]['dates_allyear']
+        nures[mod]['dates_allyear'] = dict()
+        i = 0
+        for nam, lensel in zip(ens_names[mod], results[mod]['ens_lengths_full']):
+            nures[mod]['dates_allyear'][nam] = res[i:i+lensel]
+            i += lensel
+
+        nures[mod]['freq_clus_monthly'] = dict()
+        nures[mod]['freq_clus_monthly_dates'] = dict()
+        for nam in ens_names[mod]:
+            var, datesmon = ctl.calc_monthly_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam])
+            nures[mod]['freq_clus_monthly'][nam] = var
+            nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
+
+        nures[mod]['ens_names'] = ens_names[mod]
+
+    return nures
+
+
+def export_results_to_json(filename, results):
+    """
+    Export the results dictionary to json file. Some complicated keys are skipped.
+    - ndarrays are converted to lists
+    - datetime objects to string
+    """
+
+    import json
+    nures = copy(results)
+
+    alkeens = 'labels dist_centroid pcs dates dates_allyear freq_clus_monthly freq_clus_monthly_dates'.split()
+
+    for mod in results.keys():
+        for ke in results[mod]:
+            if ke in ['solver', 'regime_transition_pcs', 'resid_times', 'var_area', 'var_glob']:
+                del nures[mod][ke]
+
+        if 'is_ensemble' not in results[mod].keys(): # backward Compatibility
+            nures[mod]['is_ensemble'] = False
+
+        if not nures[mod]['is_ensemble']:
+            for ke in nures[mod]:
+                if type(nures[mod][ke]) in [np.ndarray, pd.DatetimeIndex]:
+                    nures[mod][ke] = nures[mod][ke].tolist()
+                # le date
+                if type(nures[mod][ke]) == list and type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                    nures[mod][ke] = [cos.isoformat() for cos in nures[mod][ke]]
+        else:
+            for ke in nures[mod]:
+                if type(nures[mod][ke]) == np.ndarray:
+                    nures[mod][ke] = nures[mod][ke].tolist()
+
+            for ke in alkeens:
+                # devo splittare ogni ens
+                for ens in nures[mod]['ens_names']:
+                    coso = nures[mod][ke][ens]
+                    if type(coso) in [np.ndarray, pd.DatetimeIndex]:
+                        nures[mod][ke][ens] = coso.tolist()
+
+                    coso = nures[mod][ke][ens]
+                    if type(coso) == list and type(coso[0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                        nures[mod][ke][ens] = [cos.isoformat() for cos in coso]
+
+    with open(filename, 'w') as fp:
+        json.dump(nures, fp)
+
+    return nures
 
 
 def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
@@ -944,6 +1043,311 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
                 lat = obs['lat']
                 lon = obs['lon']
 
+            ctl.save_iris_3Dfield(outfil, var, lat, lon)
+
+        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
+
+        # for each model
+        for mod in models:
+            outfil = cart_out + '{}_{}.nc'.format(nam, mod)
+
+            var = models[mod][modelnam]
+            lat = models[mod]['lat_area']
+            lon = models[mod]['lon_area']
+            if nam == 'cluspattern':
+                lat = models[mod]['lat']
+                lon = models[mod]['lon']
+
+            ctl.save_iris_3Dfield(outfil, var, lat, lon)
+
+    # Salvo time series: labels, pcs, dist_centroid?
+    long_name = 'cluster index (ranges from 0 to {})'.format(inputs['numclus']-1)
+    std_name = None
+    units = '1'
+    if obs is not None:
+        outfil = cart_out + 'regime_index_ref.nc'
+
+        var = obs['labels']
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
+
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+
+        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = obs['time_units'], time_cal = obs['time_cal'], std_name = std_name, units = units, long_name = long_name)
+
+    for mod in models:
+        outfil = cart_out + 'regime_index_{}.nc'.format(mod)
+
+        var = models[mod]['labels']
+        dates_all = models[mod]['dates_allyear']
+        dates_season = models[mod]['dates']
+
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+
+        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], std_name = std_name, units = units, long_name = long_name)
+
+        outfil2 = cart_out + 'regime_index_{}_compressed.npy'.format(mod)
+        if type(var_all) is np.ma.core.MaskedArray:
+            np.save(outfil2, var_all.compressed())
+        else:
+            np.save(outfil2, var_all)
+
+
+    # monthly clus frequency
+    std_name = None
+    units = '1'
+    if obs is not None:
+        outfil = cart_out + 'clus_freq_monthly_ref.nc'
+
+        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('clus {} frequency'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, datesmon)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+
+    for mod in models:
+        outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
+        var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'])
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('clus {} frequency'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, datesmon)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+
+    # pcs
+    std_name = None
+    units = 'm'
+    if obs is not None:
+        outfil = cart_out + 'pcs_timeseries_ref.nc'
+
+        var = obs['pcs'].T
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('pcs {}'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+
+    for mod in models:
+        outfil = cart_out + 'pcs_timeseries_{}.nc'.format(mod)
+
+        var = models[mod]['pcs'].T
+        dates_all = models[mod]['dates_allyear']
+        dates_season = models[mod]['dates']
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('pcs {}'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+
+    return
+
+
+def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
+    """
+    Output in netcdf format.
+    """
+    print('Saving netcdf output to {}\n'.format(cart_out))
+    # Salvo EOFs, cluspattern_area, clus_pattern_global
+    long_name = 'geopotential height anomaly at 500 hPa'
+    std_name = 'geopotential_height_anomaly'
+    units = 'm'
+
+    # print('obs: ', obs.keys())
+    print('models: ', list(models.values())[0].keys())
+    for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
+        obsnam = nam
+        modelnam = nam
+        # if nam == 'model_eofs':
+        #     if 'model_eofs' not in list(models.values())[0].keys():
+        #         modelnam = 'eofs' # backward Compatibility
+        #     if 'model_eofs' not in obs.keys():
+        #         obsnam = 'eofs' # backward Compatibility
+
+        if obs is not None:
+            outfil = cart_out + '{}_ref.nc'.format(nam)
+            var = obs[obsnam]
+            lat = obs['lat_area']
+            lon = obs['lon_area']
+            if nam == 'cluspattern':
+                lat = obs['lat']
+                lon = obs['lon']
+
+            ctl.save_iris_3Dfield(outfil, var, lat, lon)
+
+        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
+
+        # for each model
+        for mod in models:
+            outfil = cart_out + '{}_{}.nc'.format(nam, mod)
+
+            var = models[mod][modelnam]
+            lat = models[mod]['lat_area']
+            lon = models[mod]['lon_area']
+            if nam == 'cluspattern':
+                lat = models[mod]['lat']
+                lon = models[mod]['lon']
+
+            ctl.save_iris_3Dfield(outfil, var, lat, lon)
+
+    # Salvo time series: labels, pcs, dist_centroid?
+    long_name = 'cluster index (ranges from 0 to {})'.format(inputs['numclus']-1)
+    std_name = None
+    units = '1'
+    if obs is not None:
+        outfil = cart_out + 'regime_index_ref.nc'
+
+        var = obs['labels']
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
+
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+
+        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = obs['time_units'], time_cal = obs['time_cal'], std_name = std_name, units = units, long_name = long_name)
+
+    for mod in models:
+        ens_names = models[mod]['ens_names']
+
+        for ens in ens_names:
+            outfil = cart_out + 'regime_index_{}_{}.nc'.format(mod, ens)
+
+            var = models[mod]['labels'][ens]
+            dates_all = models[mod]['dates_allyear'][ens]
+            dates_season = models[mod]['dates'][ens]
+
+            var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+
+            ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], std_name = std_name, units = units, long_name = long_name)
+
+            outfil2 = cart_out + 'regime_index_{}_{}_compressed.npy'.format(mod, ens)
+            if type(var_all) is np.ma.core.MaskedArray:
+                np.save(outfil2, var_all.compressed())
+            else:
+                np.save(outfil2, var_all)
+
+
+    # monthly clus frequency
+    std_name = None
+    units = '1'
+    if obs is not None:
+        outfil = cart_out + 'clus_freq_monthly_ref.nc'
+
+        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('clus {} frequency'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, datesmon)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+
+    for mod in models:
+        ens_names = models[mod]['ens_names']
+
+        for ens in ens_names:
+            outfil = cart_out + 'clus_freq_monthly_{}_{}.nc'.format(mod, ens)
+            var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'][ens], models[mod]['dates'][ens])
+
+            vars_all = []
+            long_names = []
+            for i, fre in enumerate(var):
+                long_names.append('clus {} frequency'.format(i))
+                var_all, datesall = ctl.complete_time_range(fre, datesmon)
+                vars_all.append(var_all)
+
+            ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+
+    # pcs
+    std_name = None
+    units = 'm'
+    if obs is not None:
+        outfil = cart_out + 'pcs_timeseries_ref.nc'
+
+        var = obs['pcs'].T
+        dates_all = obs['dates_allyear']
+        dates_season = obs['dates']
+
+        vars_all = []
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('pcs {}'.format(i))
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            vars_all.append(var_all)
+
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+
+    for mod in models:
+        ens_names = models[mod]['ens_names']
+
+        for ens in ens_names:
+            outfil = cart_out + 'pcs_timeseries_{}_{}.nc'.format(mod, ens)
+
+            var = models[mod]['pcs'][ens].T
+            dates_all = models[mod]['dates_allyear'][ens]
+            dates_season = models[mod]['dates'][ens]
+
+            vars_all = []
+            long_names = []
+            for i, fre in enumerate(var):
+                long_names.append('pcs {}'.format(i))
+                var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+                vars_all.append(var_all)
+
+            ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+
+    return
+
+
+def out_WRtool_netcdf_orig(cart_out, models, obs, inputs):
+    """
+    Output in netcdf format.
+    """
+    print('Saving netcdf output to {}\n'.format(cart_out))
+    # Salvo EOFs, cluspattern_area, clus_pattern_global
+    long_name = 'geopotential height anomaly at 500 hPa'
+    std_name = 'geopotential_height_anomaly'
+    units = 'm'
+
+    # print('obs: ', obs.keys())
+    print('models: ', list(models.values())[0].keys())
+    for nam in ['model_eofs', 'cluspattern', 'cluspattern_area']:
+        obsnam = nam
+        modelnam = nam
+        # if nam == 'model_eofs':
+        #     if 'model_eofs' not in list(models.values())[0].keys():
+        #         modelnam = 'eofs' # backward Compatibility
+        #     if 'model_eofs' not in obs.keys():
+        #         obsnam = 'eofs' # backward Compatibility
+
+        if obs is not None:
+            outfil = cart_out + '{}_ref.nc'.format(nam)
+            var = obs[obsnam]
+            lat = obs['lat_area']
+            lon = obs['lon_area']
+            if nam == 'cluspattern':
+                lat = obs['lat']
+                lon = obs['lon']
+
             var_ok, lat_ok, lon_ok = ctl.check_increasing_latlon(var, lat, lon)
 
             index = ctl.create_iris_coord(np.arange(len(var)), None, long_name = 'index')
@@ -1236,8 +1640,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
         ctl.newline(filos)
         filos.write('---- Optimal ratio of regime structure ----\n')
-        varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
-        filos.write('{:10.4f}'.format(varopt))
+        #varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
+        filos.write('{:10.4f}'.format(obs['var_ratio']))
 
         ctl.newline(filos)
         filos.write('---- Regimes frequencies ----\n')
@@ -1302,8 +1706,9 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
         ctl.newline(filos)
         filos.write('---- Optimal ratio of regime structure ----\n')
-        varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
-        filos.write('{:10.4f}'.format(varopt))
+        #varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
+        #filos.write('{:10.4f}'.format(varopt))
+        filos.write('{:10.4f}'.format(models[mod]['var_ratio']))
 
         ctl.newline(filos)
         filos.write('---- Regimes frequencies ----\n')
@@ -1377,9 +1782,10 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
             ctl.newline(filos)
             filos.write('---- Optimal ratio of regime structure ----\n')
-            varopts = []
-            for mod in inputs['groups'][gru]:
-                varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
+
+            varopts = [models[mod]['var_ratio'] for mod in inputs['groups'][gru]]
+            # for mod in inputs['groups'][gru]:
+                #varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
             sig = np.mean(varopts)
             std = np.std(varopts)
             filos.write('{:10.4f} +/- {:10.4f}'.format(sig, std))

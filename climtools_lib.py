@@ -110,15 +110,27 @@ def openlog(cart_out, tag = None, redirect_stderr = True):
     return
 
 
-def cmip6_naming(filename):
-    cose = filename.split('_')
+def cmip6_naming(filename, seasonal = False):
+    nome = filename.strip('.nc')
+    cose = nome.split('_')
 
     metadata = dict()
     metadata['var_name'] = cose[0]
     metadata['MIP_table'] = cose[1]
     metadata['model'] = cose[2]
     metadata['experiment'] = cose[3]
-    metadata['member'] = cose[4]
+    metadata['dates'] = cose[6].split('-')
+
+    if not seasonal:
+        metadata['member'] = cose[4]
+    else:
+        metadata['sdate'] = cose[4].split('-')[0]
+        metadata['member'] = cose[4].split('-')[1]
+        #fyear = int(metadata['dates'][0][:4]) - int(metadata['sdate'][1:])
+
+    # APPUNTI PER CUSTOM FILE NAMING
+    #nome = '$var$_$miptab$_$model$_$exptype$_$sdate$-$mem$_$gr$_$dates$.nc'
+    #nome.strip('.nc').strip('$').split('$_$')
 
     return metadata
 
@@ -1103,6 +1115,111 @@ def create_iris_coord(points, std_name, long_name = None, units = None, circular
         coord = iris.coords.AuxCoord(points, standard_name = std_name, long_name = long_name, units = units)
 
     return coord
+
+
+def save_iris_3Dfield(filename, var, lat, lon, dates = None, time_units = None, time_cal = None):
+    """
+    Saves 3D field (time, lat, lon) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
+    """
+
+    var_ok, lat_ok, lon_ok = check_increasing_latlon(var, lat, lon)
+
+    if dates is None:
+        index = create_iris_coord(np.arange(len(var)), None, long_name = 'index')
+    else:
+        if time_units is None or time_cal is None:
+            raise ValueError('Must specify both time_units and time_cal')
+        time = nc.date2num(dates, units = time_units, calendar = time_cal)
+        index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
+
+    colist = create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
+    colist = [index] + colist
+    cubo = create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
+
+    iris.save(cubo, filename)
+
+    return
+
+
+def save_iris_3Dfield(filename, var, lat, lon, dates = None, time_units = None, time_cal = None, std_name = None, long_name = '', units = '1'):
+    """
+    Saves 3D field (time, lat, lon) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
+    """
+
+    var_ok, lat_ok, lon_ok = check_increasing_latlon(var, lat, lon)
+
+    if dates is None:
+        index = create_iris_coord(np.arange(len(var)), None, long_name = 'index')
+    else:
+        if time_units is None or time_cal is None:
+            raise ValueError('Must specify both time_units and time_cal')
+        time = nc.date2num(dates, units = time_units, calendar = time_cal)
+        index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
+
+    colist = create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
+    colist = [index] + colist
+    cubo = create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
+
+    iris.save(cubo, filename)
+
+    return
+
+
+def save_iris_timeseries(filename, var, dates = None, time_units = None, time_cal = None, std_name = None, long_name = '', units = '1'):
+    """
+    Saves a timeseries 1D (time, var) or 2D (time, index, var) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
+    """
+
+    if dates is None:
+        time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
+    else:
+        if time_units is None or time_cal is None:
+            raise ValueError('Must specify both time_units and time_cal')
+
+        time = nc.date2num(dates, units = time_units, calendar = time_cal)
+        try:
+            time_index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
+        except Exception as errrr:
+            print('!!!! Error in creating iris time coord, creating dummy time_index instead !!!!\n')
+            print(errrr)
+            time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
+
+    cubo = create_iris_cube(var, std_name, units, [time_index], long_name = long_name)
+    iris.save(cubo, filename)
+
+    return
+
+
+def save_iris_N_timeseries(filename, vars, dates = None, time_units = None, time_cal = None, long_names = None):
+    """
+    Saves a set of timeseries 1D (time, var) as multiple variables in nc file using iris. If dates is None, creates a dummy 'index' coordinate. Variable names are set by std_names (only if cmor) or long_names.
+    """
+
+    if dates is None:
+        time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
+    else:
+        if time_units is None or time_cal is None:
+            raise ValueError('Must specify both time_units and time_cal')
+        time = nc.date2num(dates, units = time_units, calendar = time_cal)
+        try:
+            time_index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
+        except Exception as errrr:
+            print('!!!! Error in creating iris time coord, creating dummy time_index instead !!!!\n')
+            print(errrr)
+            time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
+
+    if long_names is None:
+        long_names = ['var{}'.format(i) for i in range(len(vars))]
+
+    cubolis = []
+    for var, longnam in zip(vars, long_names):
+        cubo = create_iris_cube(var, None, '1', [time_index], long_name = longnam)
+        cubolis.append(cubo)
+
+    cubolis = iris.cube.CubeList(cubolis)
+    iris.save(cubolis, filename)
+
+    return
 
 
 def save2Dncfield(lats,lons,variab,varname,ofile):
@@ -3247,6 +3364,68 @@ def calc_composite_map(var, mask):
     return pattern #, pattern_std
 
 
+def calc_gradient_2d(map, lat, lon):
+    """
+    Calculates the gradient of a 2D map.
+
+    !! Neglects the change of dx and dy with height: 1/1000 error for 500 hPa !!
+    """
+
+    latgr = np.deg2rad(lat)
+    longr = np.deg2rad(lon)
+    longr = (longr-longr[0])%(2*np.pi)
+
+    longrgr, latgrgr = np.meshgrid(longr, latgr)
+
+    xs = Rearth*np.cos(latgrgr)*longrgr
+    ys = Rearth*latgrgr
+
+    # Siccome ho posizioni variabili devo fare riga per riga. Parto dalle x
+    grads = []
+    for xli, mapli in zip(xs, map):
+        grads.append(np.gradient(mapli, xli))
+    gradx = np.stack(grads)
+
+    grads = []
+    for yli, mapli in zip(ys.T, map.T):
+        grads.append(np.gradient(mapli, yli))
+    grady = np.stack(grads).T
+
+    grad = np.stack([gradx, grady])
+
+    return grad
+
+
+def calc_max_gradient(map, lat, lon, return_indices = False):
+    """
+    Calculates the maximum gradient in a 2D map. If return_indices is True, also returns the indices corresponding to the peak.
+
+    !! Neglects the change of dx and dy with height: 1/1000 error for 500 hPa !!
+
+    Spatial units are m. So the gradient is in m-1.
+    """
+
+    #grad = np.gradient(map, ys, xs)
+    grad = calc_gradient_2d(map, lat, lon)
+    grad2 = np.sum([gr**2 for gr in grad], axis = 0)
+
+    if return_indices:
+        #print(grad2.shape, np.argmax(grad2))
+        id = np.unravel_index(np.argmax(grad2), grad2.shape)
+        return np.sqrt(np.max(grad2)), id
+    else:
+        return np.sqrt(np.max(grad2))
+
+
+def calc_max_gradient_series(var, lat, lon):
+    """
+    Applies calc_max_gradient to a timeseries of maps.
+    """
+    allgrads = np.array([calc_max_gradient(map, lat, lon) for map in var])
+
+    return allgrads
+
+
 def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
     """
     Calculates residence times given a set of indices indicating cluster numbers.
@@ -3995,7 +4174,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None):
     """
     Plots field contours on the axis of a figure.
 
@@ -4037,6 +4216,13 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
             lon_o = lon
             data, lon = cutil.add_cyclic_point(data, coord = lon)
 
+            if add_contour_field is not None:
+                add_contour_field, lon = cutil.add_cyclic_point(add_contour_field, coord = lon_o)
+
+            if add_vector_field is not None:
+                add_vector_field[0], lon = cutil.add_cyclic_point(add_vector_field[0], coord = lon_o)
+                add_vector_field[1], lon = cutil.add_cyclic_point(add_vector_field[1], coord = lon_o)
+
             if add_hatching is not None:
                 add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
 
@@ -4048,12 +4234,14 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         if nskip == 0: nskip = 1
         if draw_contour_lines:
             map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+        if add_contour_field is not None:
+            map_plot_lines = ax.contour(xi, yi, add_contour_field, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
     elif plot_type == 'pcolormesh':
         map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree())
     elif plot_type == 'contour':
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
-        map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+        map_plot = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
     else:
         raise ValueError('plot_type <{}> not recognised. Only available: filled_contour, pcolormesh, contour'.format(plot_type))
 
@@ -4062,6 +4250,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','wb'))
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
 
+    if add_vector_field is not None:
+        vecfi = ax.quiver(xi, yi, add_vector_field[0], add_vector_field[1])
 
     if isinstance(proj, ccrs.PlateCarree):
         if plot_margins is not None:
@@ -4275,7 +4465,7 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None):
     """
     Plots a single map to a figure.
 
@@ -4324,7 +4514,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = None, add_vector_field = None)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -4557,7 +4747,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -4590,6 +4780,11 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     """
 
     proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
+
+    if add_contour_field is None:
+        add_contour_field = [None]*len(dataset)
+    if add_vector_field is None:
+        add_vector_field = [None]*len(dataset)
 
     # Determining color levels
     if isinstance(cmap, str):
@@ -4655,7 +4850,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens])
 
             if number_subplots:
                 subtit = nens
