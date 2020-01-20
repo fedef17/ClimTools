@@ -4220,8 +4220,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
                 add_contour_field, lon = cutil.add_cyclic_point(add_contour_field, coord = lon_o)
 
             if add_vector_field is not None:
-                add_vector_field[0], lon = cutil.add_cyclic_point(add_vector_field[0], coord = lon_o)
-                add_vector_field[1], lon = cutil.add_cyclic_point(add_vector_field[1], coord = lon_o)
+                add_vector_field_0, lon = cutil.add_cyclic_point(add_vector_field[0], coord = lon_o)
+                add_vector_field_1, lon = cutil.add_cyclic_point(add_vector_field[1], coord = lon_o)
 
             if add_hatching is not None:
                 add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
@@ -4251,7 +4251,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
 
     if add_vector_field is not None:
-        vecfi = ax.quiver(xi, yi, add_vector_field[0], add_vector_field[1])
+        vecfi = ax.quiver(xi, yi, add_vector_field_0, add_vector_field_1)
 
     if isinstance(proj, ccrs.PlateCarree):
         if plot_margins is not None:

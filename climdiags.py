@@ -1318,6 +1318,230 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
     return
 
 
+def out_WRtool_mainres(outfile, models, obs, inputs):
+    """
+    Output of results in synthetic text format.
+    """
+    print('Writing main results to {}\n'.format(outfile))
+
+    filos = open(outfile, 'w')
+    ctl.printsep(filos)
+    ctl.newline(filos)
+    filos.write('Results of WRtool - {}\n'.format(ctl.datestamp()))
+    filos.write('----> Area: {}, Season: {}, year_range: {}\n'.format(inputs['area'], inputs['season'], inputs['year_range']))
+    ctl.newline(filos)
+    ctl.printsep(filos)
+
+    nsqr = np.sqrt(models[inputs['model_names'][0]]['cluspattern_area'].size)
+
+    if obs is not None:
+        # OUT for the observations
+        filos.write('----> observed: {}\n'.format(inputs['obs_name']))
+
+        if 'significance' in obs.keys():
+            ctl.newline(filos)
+            filos.write('---- Sharpness of regime structure ----\n')
+            filos.write('{:8.3f}'.format(obs['significance']))
+
+        ctl.newline(filos)
+        filos.write('---- Optimal ratio of regime structure ----\n')
+        #varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
+        filos.write('{:10.4f}'.format(obs['var_ratio']))
+
+        ctl.newline(filos)
+        filos.write('---- Regimes frequencies ----\n')
+        stringa = inputs['numclus']*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*obs['freq_clus']))
+
+        if inputs['show_transitions']:
+            ctl.newline(filos)
+            filos.write('---- Transition matrix ----\n')
+            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+            for i, cen in enumerate(obs['trans_matrix']):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+        ctl.newline(filos)
+        filos.write('---- Centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(obs['centroids']):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+        ctl.newline(filos)
+        if 'model_eofs_varfrac' in obs.keys():
+            oks = np.sqrt(obs['model_eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.sqrt(obs['eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:10.3e}'+'\n'
+        filos.write(stringa.format(*oks))
+
+        ctl.newline(filos)
+        if 'model_eofs_varfrac' in obs.keys():
+            oks = np.cumsum(obs['model_eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.cumsum(obs['eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*oks))
+        ctl.newline(filos)
+        ctl.printsep(filos)
+
+    # NOw for each model
+
+    for mod in inputs['model_names']:
+        if 'RMS' in models[mod].keys():
+            filos.write('----> model: {}\n'.format(mod))
+            ctl.newline(filos)
+            filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
+            stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*(models[mod]['RMS']/nsqr)))
+            stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*models[mod]['patcor']))
+        else:
+            filos.write('----> observed: {}\n'.format(mod))
+
+        if 'significance' in models[mod].keys():
+            ctl.newline(filos)
+            filos.write('---- Sharpness of regime structure ----\n')
+            filos.write('{:8.3f}'.format(models[mod]['significance']))
+
+        ctl.newline(filos)
+        filos.write('---- Optimal ratio of regime structure ----\n')
+        #varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
+        #filos.write('{:10.4f}'.format(varopt))
+        filos.write('{:10.4f}'.format(models[mod]['var_ratio']))
+
+        ctl.newline(filos)
+        filos.write('---- Regimes frequencies ----\n')
+        stringa = inputs['numclus']*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*models[mod]['freq_clus']))
+
+        if inputs['show_transitions']:
+            ctl.newline(filos)
+            filos.write('---- Transition matrix ----\n')
+            stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+            filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+            for i, cen in enumerate(models[mod]['trans_matrix']):
+                stringa = len(cen)*'{:11.2e}' + '\n'
+                filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+        ctl.newline(filos)
+        filos.write('---- Centroids coordinates (in pc space) ----\n')
+        for i, cen in enumerate(models[mod]['centroids']):
+            stringa = len(cen)*'{:10.2f}' + '\n'
+            filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+        ctl.newline(filos)
+        if 'model_eofs_eigenvalues' in models[mod].keys():
+            oks = np.sqrt(models[mod]['model_eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.sqrt(models[mod]['eofs_eigenvalues'][:10])
+            filos.write('---- sqrt eigenvalues of first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:10.3e}'+'\n'
+        filos.write(stringa.format(*oks))
+
+        ctl.newline(filos)
+        if 'model_eofs_varfrac' in models[mod].keys():
+            oks = np.cumsum(models[mod]['model_eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} model EOFs ----\n'.format(len(oks)))
+        else:
+            oks = np.cumsum(models[mod]['eofs_varfrac'][:10])
+            filos.write('---- cumulative varfrac explained by first {} EOFs ----\n'.format(len(oks)))
+        stringa = len(oks)*'{:8.2f}'+'\n'
+        filos.write(stringa.format(*oks))
+        ctl.newline(filos)
+        ctl.printsep(filos)
+
+    if inputs['groups'] is not None:
+        ctl.newline(filos)
+        ctl.printsep(filos)
+        for gru in inputs['groups']:
+            if 'RMS' in list(models.values())[0].keys():
+                filos.write('----> group: {}\n'.format(gru))
+                ctl.newline(filos)
+                filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
+                stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
+                coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
+                cosoerr = np.std([models[mod]['RMS'] for mod in inputs['groups'][gru]], axis = 0)/nsqr
+                filos.write(stringa.format(*coso))
+                stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
+                filos.write(stringa.format(*cosoerr))
+                stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
+                coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+                cosoerr = np.std([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+                filos.write(stringa.format(*coso))
+                stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
+                filos.write(stringa.format(*cosoerr))
+
+            if 'significance' in list(models.values())[0].keys():
+                ctl.newline(filos)
+                filos.write('---- Sharpness of regime structure ----\n')
+                sig = np.mean([models[mod]['significance'] for mod in inputs['groups'][gru]])
+                std = np.std([models[mod]['significance'] for mod in inputs['groups'][gru]])
+                filos.write('{:8.3f} +/- {:8.3f}'.format(sig, std))
+
+            ctl.newline(filos)
+            filos.write('---- Optimal ratio of regime structure ----\n')
+
+            varopts = [models[mod]['var_ratio'] for mod in inputs['groups'][gru]]
+            # for mod in inputs['groups'][gru]:
+                #varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
+            sig = np.mean(varopts)
+            std = np.std(varopts)
+            filos.write('{:10.4f} +/- {:10.4f}'.format(sig, std))
+
+            ctl.newline(filos)
+            filos.write('---- Regimes frequencies ----\n')
+            stringa = '    '+inputs['numclus']*'{:8.2f}'+'\n'
+            coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+            std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+            filos.write(stringa.format(*coso))
+            stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
+            filos.write(stringa.format(*std))
+
+            if inputs['show_transitions']:
+                ctl.newline(filos)
+                filos.write('---- Transition matrix ----\n')
+                stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
+                filos.write(stringa.format(*(['']+inputs['patnames_short'])))
+
+                coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+                std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+                for i, cen in enumerate(coso):
+                    stringa = len(cen)*'{:11.2e}' + '\n'
+                    filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+                filos.write('---- Std dev of transition matrix ----\n')
+                for i, cen in enumerate(std):
+                    stringa = len(cen)*'{:11.2e}' + '\n'
+                    filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
+
+            ctl.newline(filos)
+            coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+            std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+            filos.write('---- Centroids coordinates (in pc space) ----\n')
+            for i, cen in enumerate(coso):
+                stringa = len(cen)*'{:10.2f}' + '\n'
+                filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+            filos.write('---- Std dev of centroids coordinates (in pc space) ----\n')
+            for i, cen in enumerate(std):
+                stringa = len(cen)*'{:10.2f}' + '\n'
+                filos.write('cluster {}: '.format(i) + stringa.format(*cen))
+
+            ctl.newline(filos)
+            ctl.printsep(filos)
+
+    filos.close()
+
+    return
+
+
 #############################################################################
 #############################################################################
 
