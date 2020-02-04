@@ -128,6 +128,27 @@ def cmip6_naming(filename, seasonal = False):
         metadata['member'] = cose[4].split('-')[1]
         #fyear = int(metadata['dates'][0][:4]) - int(metadata['sdate'][1:])
 
+    return metadata
+
+def custom_naming(filename, keynames, seasonal = False):
+    nome = filename.strip('.nc')
+    cose = nome.split('_')
+
+    metadata = dict()
+    for iii, ke in enumerate(keynames):
+        metadata[ke] = cose[iii]
+
+    if seasonal:
+        if 'sdate' not in keynames:
+            raise ValueError('One of the custom keys must be "sdate" since this is a seasonal run')
+
+    if 'member' not in keynames:
+        metadata['member'] = ''
+        #raise ValueError('One of the custom keys must be "member"')
+
+    if 'model' not in keynames:
+        raise ValueError('One of the custom keys must be "model"')
+
     # APPUNTI PER CUSTOM FILE NAMING
     #nome = '$var$_$miptab$_$model$_$exptype$_$sdate$-$mem$_$gr$_$dates$.nc'
     #nome.strip('.nc').strip('$').split('$_$')
@@ -1585,7 +1606,7 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     return var_area, lat_new, lon_new
 
 
-def sel_season(var, dates, season, cut = True, remove_29feb = False):
+def sel_season(var, dates, season, cut = True, remove_29feb = True):
     """
     Selects the desired seasons from the dataset.
 
@@ -2961,7 +2982,9 @@ def calc_varopt_molt(pcs, centroids, labels):
     """
 
     numpcs = centroids.shape[1]
-    freq_clus_abs = calc_clus_freq(labels)/100.
+    numclus = centroids.shape[0]
+
+    freq_clus_abs = calc_clus_freq(labels, numclus)/100.
 
     varopt = np.sum(freq_clus_abs*np.sum(centroids**2, axis = 1))
 
@@ -3078,12 +3101,12 @@ def calc_trend_climatevar(global_tas, var, var_units = None):
     return var_trend, var_intercept, var_trend_err, var_intercept_err
 
 
-def calc_clus_freq(labels, numclus = None):
+def calc_clus_freq(labels, numclus):
     """
     Calculates clusters frequency.
     """
-    if numclus is None:
-        numclus = int(np.max(labels)+1)
+    # if numclus is None:
+    #     numclus = int(np.max(labels)+1)
     #print('yo',labels.shape)
 
     num_mem = []
@@ -3096,36 +3119,28 @@ def calc_clus_freq(labels, numclus = None):
     return freq_clus
 
 
-def calc_seasonal_clus_freq(labels, dates, nmonths_season = 3):
+def calc_seasonal_clus_freq(labels, dates, numclus):
     """
     Calculates cluster frequency season by season.
     """
-    numclus = int(np.max(labels)+1)
 
-    dates_pdh = pd.to_datetime(dates)
-    dates_init = dates_pdh[0]
-    season_range = pd.Timedelta('{} days 00:00:00'.format(nmonths_season*31))
+    lab_seas, dates_seas = seasonal_set(labels, dates, None)
 
     freqs = []
-    while dates_init < dates_pdh[-1]:
-        dateok = (dates_pdh >= dates_init) & (dates_pdh < dates_init+season_range)
-        freqs.append(calc_clus_freq(labels[dateok], numclus = numclus))
-        nextdat = dates_pdh > dates_init+season_range
-        if np.sum(nextdat) > 0:
-            dates_init = dates_pdh[nextdat][0]
-        else:
-            break
+    for labs, dats in zip(lab_seas, dates_seas):
+        freqs.append(calc_clus_freq(labs, numclus))
 
     freqs = np.stack(freqs)
+    years = np.array([da[0].year for da in dates_seas])
 
-    return freqs.T
+    return freqs.T, years
 
 
-def calc_monthly_clus_freq(labels, dates):
+def calc_monthly_clus_freq(labels, dates, numclus):
     """
     Calculates monthly cluster frequency.
     """
-    numclus = int(np.max(labels)+1)
+    #numclus = int(np.max(labels)+1)
 
     dates_pdh = pd.to_datetime(dates)
     years = dates_pdh.year
@@ -3168,10 +3183,10 @@ def clus_order_by_frequency(centroids, labels):
     """
     Orders the clusters in decreasing frequency. Returns new labels and ordered centroids.
     """
-    numclus = int(np.max(labels)+1)
+    numclus = len(centroids)
     #print('yo',labels.shape)
 
-    freq_clus = calc_clus_freq(labels)
+    freq_clus = calc_clus_freq(labels, numclus)
     new_ord = freq_clus.argsort()[::-1]
 
     centroids, labels = change_clus_order(centroids, labels, new_ord)
@@ -4237,7 +4252,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         if add_contour_field is not None:
             map_plot_lines = ax.contour(xi, yi, add_contour_field, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
     elif plot_type == 'pcolormesh':
-        map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree())
+        map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree(), vmin = clevels[0], vmax = clevels[-1])
     elif plot_type == 'contour':
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
@@ -4460,6 +4475,90 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
         i+=0.7
 
         ax.set_xticks([])
+    #ax.grid(color = 'lightslategray', alpha = 0.5)
+
+    return
+
+
+def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True):
+    """
+    Plots a boxplot. allpercs is a dictionary with keys: mean, p10, p25, p50, p75, p90
+
+    For each key, allpercs[key] is a list with the values corresponding to each model.
+    """
+
+    i = 0
+
+    if versions is None:
+        versions = [ens_names[0]]*len(model_names)
+
+    if edge_colors is None: edge_colors = colors
+
+    if positions is None:
+        positions = list(np.arange(len(model_names))*0.7)
+        if obsperc is not None:
+            positions.append(positions[-1]+0.35+0.7)
+        if plot_ensmeans:
+            for cos in ens_names:
+                positions.append(positions[-1]+0.7)
+
+    for iii, (pos, mod, col, vv, mcol) in enumerate(zip(positions, model_names, colors, versions, edge_colors)):
+        boxlist = []
+        box = {'med': allpercs['p50'][iii], 'q1': allpercs['p25'][iii], 'q3': allpercs['p75'][iii], 'whislo': allpercs['p10'][iii], 'whishi': allpercs['p90'][iii], 'showfliers' : False}
+        boxlist.append(box)
+
+        boxprops = {'edgecolor' : mcol, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
+        whiskerprops = {'color': mcol, 'linewidth': 2}
+        medianprops = {'color': mcol, 'linewidth': 4}
+        capprops = {'color': mcol, 'linewidth': 2}
+        bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+
+        boxplo = ax.bxp(boxlist, [pos], [wi], **bxp_kwargs)
+        if plot_mean: ax.scatter(pos, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
+        # if allpercs['ens_std'][iii] > 0.:
+        #     ax.scatter(i, allpercs['ens_min'][iii], color = mcol, marker = 'v', s = 20)
+        #     ax.scatter(i, allpercs['ens_max'][iii], color = mcol, marker = '^', s = 20)
+
+    iii += 1
+    if obsperc is not None:
+        ax.axvline(positions[iii]-0.5, color = 'grey', alpha = 0.6, zorder = -1)
+        boxlist = []
+        box = {'med': obsperc['p50'], 'q1': obsperc['p25'], 'q3': obsperc['p75'], 'whislo': obsperc['p10'], 'whishi': obsperc['p90'], 'showfliers' : False}
+        boxlist.append(box)
+
+        boxprops = {'edgecolor' : obs_color, 'linewidth': 2, 'facecolor': obs_color, 'alpha': 0.6}
+        whiskerprops = {'color': obs_color, 'linewidth': 2}
+        medianprops = {'color': obs_color, 'linewidth': 4}
+        capprops = {'color': obs_color, 'linewidth': 2}
+        bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+
+        boxplo = ax.bxp(boxlist, [positions[iii]], [wi], **bxp_kwargs)
+        iii += 1
+
+    if plot_ensmeans:
+        mean_vals = dict()
+        for kak, col, pos in zip(ens_names, ens_colors, positions[iii:]):
+            for cos in allpercs.keys():
+                mean_vals[(cos, kak)] = np.mean([val for val, vv in zip(allpercs[cos], versions) if vv == kak])
+            mean_vals[('ens_min', kak)] = np.min([val for val, vv in zip(allpercs['mean'], versions) if vv == kak])
+            mean_vals[('ens_max', kak)] = np.max([val for val, vv in zip(allpercs['mean'], versions) if vv == kak])
+
+            boxlist = []
+            box = {'med': mean_vals[('p50', kak)], 'q1': mean_vals[('p25', kak)], 'q3': mean_vals[('p75', kak)], 'whislo': mean_vals[('p10', kak)], 'whishi': mean_vals[('p90', kak)], 'showfliers' : False}
+            boxlist.append(box)
+
+            boxprops = {'edgecolor' : col, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
+            whiskerprops = {'color': col, 'linewidth': 2}
+            medianprops = {'color': col, 'linewidth': 4}
+            capprops = {'color': col, 'linewidth': 2}
+            bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+
+            boxplo = ax.bxp(boxlist, [pos], [wi], **bxp_kwargs)
+            if plot_mean: ax.scatter(pos, mean_vals[('mean', kak)], color = col, marker = 'o', s = 20)
+            ax.scatter(pos, mean_vals[('ens_min', kak)], color = col, marker = 'v', s = 20)
+            ax.scatter(pos, mean_vals[('ens_max', kak)], color = col, marker = '^', s = 20)
+
+            ax.set_xticks([])
     #ax.grid(color = 'lightslategray', alpha = 0.5)
 
     return

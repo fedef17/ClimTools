@@ -180,7 +180,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         results['time_cal'] = aux_info['time_calendar']
         results['time_units'] = aux_info['time_units']
 
-    var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season)
+    var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season, kwargs['numclus'])
     results['freq_clus_monthly'] = var
     results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
 
@@ -189,6 +189,10 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         results['is_ensemble'] = True
         results['ens_lengths_sel'] = ens_lengths_sel
         results['ens_lengths_full'] = ens_lengths_full
+    else:
+        var, years = ctl.calc_seasonal_clus_freq(results['labels'], results['dates'], kwargs['numclus'])
+        results['freq_clus_seasonal'] = var
+        results['freq_clus_seasonal_years'] = years
 
     return results
 
@@ -198,6 +202,8 @@ def extract_ensemble_results(results, ens_names):
     Separates results from ens_members, assigning a key to each member.
     """
     nures = copy(results)
+    mod = list(results.keys())[0]
+    numclus = len(results[mod]['centroids'])
 
     for mod in results.keys():
         tot_len = len(results[mod]['labels'])
@@ -222,10 +228,16 @@ def extract_ensemble_results(results, ens_names):
 
         nures[mod]['freq_clus_monthly'] = dict()
         nures[mod]['freq_clus_monthly_dates'] = dict()
+        nures[mod]['freq_clus_seasonal'] = dict()
+        nures[mod]['freq_clus_seasonal_years'] = dict()
         for nam in ens_names[mod]:
-            var, datesmon = ctl.calc_monthly_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam])
+            var, datesmon = ctl.calc_monthly_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
             nures[mod]['freq_clus_monthly'][nam] = var
             nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
+
+            var, years = ctl.calc_seasonal_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
+            nures[mod]['freq_clus_seasonal'][nam] = var
+            nures[mod]['freq_clus_seasonal_years'][nam] = years
 
         nures[mod]['ens_names'] = ens_names[mod]
 
@@ -242,9 +254,13 @@ def export_results_to_json(filename, results):
     import json
     nures = copy(results)
 
-    alkeens = 'labels dist_centroid pcs dates dates_allyear freq_clus_monthly freq_clus_monthly_dates'.split()
+    alkeens = 'labels dist_centroid pcs dates dates_allyear freq_clus_monthly freq_clus_monthly_dates maxgrad freq_clus_seasonal freq_clus_seasonal_years'.split()
 
     for mod in results.keys():
+        if results[mod] is None:
+            nures[mod] = []
+            continue
+
         for ke in results[mod]:
             if ke in ['solver', 'regime_transition_pcs', 'resid_times', 'var_area', 'var_glob']:
                 del nures[mod][ke]
@@ -274,6 +290,7 @@ def export_results_to_json(filename, results):
                     coso = nures[mod][ke][ens]
                     if type(coso) == list and type(coso[0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
                         nures[mod][ke][ens] = [cos.isoformat() for cos in coso]
+
 
     with open(filename, 'w') as fp:
         json.dump(nures, fp)
@@ -466,7 +483,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     print('varopt: {:8.4f}\n'.format(varopt))
-    freq_clus = ctl.calc_clus_freq(labels)
+    freq_clus = ctl.calc_clus_freq(labels, numclus)
 
     results = dict()
 
@@ -642,7 +659,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 
     varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
     print('varopt: {:8.4f}\n'.format(varopt))
-    freq_clus = ctl.calc_clus_freq(labels)
+    freq_clus = ctl.calc_clus_freq(labels, numclus)
 
     if run_significance_calc:
         print('Running clus sig\n')
@@ -685,7 +702,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         results[ennam]['pcs'] = PCs[ind1:ind2]
         results[ennam]['dates'] = dates_season_set[ens]
 
-        results[ennam]['freq_clus'] = ctl.calc_clus_freq(labels[ind1:ind2])
+        results[ennam]['freq_clus'] = ctl.calc_clus_freq(labels[ind1:ind2], numclus)
         results[ennam]['resid_times'] = ctl.calc_regime_residtimes(labels[ind1:ind2], dates = dates_season_set[ens])[0]
         results[ennam]['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels[ind1:ind2], dates_season_set[ens])
 
@@ -1024,6 +1041,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     long_name = 'geopotential height anomaly at 500 hPa'
     std_name = 'geopotential_height_anomaly'
     units = 'm'
+    numclus = inputs['numclus']
 
     # print('obs: ', obs.keys())
     print('models: ', list(models.values())[0].keys())
@@ -1101,7 +1119,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     if obs is not None:
         outfil = cart_out + 'clus_freq_monthly_ref.nc'
 
-        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'], numclus)
 
         vars_all = []
         long_names = []
@@ -1114,7 +1132,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
 
     for mod in models:
         outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
-        var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'])
+        var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'], models[mod]['dates'], numclus)
 
         vars_all = []
         long_names = []
@@ -1172,6 +1190,7 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
     long_name = 'geopotential height anomaly at 500 hPa'
     std_name = 'geopotential_height_anomaly'
     units = 'm'
+    numclus = inputs['numclus']
 
     # print('obs: ', obs.keys())
     print('models: ', list(models.values())[0].keys())
@@ -1252,7 +1271,7 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
     if obs is not None:
         outfil = cart_out + 'clus_freq_monthly_ref.nc'
 
-        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'])
+        var, datesmon = ctl.calc_monthly_clus_freq(obs['labels'], obs['dates'], numclus)
 
         vars_all = []
         long_names = []
@@ -1268,7 +1287,7 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
 
         for ens in ens_names:
             outfil = cart_out + 'clus_freq_monthly_{}_{}.nc'.format(mod, ens)
-            var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'][ens], models[mod]['dates'][ens])
+            var, datesmon = ctl.calc_monthly_clus_freq(models[mod]['labels'][ens], models[mod]['dates'][ens], numclus)
 
             vars_all = []
             long_names = []
@@ -2382,7 +2401,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     return
 
 
-def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False):
+def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False, plot_type = 'pcolormesh'):
     """
     Plot the results of WRtool.
 
@@ -2471,7 +2490,7 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
 
         fig = plt.figure(figsize=(16,6))
         ax = fig.add_subplot(121)
-        gigi = ax.imshow(results[lab]['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
+        gigi = ax.imshow(results['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
         ax.xaxis.tick_top()
         #ax.invert_yaxis()
         # ax.set_xticks(np.arange(n_clus)+0.5, minor=False)
@@ -2494,7 +2513,7 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
         ax.set_yticks(np.arange(n_clus), minor = False)
         ax.set_yticklabels(patnames_short, size='small')
         cb = plt.colorbar(gigi)
-        cb.set_label('Transitions only'.format(lab, obs_name))
+        cb.set_label('Transitions only')
         mappe.append(gigi)
 
         fig.suptitle(model_name)
@@ -2506,7 +2525,7 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     lat = results['lat']
     lon = results['lon']
     filename = cart_out+'Allclus_{}.pdf'.format(model_name)
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
     all_figures += figs
     figs[0].savefig(filename)
 
