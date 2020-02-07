@@ -49,7 +49,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -79,7 +79,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             dates = coords['dates']
 
         else:
-            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
@@ -190,9 +190,12 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         results['ens_lengths_sel'] = ens_lengths_sel
         results['ens_lengths_full'] = ens_lengths_full
     else:
-        var, years = ctl.calc_seasonal_clus_freq(results['labels'], results['dates'], kwargs['numclus'])
-        results['freq_clus_seasonal'] = var
-        results['freq_clus_seasonal_years'] = years
+        try:
+            var, years = ctl.calc_seasonal_clus_freq(results['labels'], results['dates'], kwargs['numclus'])
+            results['freq_clus_seasonal'] = var
+            results['freq_clus_seasonal_years'] = years
+        except Exception as czz:
+            print(czz)
 
     return results
 
@@ -281,6 +284,7 @@ def export_results_to_json(filename, results):
                     nures[mod][ke] = nures[mod][ke].tolist()
 
             for ke in alkeens:
+                if ke not in nures[mod]: continue
                 # devo splittare ogni ens
                 for ens in nures[mod]['ens_names']:
                     coso = nures[mod][ke][ens]
@@ -324,7 +328,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -537,7 +541,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
     results['dates'] = dates_season
 
-    results['maxgrad'] = ctl.calc_max_gradient_series(var_area, lat_area, lon_area)
+    if calc_gradient: results['maxgrad'] = ctl.calc_max_gradient_series(var_area, lat_area, lon_area)
 
     if heavy_output:
         results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs, filter_longer_than = 3)

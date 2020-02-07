@@ -93,6 +93,12 @@ def mkdir(cart):
     return
 
 def openlog(cart_out, tag = None, redirect_stderr = True):
+    """
+    Redirects stdout and stderr to a file.
+
+    DON'T USE WITH interactive session!
+    """
+
     if tag is None:
         tag = datetime.strftime(datetime.now(), format = '%d%m%y_h%H%M')
     # open our log file
@@ -381,7 +387,7 @@ def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
     return nucube
 
 
-def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = None, extract_level_hPa = None, regrid_scheme = 'linear', adjust_nonstd_dates = True):
+def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = None, extract_level_hPa = None, regrid_scheme = 'linear', adjust_nonstd_dates = True, pressure_levels = False):
     """
     Transforms an iris cube in a variable and a set of coordinates.
     Optionally selects a level (given in hPa).
@@ -433,7 +439,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         for std_nam in allconames:
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
-                if std_nam == 'level':
+                if pressure_levels and std_nam == 'level':
                     coor.convert_units('hPa')
                 datacoords[std_nam] = coor.points
                 ax_coord[std_nam] = i
@@ -442,16 +448,21 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
 
     #print(datetime.now())
-    if 'level' in datacoords.keys() and extract_level_hPa is not None:
-        okind = datacoords['level'] == extract_level_hPa
+    if 'level' in datacoords.keys():
         if len(datacoords['level']) == 1:
             data = data.squeeze()
             print('File contains only level {}'.format(datacoords['level'][0]))
-        elif np.any(okind):
-            datacoords['level'] = datacoords['level'][okind]
-            data = data.take(first(okind), axis = ax_coord['level'])
         else:
-            raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+            if extract_level_hPa is not None:
+                okind = datacoords['level'] == extract_level_hPa
+
+                if np.any(okind):
+                    datacoords['level'] = datacoords['level'][okind]
+                    data = data.take(first(okind), axis = ax_coord['level'])
+                else:
+                    raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+            else:
+                raise ValueError('File contains more levels. select level to keep if in hPa or give a single level file as input')
 
     #print(datetime.now())
     if 'time' in coord_names:
@@ -483,7 +494,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     return data, datacoords, aux_info
 
 
-def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True):
+def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False):
     """
     Read a netCDF file using the iris library.
 
@@ -522,7 +533,7 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
     all_vars = dict()
     if not is_ensemble:
         for cu in fh:
-            all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
+            all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates, pressure_levels = pressure_levels)
         if select_var is not None:
             print('Read variable: {}\n'.format(select_var))
             return all_vars[select_var]
@@ -1779,7 +1790,12 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
     """
 
     var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
-    var_set_avg = np.mean(var_set, axis = 1)
+    try:
+        var_set_avg = np.mean(var_set, axis = 1)
+    except Exception as czz:
+        print(czz)
+        var_set_avg = np.stack([np.mean(va, axis = 0) for va in var_set])
+
     years = np.array([da[0].year for da in dates_set])
 
     if area != 'global':
@@ -1948,23 +1964,30 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_dates_seas = [dates_season[len_seas*i:len_seas*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len_seas*i:len_seas*(i+1), ...] for i in range(n_seas)]
 
-    lengths = np.unique([len(coso) for coso in all_dates_seas])
-    if len(lengths) > 1:
-        for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
+    try:
+        all_vars = np.stack(all_var_seas)
+    except Exception as czz:
+        print(czz)
+        print('Seasons are not all of the same length: \n')
+        lengths = np.unique([len(coso) for coso in all_dates_seas])
+        if len(lengths) > 1:
+            for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
+        all_vars = np.array(all_var_seas)
 
-    all_vars = np.stack(all_var_seas)
     all_dates = np.array(all_dates_seas)
     #print(np.shape(all_vars))
 
-    if not seasonal_average:
-        return all_vars, all_dates
-    else:
-        return np.mean(all_vars, axis = 1), [dat[0] for dat in all_dates]
+    if seasonal_average:
+        return np.stack([np.mean(va, axis = 0) for va in all_vars]), [dat[0] for dat in all_dates]
+
+    return all_vars, all_dates
 
 
-def bootstrap(var, dates, season, y = None, apply_func = None, n_choice = 30, n_bootstrap = 100):
+def bootstrap(var, dates, season, y = None, apply_func = None, func_args = None, n_choice = 30, n_bootstrap = 100):
     """
     Performs a bootstrapping picking a set of n_choice seasons, n_bootstrap times. Optionally add a second variable y which has the same dates. apply_func is an external function that performs some operation on the bootstrapped quantities and takes var as input. If y is set, the function needs 2 inputs: var and y.
+
+    if requested by apply_func, func_args is a list of args.
     """
 
     var_set, dates_set = seasonal_set(var, dates, season)
@@ -1983,9 +2006,15 @@ def bootstrap(var, dates, season, y = None, apply_func = None, n_choice = 30, n_
 
         if apply_func is not None:
             if y is None:
-                cos = apply_func(var_ok)
+                if func_args is None:
+                    cos = apply_func(var_ok)
+                else:
+                    cos = apply_func(var_ok, *func_args)
             else:
-                cos = apply_func(var_ok, y_ok)
+                if func_args is None:
+                    cos = apply_func(var_ok, y_ok)
+                else:
+                    cos = apply_func(var_ok, y_ok, *func_args)
         else:
             cos = var_ok
 
@@ -2153,6 +2182,9 @@ def running_mean(var, wnd):
 
 
 def apply_recursive_1D(arr, func, *args, **kwargs):
+    """
+    Applies a 1D function recursively to all slices of a matrix. The dimension along which you want to apply the func must be in first position. Example: if applying a convolution along time, time must be the first dimension.
+    """
     if arr.ndim > 1:
         res = np.empty_like(arr)
         for ii in range(arr.shape[-1]):
@@ -2230,6 +2262,23 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
         raise ValueError('{} and {} differ'.format(len(var_anom_tot), len(var)))
 
     return var_anom_tot
+
+
+def anomalies_daily_detrended_global(lat, lon, var, dates, season, area_dtr = 'global', window_days = 20):
+    """
+    Calculates the daily anomalies wrt a trending climatology.
+
+    The trend is calculated for season. only season is selected
+
+    area_dtr indicates the area in which the global trend is calculated. Has to be in the form needed by sel_area.
+    """
+
+    var_season, dates_season = ctl.sel_season(var, dates, season)
+    var_season = ctl.trend_climate_linregress(lat, lon, var_season, dates_season, season, area_dtr)
+
+    var_anom = ctl.anomalies_daily(var_season, dates_season, window = window_days)
+
+    return var_anom
 
 
 def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
@@ -2873,6 +2922,55 @@ def eof_computation(var, latitude, weight = True):
     print('EOF computation took me {:7.2f} seconds'.format((end-start).total_seconds()))
 
     return solver
+
+
+def reconstruct_from_pcs(pcs, eofs):
+    """
+    Returns the timeseries of the variable represented by the pcs.
+    """
+
+    var = np.zeros(tuple([len(pcs)] + list(eofs.shape[1:])))
+    for ii, co in enumerate(pcs):
+        for pc, eof in zip(co, eofs):
+            var[ii] += pc*eof
+
+    return var
+
+
+def assign_to_closest_cluster(PCs, centroids):
+    """
+    Given a set of PCs and a set of centroids, assigns each PC to the closest centroid. Returns the corresponding label sequence.
+    """
+
+    labels = []
+    dist_centroid = []
+    for el in PCs:
+        distcen = [distance(el, centr) for centr in centroids]
+        labels.append(np.argmin(distcen))
+        dist_centroid.append(np.min(distcen))
+    labels = np.array(labels)
+
+    return labels
+
+
+def calc_distcen(PCs, labels, centroids):
+    dist_centroid = []
+    for el, lab in zip(PCs, labels):
+        dist_centroid.append(distance(el, centroids[lab]))
+        
+    return np.array(dist_centroid)
+
+
+def calc_effective_centroids(PCs, labels, numclus):
+    """
+    Calculates the centroids in PC space given pcs and labels.
+    """
+    effcen = []
+    for clus in range(numclus):
+        oklabs = labels == clus
+        effcen.append(np.mean(PCs[oklabs], axis = 0))
+
+    return np.stack(effcen)
 
 
 def Kmeans_clustering_from_solver(eof_solver, numclus, numpcs, **kwargs):
