@@ -2957,7 +2957,7 @@ def calc_distcen(PCs, labels, centroids):
     dist_centroid = []
     for el, lab in zip(PCs, labels):
         dist_centroid.append(distance(el, centroids[lab]))
-        
+
     return np.array(dist_centroid)
 
 
@@ -4578,7 +4578,7 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
     return
 
 
-def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True):
+def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True, plot_minmax = False):
     """
     Plots a boxplot. allpercs is a dictionary with keys: mean, p10, p25, p50, p75, p90
 
@@ -4613,9 +4613,10 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
 
         boxplo = ax.bxp(boxlist, [pos], [wi], **bxp_kwargs)
         if plot_mean: ax.scatter(pos, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
-        # if allpercs['ens_std'][iii] > 0.:
-        #     ax.scatter(i, allpercs['ens_min'][iii], color = mcol, marker = 'v', s = 20)
-        #     ax.scatter(i, allpercs['ens_max'][iii], color = mcol, marker = '^', s = 20)
+
+        if plot_minmax:
+            ax.scatter(pos, allpercs['ens_min'][iii], color = mcol, marker = 'v', s = 20)
+            ax.scatter(pos, allpercs['ens_max'][iii], color = mcol, marker = '^', s = 20)
 
     iii += 1
     if obsperc is not None:

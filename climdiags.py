@@ -328,7 +328,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -455,10 +455,22 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
             PCs = ref_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
 
     if not use_reference_clusters:
-        print('Running clustering\n')
-        #### CLUSTERING
-        centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
-        dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+        if not supervised_clustering:
+            print('Running clustering\n')
+            #### CLUSTERING
+            centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
+            dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+        else:
+            print('Running clustering with supervised fraction = {:5.2e}\n'.format(frac_super))
+            if frac_super == 0:
+                raise ValueError('fraction supervised is 0! cannot perform supervised clustering')
+            n_rep = int(np.ceil(len(PCs)*frac_super))
+            gigi = np.concatenate(n_rep*[ref_clusters_centers], axis = 0)
+            pcs2 = np.concatenate([PCs, gigi], axis = 0)
+
+            centroids, labels = ctl.Kmeans_clustering(pcs2, numclus, algorithm = clus_algorhitm)
+            labels = labels[:len(PCs)]
+            dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
     else:
         print('Assigning pcs to closest reference cluster center\n')
         centroids = ref_clusters_centers
