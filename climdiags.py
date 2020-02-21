@@ -71,15 +71,21 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     print('Running precompute\n')
     if type(ifile) not in [list, np.ndarray]:
         is_ensemble = False
-        if netcdf4_read:
-            #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            lat = coords['lat']
-            lon = coords['lon']
-            dates = coords['dates']
+        if ifile[-3:] == '.nc':
+            if netcdf4_read:
+                #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+                var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
 
-        else:
-            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+            else:
+                var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+        elif ifile[-4:] == '.grb' or ifile[-5:] == '.grib':
+            var, coords, aux_info = ctl.read3D_grib(ifile)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
@@ -113,14 +119,20 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         dates_full = []
         for fil in ifile:
             # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
-            if netcdf4_read:
-                var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
-                # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            else:
-                var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            if fil[-3:] == '.nc':
+                if netcdf4_read:
+                    var, coords, aux_info = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
+                    lat = coords['lat']
+                    lon = coords['lon']
+                    dates = coords['dates']
+                    # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+                else:
+                    var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+                    lat = coords['lat']
+                    lon = coords['lon']
+                    dates = coords['dates']
+            elif fil[-4:] == '.grb' or fil[-5:] == '.grib':
+                var, coords, aux_info = ctl.read3D_grib(fil)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
