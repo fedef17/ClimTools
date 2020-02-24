@@ -314,6 +314,16 @@ def get_size(obj, seen=None):
 #######################################################
 
 
+def readlines_to_matrix(lines, n_skip = 0, dtype = float):
+    """
+    Given readlines output of a datafile, returns a matrix. Skip the lines to be avoided (file header, non matrix lines). Very simple, won't work if the data lines are interrupted by comments or blank lines.
+    """
+    # read all the file and transform it into a matrix of floats
+    data = np.array([list(map(dtype, lin.rstrip().split())) for lin in lines[n_skip:]])
+
+    return data
+
+
 def check_increasing_latlon(var, lat, lon):
     """
     Checks that the latitude and longitude are in increasing order. Returns ordered arrays.
@@ -4426,6 +4436,45 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     #     return map_plot, map_plot_lines
     # else:
     #     return map_plot
+
+
+def extract_polys_contour(map_plot):
+    all_level_polys = []
+    for collec in map_plot.collections:
+        polys = []
+        # Loop through all polygons that have the same intensity level
+        for contour_path in collec.get_paths():
+            # Create the polygon for this intensity level
+            for ncp,cp in enumerate(contour_path.to_polygons()):
+                x = cp[:,0]
+                y = cp[:,1]
+                new_shape = geometry.Polygon([(i[0], i[1]) for i in zip(x,y)])
+                # The first polygon in the path is the main one, the following ones are "holes"
+                if ncp == 0:
+                    poly = new_shape
+                else:
+                    try:
+                        # Remove the holes if there are any
+                        poly = poly.difference(new_shape)
+                    except Exception as cazzz:
+                        print(cazzz)
+                        pass
+
+            polys.append(poly)
+
+        all_level_polys.append(polys)
+
+    return all_level_polys
+
+
+def plot_only_somelevels(ax, map_plot, colors, lev_to_plot):
+    all_level_polys = extract_polys_contour(map_plot)
+    for num, (polys, col) in enumerate(zip(all_level_polys, colors)):
+        if num not in lev_to_plot: continue
+        print('Plottin level {}\n'.format(num))
+        ax.add_geometries(polys, ccrs.PlateCarree(), facecolor = col, edgecolor = 'none')
+
+    return
 
 
 def get_cbar_range(data, symmetrical = False, percentiles = (0,100), n_color_levels = None):
