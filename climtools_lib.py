@@ -20,6 +20,7 @@ from matplotlib.animation import ImageMagickFileWriter
 import seaborn as sns
 
 from shapely.geometry.polygon import LinearRing
+from shapely import geometry
 
 import netCDF4 as nc
 import cartopy.crs as ccrs
