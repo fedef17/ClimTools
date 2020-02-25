@@ -49,7 +49,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -139,6 +139,12 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
             if sel_yr_range is not None:
                 var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+
+            if select_area_first:
+                print('Selecting area first for saving memory')
+                var, lat, lon = ctl.sel_area(lat, lon, var, area)
+
+            ### inefficient for memory: I just need 20 days at both ends to calculate climatology
             dates_full.append(dates)
             var_full.append(var)
 
