@@ -160,6 +160,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         var = np.concatenate(var_full)
         dates = np.concatenate(dates_full)
 
+        del var_full, var_sel, dates_full, dates_sel
+
     #HERE calculate climat_mean
     print('Calculating mean climatology\n')
     if ctl.check_daily(dates):
@@ -187,8 +189,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     #     dates_pdh = pd.to_datetime(dates)
     #     okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
     #     dates = dates[okdat]
+    del var
 
-    results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, climat_mean_dtr = climat_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, **kwargs)
+    results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, climat_mean_dtr = climat_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
 
     results['dates_allyear'] = dates
     if netcdf4_read:
@@ -346,7 +349,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -405,7 +408,12 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
                 climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var_season, dates_season, window_years = wnd_years)
             var_anom_dtr = ctl.anomalies_monthly_detrended(var_season, dates_season, climat_mean = climat_mean_dtr, dates_climate_mean = dates_climate_mean_dtr)
 
-        var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
+        if select_area_first:
+            var_area_dtr = var_anom_dtr
+            lat_area = lat
+            lon_area = lon
+        else:
+            var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
 
         print('Running compute\n')
         #### EOF COMPUTATION
@@ -434,7 +442,12 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
                     climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
                 var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
 
-            var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
+            if select_area_first:
+                var_area = var_anom
+                lat_area = lat
+                lon_area = lon
+            else:
+                var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
             if not use_reference_eofs:
                 PCs = eof_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
@@ -456,7 +469,12 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
                 climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
             var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
 
-        var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
+        if select_area_first:
+            var_area = var_anom
+            lat_area = lat
+            lon_area = lon
+        else:
+            var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
         print('Running compute\n')
         #### EOF COMPUTATION
