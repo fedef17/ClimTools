@@ -119,7 +119,13 @@ def openlog(cart_out, tag = None, redirect_stderr = True):
 
 
 def cmip6_naming(filename, seasonal = False):
-    nome = filename.strip('.nc')
+    if filename[-3:] == '.nc':
+        nome = filename.strip('.nc')
+    elif filename[-4:] == '.grb':
+        nome = filename.strip('.grb')
+
+    # Removing directory structure
+    nome = nome.split('/')[-1]
     cose = nome.split('_')
 
     metadata = dict()
@@ -139,7 +145,13 @@ def cmip6_naming(filename, seasonal = False):
     return metadata
 
 def custom_naming(filename, keynames, seasonal = False):
-    nome = filename.strip('.nc')
+    if filename[-3:] == '.nc':
+        nome = filename.strip('.nc')
+    elif filename[-4:] == '.grb':
+        nome = filename.strip('.grb')
+
+    # Removing directory structure
+    nome = nome.split('/')[-1]
     cose = nome.split('_')
 
     metadata = dict()

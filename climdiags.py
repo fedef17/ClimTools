@@ -349,6 +349,199 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
+def WRtool_core_new(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False):
+    """
+    Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
+    This is the core: works on a set of variables already filtered for the season.
+
+    < numpcs > : int. Number of Principal Components to be retained in the reduced phase space.
+    < numclus > : int. Number of clusters.
+    < wnd_days > : int. Number of days of the averaging window to calculate the climatology.
+
+    < clus_algorithm > : 'molteni' or 'sklearn', algorithm to be used for clustering.
+    < nrsamp_sig > : number of samples to be used for significance calculation.
+
+    < heavy_output > : bool. Output only the main results: cluspatterns, significance, patcor, et, labels. Instead outputs the eof solver and the local and global anomalies fields as well.
+
+    < ref_solver >, < ref_patterns_area > : reference solver (ERA) and reference cluster pattern for cluster comparison.
+
+    < detrended_eof_calculation > : Calculates a 20-year running mean for the geopotential before calculating the eofs.
+    < detrended_anom_for_clustering > : Calculates the anomalies for clustering using the same detrended running mean.
+
+    < detrend_only_global > : detrends only the global tendencies over area <area_dtr>, which defaults to global.
+
+    Note on the anomaly calculation: it is suggested to calculate the climatological mean (climat_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
+    """
+
+    is_daily = ctl.check_daily(dates_season)
+    if is_daily:
+        print('Analyzing a set of daily data..\n')
+    else:
+        print('Analyzing a set of monthly data..\n')
+
+
+    if use_reference_clusters:
+        print('\n\n <<<<< Using reference cluster centers! No KMeans is run on the models. (use_reference_clusters set to True)>>>>> \n\n\n')
+        use_reference_eofs = True
+        if ref_clusters_centers is None:
+            raise ValueError('reference cluster centers is None!')
+
+    if use_reference_eofs:
+        print('\n\n <<<<< Using reference EOF space for the whole analysis!! (use_reference_eofs set to True)>>>>> \n\n\n')
+        if ref_solver is None:
+            raise ValueError('reference solver is None!')
+
+    ## PRECOMPUTE
+    if detrend_only_global:
+        print('Detrending global tendencies over area {}'.format(area_dtr))
+        var_season = ctl.trend_climate_linregress(lat, lon, var_season, dates_season, None, area_dtr)
+        climat_mean = None # need to recalculate climate_mean
+
+    if is_daily:
+        if climat_mean is None:
+            climat_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
+        var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+    else:
+        if climat_mean is None:
+            climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
+        var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+
+    if select_area_first:
+        var_area = var_anom
+        lat_area = lat
+        lon_area = lon
+    else:
+        var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
+
+    print('Running compute\n')
+    #### EOF COMPUTATION
+    eof_solver = ctl.eof_computation(var_area, lat_area)
+    if perc is not None:
+        varfrac = eof_solver.varianceFraction()
+        acc = np.cumsum(varfrac*100)
+        numpcs = ctl.first(acc >= perc)
+        print('Selected numpcs = {}, accounting for {}% of the total variance.\n'.format(numpcs, perc))
+
+    if not use_reference_eofs:
+        PCs = eof_solver.pcs()[:, :numpcs]
+    else:
+        PCs = ref_solver.projectField(var_area, neofs=numpcs, eofscaling=0, weighted=True)
+
+    if not use_reference_clusters:
+        if not supervised_clustering:
+            print('Running clustering\n')
+            #### CLUSTERING
+            centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
+            dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+        else:
+            print('Running clustering with supervised fraction = {:5.2e}\n'.format(frac_super))
+            if frac_super == 0:
+                raise ValueError('fraction supervised is 0! cannot perform supervised clustering')
+            n_rep = int(np.ceil(len(PCs)*frac_super))
+            gigi = np.concatenate(n_rep*[ref_clusters_centers], axis = 0)
+            pcs2 = np.concatenate([PCs, gigi], axis = 0)
+
+            centroids, labels = ctl.Kmeans_clustering(pcs2, numclus, algorithm = clus_algorhitm)
+            labels = labels[:len(PCs)]
+            dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
+    else:
+        print('Assigning pcs to closest reference cluster center\n')
+        centroids = ref_clusters_centers
+        labels = []
+        dist_centroid = []
+        for el in PCs:
+            distcen = [ctl.distance(el, centr) for centr in centroids]
+            labels.append(np.argmin(distcen))
+            dist_centroid.append(np.min(distcen))
+        labels = np.array(labels)
+
+        if len(np.unique(labels)) == 1:
+            raise ValueError('Problem in assignment: all points assigned to cluster {}!!'.format(np.unique(labels)))
+        dist_centroid = np.array(dist_centroid)
+
+    if detrended_anom_for_clustering:
+        cluspattern = ctl.compute_clusterpatterns(var_anom_dtr, labels)
+    else:
+        cluspattern = ctl.compute_clusterpatterns(var_anom, labels)
+
+    cluspatt_area = []
+    for clu in cluspattern:
+        cluarea, _, _ = ctl.sel_area(lat, lon, clu, area)
+        cluspatt_area.append(cluarea)
+    cluspatt_area = np.stack(cluspatt_area)
+
+    varopt = ctl.calc_varopt_molt(PCs, centroids, labels)
+    print('varopt: {:8.4f}\n'.format(varopt))
+    freq_clus = ctl.calc_clus_freq(labels, numclus)
+
+    results = dict()
+
+    if run_significance_calc:
+        print('Running clus sig\n')
+        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
+        results['significance'] = significance
+
+    results['var_ratio'] = ctl.calc_varopt_molt(PCs, centroids, labels)
+
+    if ref_solver is not None and ref_patterns_area is not None:
+        print('Running compare\n')
+        perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs, bad_matching_rule = bad_matching_rule, matching_hierarchy = matching_hierarchy)
+
+        print('Optimal permutation: {}\n'.format(perm))
+        cluspattern = cluspattern[perm, ...]
+        cluspatt_area = cluspatt_area[perm, ...]
+        freq_clus = freq_clus[perm]
+
+        results['RMS'] = et
+        results['patcor'] = patcor
+
+    results['freq_clus'] = freq_clus
+    results['cluspattern'] = cluspattern
+    results['cluspattern_area'] = cluspatt_area
+    results['lat'] = lat
+    results['lat_area'] = lat_area
+    results['lon'] = lon
+    results['lon_area'] = lon_area
+    results['labels'] = labels
+    results['centroids'] = centroids
+    results['dist_centroid'] = dist_centroid
+    results['pcs'] = PCs
+
+    effcen = []
+    for clus in range(numclus):
+        oklabs = labels == clus
+        effcen.append(np.mean(PCs[oklabs], axis = 0))
+
+    results['eff_centroids'] = np.stack(effcen) # mean of the PCs for each cluster
+
+    if 'use_reference_eofs' and ref_solver is not None:
+        results['eofs_ref_pcs'] = ref_solver.eofs()[:numpcs]
+    else:
+        results['eofs_ref_pcs'] = eof_solver.eofs()[:numpcs]
+
+    results['model_eofs'] = eof_solver.eofs()[:numpcs]
+    results['model_eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
+    results['model_eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
+
+    results['resid_times'] = ctl.calc_regime_residtimes(labels, dates = dates_season)[0]
+    results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
+    results['dates'] = dates_season
+
+    if calc_gradient: results['maxgrad'] = ctl.calc_max_gradient_series(var_area, lat_area, lon_area)
+
+    if heavy_output:
+        results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs, filter_longer_than = 3)
+        if detrended_anom_for_clustering:
+            results['var_area'] = var_area_dtr
+            results['var_glob'] = var_anom_dtr
+        else:
+            results['var_area'] = var_area
+            results['var_glob'] = var_anom
+        results['solver'] = eof_solver
+
+    return results
+
+
 def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', detrended_eof_calculation = False, detrended_anom_for_clustering = False, use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, climat_mean_dtr = None, dates_climate_mean_dtr = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
