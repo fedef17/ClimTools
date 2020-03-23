@@ -36,7 +36,7 @@ import math
 from sklearn.cluster import KMeans
 
 import xarray as xr
-import cfgrib
+#import cfgrib
 
 from datetime import datetime
 import pickle
@@ -1479,6 +1479,18 @@ def sel_area_translate(area):
         latS = 0.0
         lonW = -180.
         lonE = 180.
+    elif area=='NML':
+        printarea='Northern Mid-Latitudes'
+        latN = 90.0
+        latS = 30.0
+        lonW = -180.
+        lonE = 180.
+    elif area=='Arctic':
+        printarea='Arctic'
+        latN = 90.0
+        latS = 70.0
+        lonW = -180.
+        lonE = 180.
     elif area=='Eu':
         printarea='Europe'
         latN = 72.0
@@ -1833,7 +1845,7 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
-def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', print_trend = True):
+def trend_climate_polyfit(lat, lon, var, dates, season, deg = 3, area = 'global', print_trend = True):
     """
     Subtracts the linear trend calculated on some regional (or global) average from the timeseries.
     Area defaults to global, but can assume each area allowed by sel_area.
@@ -1843,10 +1855,10 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
 
     var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
     try:
-        var_set_avg = np.mean(var_set, axis = 1)
+        var_set_avg = np.nanmean(var_set, axis = 1)
     except Exception as czz:
         print(czz)
-        var_set_avg = np.stack([np.mean(va, axis = 0) for va in var_set])
+        var_set_avg = np.stack([np.nanmean(va, axis = 0) for va in var_set])
 
     years = np.array([da[0].year for da in dates_set])
 
@@ -1856,14 +1868,15 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
     else:
         var_regional = global_mean(var_set_avg, lat)
 
-    m, c, err_m, err_c = linear_regre_witherr(years, var_regional)
-    if print_trend:
-        print('Trend: {:7.2e} +/- {:7.1e}\n'.format(m, err_m))
-        print('Intercept: {:7.2e} +/- {:7.1e}\n'.format(c, err_c))
+    #m, c, err_m, err_c = linear_regre_witherr(years, var_regional)
+    coeffs, covmat = np.polyfit(years, var_regional, deg = deg, cov = True)
+    # if print_trend:
+    #     print('Trend: {:7.2e} +/- {:7.1e}\n'.format(m, err_m))
+    #     print('Intercept: {:7.2e} +/- {:7.1e}\n'.format(c, err_c))
 
+    fitted = np.polyval(coeffs, years)
     var_set_notr = []
-    for va, ye in zip(var_set, years):
-        cos = c + m*ye
+    for va, ye, cos in zip(var_set, years, fitted):
         #print(ye, np.nanmean(va), np.sum(np.isnan(va)), cos)
         var_set_notr.append(va - cos)
 
@@ -1871,7 +1884,7 @@ def trend_climate_linregress(lat, lon, var, dates, season, area = 'global', prin
 
     #print('Detrended series: {:8.2e} {:8.2e}'.format(np.nanmean(var_set_notr), np.nanstd(var_set_notr)))
 
-    return var_set_notr
+    return var_set_notr, coeffs, var_regional
 
 
 def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
