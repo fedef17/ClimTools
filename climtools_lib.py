@@ -2283,8 +2283,8 @@ def lowpass_lanczos(var, wnd, nan_extremes = True):
     low_var = apply_recursive_1D(var, conv2, lanc20, mode = 'same')
 
     if nan_extremes:
-        low_var[:wnd/2] = np.nan
-        low_var[-1*wnd/2:] = np.nan
+        low_var[:wnd//2] = np.nan
+        low_var[-1*wnd//2:] = np.nan
 
     return low_var
 
