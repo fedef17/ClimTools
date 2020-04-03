@@ -2264,7 +2264,7 @@ def conv2(a, b, mode = 'same'):
     return np.convolve(b, a, mode = mode)
 
 
-def lowpass_lanczos(var, wnd):
+def lowpass_lanczos(var, wnd, nan_extremes = True):
     """
     Applies a lowpass Lanczos filter at wnd days (or months/years depending on the time units of var) on the first axis.
     """
@@ -2281,6 +2281,10 @@ def lowpass_lanczos(var, wnd):
     #         low_var_2[:, ii, jj] = np.convolve(lanc20, var[:, ii, jj], mode = 'same')
 
     low_var = apply_recursive_1D(var, conv2, lanc20, mode = 'same')
+
+    if nan_extremes:
+        low_var[:wnd/2] = np.nan
+        low_var[-1*wnd/2:] = np.nan
 
     return low_var
 
