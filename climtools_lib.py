@@ -432,12 +432,10 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     ax_coord = dict()
 
     #print(datetime.now())
-
     if regrid_to_reference is not None:
         cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
 
     #print(datetime.now())
-
     if convert_units_to:
         if cube.units.name != convert_units_to:
             print('Converting data from {} to {}\n'.format(cube.units.name, convert_units_to))
@@ -468,7 +466,9 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         for std_nam in allconames:
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
+                print(coor)
                 if pressure_levels and std_nam == 'level':
+                    print('Converting units to hPa')
                     coor.convert_units('hPa')
                 datacoords[std_nam] = coor.points
                 ax_coord[std_nam] = i
@@ -573,7 +573,7 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
         for cu in fh:
             if select_var is not None:
                 if cu.name() != select_var: continue
-            all_vars[cu.name()+'_{}'.format(ens_id)] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates)
+            all_vars[cu.name()+'_{}'.format(ens_id)] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates, pressure_levels = pressure_levels)
             ens_id += 1
 
     if len(all_vars.keys()) == 1:
