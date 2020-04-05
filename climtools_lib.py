@@ -123,6 +123,8 @@ def cmip6_naming(filename, seasonal = False):
         nome = filename.strip('.nc')
     elif filename[-4:] == '.grb':
         nome = filename.strip('.grb')
+    else:
+        raise ValueError('filename {} not valid'.format(filename))
 
     # Removing directory structure
     nome = nome.split('/')[-1]
@@ -149,6 +151,8 @@ def custom_naming(filename, keynames, seasonal = False):
         nome = filename.strip('.nc')
     elif filename[-4:] == '.grb':
         nome = filename.strip('.grb')
+    else:
+        raise ValueError('filename {} not valid'.format(filename))
 
     # Removing directory structure
     nome = nome.split('/')[-1]
