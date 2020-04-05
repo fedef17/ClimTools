@@ -73,6 +73,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         is_ensemble = False
         if ifile[-3:] == '.nc':
             if netcdf4_read:
+                if regrid_to_reference_cube is not None:
+                    print('WARNING! Unable to perform regridding with netcdf4_read set to True')
                 #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
                 var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
                 lat = coords['lat']
@@ -85,6 +87,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 lon = coords['lon']
                 dates = coords['dates']
         elif ifile[-4:] == '.grb' or ifile[-5:] == '.grib':
+            if regrid_to_reference_cube is not None or extract_level_hPa is not None:
+                print('WARNING! Unable to perform regridding or extracting level with grib file')
             var, coords, aux_info = ctl.read3D_grib(ifile)
             lat = coords['lat']
             lon = coords['lon']
@@ -121,6 +125,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
             if fil[-3:] == '.nc':
                 if netcdf4_read:
+                    if regrid_to_reference_cube is not None:
+                        print('WARNING! Unable to perform regridding with netcdf4_read set to True')
                     var, coords, aux_info = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
                     lat = coords['lat']
                     lon = coords['lon']
@@ -132,6 +138,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                     lon = coords['lon']
                     dates = coords['dates']
             elif fil[-4:] == '.grb' or fil[-5:] == '.grib':
+                if regrid_to_reference_cube is not None or extract_level_hPa is not None:
+                    print('WARNING! Unable to perform regridding or extracting level with grib file')
                 var, coords, aux_info = ctl.read3D_grib(fil)
                 lat = coords['lat']
                 lon = coords['lon']
@@ -206,7 +214,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     results['freq_clus_monthly'] = var
     results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
 
-    # separare qui gli ensembles? sì
+    # separare qui gli ensembles? no
     if is_ensemble:
         results['is_ensemble'] = True
         results['ens_lengths_sel'] = ens_lengths_sel
