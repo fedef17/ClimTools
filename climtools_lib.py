@@ -397,7 +397,8 @@ def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
     (nlat_ref, nlon_ref) = (len(ref_cube.coord('latitude').points), len(ref_cube.coord('longitude').points))
 
     if nlat*nlon < nlat_ref*nlon_ref:
-        raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
+        #raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
+        print('WARNING!! cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
 
     if nlat == nlat_ref and nlon == nlon_ref:
         lat_check = cube.coord('latitude').points == ref_cube.coord('latitude').points
