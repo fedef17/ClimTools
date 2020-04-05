@@ -959,7 +959,7 @@ def adjust_outofbound_dates(dates):
     syea = int(dates[0].strftime().split('-')[0])
     for ci in dates:
         # coso = ci.isoformat()
-        coso = ci.strftime()
+        coso = ci.strftime('%Y-%m-%d')
         listasp = coso.split('-')
         listasp[0] = '{:04d}'.format(int(listasp[0])+diff-syea)
         coso = '-'.join(listasp)
