@@ -467,6 +467,8 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
                 print(coor)
+                print(pressure_levels)
+                print(std_nam)
                 if pressure_levels and std_nam == 'level':
                     print('Converting units to hPa')
                     coor.convert_units('hPa')

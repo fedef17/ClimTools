@@ -133,7 +133,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                     dates = coords['dates']
                     # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
                 else:
-                    var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+                    var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
                     lat = coords['lat']
                     lon = coords['lon']
                     dates = coords['dates']
