@@ -933,7 +933,7 @@ def adjust_noleap_dates(dates):
     # diffs = []
     for ci in dates:
         # coso = ci.isoformat()
-        coso = ci.strftime()
+        coso = ci.strftime('%Y-%m-%d')
         nudat = pd.Timestamp(coso).to_pydatetime()
         # print(coso, nudat)
         # if ci-nudat >= pd.Timedelta('1 days'):
