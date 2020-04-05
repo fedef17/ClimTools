@@ -954,12 +954,14 @@ def adjust_outofbound_dates(dates):
     Still this will give problems with longer integrations... planned migration from pandas datetime to Datetime.datetime.
     """
     dates_ok = []
-    diff = 2000
+    diff = 1700
 
+    syea = int(dates[0].strftime().split('-')[0])
     for ci in dates:
-        coso = ci.isoformat()
+        # coso = ci.isoformat()
+        coso = ci.strftime()
         listasp = coso.split('-')
-        listasp[0] = '{:04d}'.format(int(listasp[0])+diff)
+        listasp[0] = '{:04d}'.format(int(listasp[0])+diff-syea)
         coso = '-'.join(listasp)
 
         nudat = pd.Timestamp(coso).to_pydatetime()
