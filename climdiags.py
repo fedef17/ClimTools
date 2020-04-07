@@ -1395,6 +1395,16 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
 
         ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
 
+    for mod in models:
+        outfil = cart_out + 'clus_freq_seasonal_{}.nc'.format(mod)
+        var, dates_yr = ctl.calc_seasonal_clus_freq(models[mod]['labels'], models[mod]['dates'], numclus, out_dates = True)
+
+        long_names = []
+        for i, fre in enumerate(var):
+            long_names.append('clus {} frequency'.format(i))
+
+        ctl.save_iris_N_timeseries(outfil, var, dates = dates_yr, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+
     # pcs
     std_name = None
     units = 'm'

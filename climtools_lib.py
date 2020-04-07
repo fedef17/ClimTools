@@ -3295,7 +3295,7 @@ def calc_clus_freq(labels, numclus):
     return freq_clus
 
 
-def calc_seasonal_clus_freq(labels, dates, numclus):
+def calc_seasonal_clus_freq(labels, dates, numclus, out_dates = False):
     """
     Calculates cluster frequency season by season.
     """
@@ -3309,7 +3309,10 @@ def calc_seasonal_clus_freq(labels, dates, numclus):
     freqs = np.stack(freqs)
     years = np.array([da[0].year for da in dates_seas])
 
-    return freqs.T, years
+    if out_dates:
+        return freqs.T, np.array([da[0] for da in dates_seas])
+    else:
+        return freqs.T, years
 
 
 def calc_monthly_clus_freq(labels, dates, numclus):
