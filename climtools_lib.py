@@ -94,6 +94,21 @@ def mkdir(cart):
     if not os.path.exists(cart): os.mkdir(cart)
     return
 
+def load_wrtool(ifile):
+    """
+    Loads wrtool output.
+    """
+    with open(ifile, 'rb') as ifi:
+        res = pickle.load(ifi)
+
+    if 'models' in res and 'reference' in res:
+        results = res['models']
+        results_ref = res['reference']
+    else:
+        results, results_ref = res
+
+    return results, results_ref
+
 def openlog(cart_out, tag = None, redirect_stderr = True):
     """
     Redirects stdout and stderr to a file.
@@ -3558,7 +3573,7 @@ def calc_composite_map(var, mask):
     return pattern #, pattern_std
 
 
-def calc_gradient_2d(map, lat, lon):
+def calc_gradient_2d(mappa, lat, lon):
     """
     Calculates the gradient of a 2D map.
 
@@ -3576,12 +3591,12 @@ def calc_gradient_2d(map, lat, lon):
 
     # Siccome ho posizioni variabili devo fare riga per riga. Parto dalle x
     grads = []
-    for xli, mapli in zip(xs, map):
+    for xli, mapli in zip(xs, mappa):
         grads.append(np.gradient(mapli, xli))
     gradx = np.stack(grads)
 
     grads = []
-    for yli, mapli in zip(ys.T, map.T):
+    for yli, mapli in zip(ys.T, mappa.T):
         grads.append(np.gradient(mapli, yli))
     grady = np.stack(grads).T
 
@@ -4844,7 +4859,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = None, add_vector_field = None, quiver_scale = quiver_scale)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = None, add_vector_field = add_vector_field, quiver_scale = quiver_scale)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
