@@ -1925,7 +1925,7 @@ def local_lineartrend_climate(lat, lon, var, dates, season, deg = 1, print_trend
     errtrendmat = np.empty_like(var_set[0])
     for i in np.arange(trendmat.shape[0]):
         for j in np.arange(trendmat.shape[1]):
-            m, c, err_m, err_c = linear_regre_witherr(years, var_set[i,j])
+            m, c, err_m, err_c = linear_regre_witherr(years, var_set[:,i,j])
             #coeffs, covmat = np.polyfit(years, var_set[i,j], deg = deg, cov = True)
             trendmat[i,j] = m
             errtrendmat[i,j] = err_m
