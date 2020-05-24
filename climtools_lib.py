@@ -1911,6 +1911,36 @@ def trend_climate_polyfit(lat, lon, var, dates, season, deg = 3, area = 'global'
     return var_set_notr, coeffs, var_regional
 
 
+def local_lineartrend_climate(lat, lon, var, dates, season, deg = 1, print_trend = True):
+    """
+    Calculates the linear trend on each grid point.
+
+    Returns trend and error.
+    """
+
+    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
+    years = np.array([da.year for da in dates_set])
+
+    trendmat = np.empty_like(var_set[0])
+    errtrendmat = np.empty_like(var_set[0])
+    for i in np.arange(trendmat.shape[0]):
+        for j in np.arange(trendmat.shape[1]):
+            m, c, err_m, err_c = linear_regre_witherr(years, var_set[i,j])
+            #coeffs, covmat = np.polyfit(years, var_set[i,j], deg = deg, cov = True)
+            trendmat[i,j] = m
+            errtrendmat[i,j] = err_m
+
+    # fitted = np.polyval(coeffs, years)
+    # var_set_notr = []
+    # for va, ye, cos in zip(var_set, years, fitted):
+    #     #print(ye, np.nanmean(va), np.sum(np.isnan(va)), cos)
+    #     var_set_notr.append(va - cos)
+    #
+    # var_set_notr = np.concatenate(var_set_notr, axis = 0)
+
+    return trendmat, errtrendmat
+
+
 def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     """
     Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
