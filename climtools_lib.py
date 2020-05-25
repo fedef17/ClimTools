@@ -1931,6 +1931,7 @@ def remove_local_lineartrend(lat, lon, var, dates, season, print_trend = True):
     trendmat, errtrendmat, cmat, errcmat = local_lineartrend_climate(lat, lon, var, dates, season, print_trend = print_trend)
 
     var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
+    years = np.array([da.year for da in dates_set])
 
     #fitted = np.stack([cmat + trendmat*ye for ye in years])
     fitted = cmat[np.newaxis,:,:] + trendmat[np.newaxis,:,:] * years
