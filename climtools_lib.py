@@ -4487,7 +4487,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if add_hatching is not None:
         if verbose: print('adding hatching')
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','wb'))
-        hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none')
+        hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none', extend = 'both')
 
     if add_vector_field is not None:
         vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale)
