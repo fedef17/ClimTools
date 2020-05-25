@@ -1911,12 +1911,17 @@ def trend_climate_polyfit(lat, lon, var, dates, season, deg = 3, area = 'global'
     return var_set_notr, coeffs, var_regional
 
 
-def local_lineartrend_climate(lat, lon, var, dates, season, deg = 1, print_trend = True):
+def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, remove_global_trend = False, global_deg = 3, global_area = 'global'):
     """
     Calculates the linear trend on each grid point.
 
     Returns trend and error.
+
+    If remove_global_trend is set, applies polinomial detrending of global (or regional) mean before calculating the local trends. In this case it calculates the trend in the local anomalies wrt the global/regional mean.
     """
+
+    if remove_global_trend:
+        var, coeffs, var_regional = trend_climate_polyfit(lat, lon, var, dates, season, deg = global_deg, area = global_area)
 
     var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
     years = np.array([da.year for da in dates_set])
