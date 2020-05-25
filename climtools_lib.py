@@ -355,6 +355,17 @@ def readlines_to_matrix(lines, n_skip = 0, dtype = float):
 
     return data
 
+def repeat(matrix, num):
+    """
+    Repeats a matrix or vector along a new axis.
+    """
+    sha = matrix.shape
+    nusha = tuple(list(sha) + [num])
+
+    gigi = np.repeat(matrix, num).reshape(nusha)
+
+    return gigi
+
 
 def check_increasing_latlon(var, lat, lon):
     """
@@ -1869,7 +1880,7 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     return climat_mean, dates_climate_mean
 
 
-def trend_climate_polyfit(lat, lon, var, dates, season, deg = 3, area = 'global', print_trend = True):
+def remove_global_polytrend(lat, lon, var, dates, season, deg = 3, area = 'global', print_trend = True):
     """
     Subtracts the linear trend calculated on some regional (or global) average from the timeseries.
     Area defaults to global, but can assume each area allowed by sel_area.
@@ -1905,10 +1916,33 @@ def trend_climate_polyfit(lat, lon, var, dates, season, deg = 3, area = 'global'
         var_set_notr.append(va - cos)
 
     var_set_notr = np.concatenate(var_set_notr, axis = 0)
+    dates_seas = np.concatenate(dates_set, axis = 0)
 
     #print('Detrended series: {:8.2e} {:8.2e}'.format(np.nanmean(var_set_notr), np.nanstd(var_set_notr)))
 
-    return var_set_notr, coeffs, var_regional
+    return var_set_notr, coeffs, var_regional, dates_seas
+
+
+def remove_local_lineartrend(lat, lon, var, dates, season, print_trend = True):
+    """
+    Removes the linear trend at each gridpoint.
+    """
+
+    trendmat, errtrendmat, cmat, errcmat = local_lineartrend_climate(lat, lon, var, dates, season, print_trend = print_trend)
+
+    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
+
+    #fitted = np.stack([cmat + trendmat*ye for ye in years])
+    fitted = cmat[np.newaxis,:,:] + trendmat[np.newaxis,:,:] * years
+    var_set_notr = []
+    for va, ye, cos in zip(var_set, years, fitted):
+        #print(ye, np.nanmean(va), np.sum(np.isnan(va)), cos)
+        var_set_notr.append(va - cos[np.newaxis,:,:])
+
+    var_set_notr = np.concatenate(var_set_notr, axis = 0)
+    dates_seas = np.concatenate(dates_set, axis = 0)
+
+    return var_set_notr, trend, dates_seas
 
 
 def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, remove_global_trend = False, global_deg = 3, global_area = 'global'):
@@ -1921,19 +1955,23 @@ def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, 
     """
 
     if remove_global_trend:
-        var, coeffs, var_regional = trend_climate_polyfit(lat, lon, var, dates, season, deg = global_deg, area = global_area)
+        var, coeffs, var_regional, dates = remove_global_polytrend(lat, lon, var, dates, season, deg = global_deg, area = global_area)
 
     var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
     years = np.array([da.year for da in dates_set])
 
     trendmat = np.empty_like(var_set[0])
     errtrendmat = np.empty_like(var_set[0])
+    cmat = np.empty_like(var_set[0])
+    errcmat = np.empty_like(var_set[0])
     for i in np.arange(trendmat.shape[0]):
         for j in np.arange(trendmat.shape[1]):
             m, c, err_m, err_c = linear_regre_witherr(years, var_set[:,i,j])
             #coeffs, covmat = np.polyfit(years, var_set[i,j], deg = deg, cov = True)
             trendmat[i,j] = m
             errtrendmat[i,j] = err_m
+            cmat[i,j] = c
+            errcmat[i,j] = err_c
 
     # fitted = np.polyval(coeffs, years)
     # var_set_notr = []
@@ -1943,7 +1981,7 @@ def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, 
     #
     # var_set_notr = np.concatenate(var_set_notr, axis = 0)
 
-    return trendmat, errtrendmat
+    return trendmat, errtrendmat, cmat, errcmat
 
 
 def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
