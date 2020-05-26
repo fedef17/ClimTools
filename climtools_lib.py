@@ -1951,7 +1951,7 @@ def remove_local_lineartrend(lat, lon, var, dates, season, print_trend = True):
     var_set_notr = np.concatenate(var_set_notr, axis = 0)
     dates_seas = np.concatenate(dates_set)
 
-    return var_set_notr, trend, dates_seas
+    return var_set_notr, trendmat, dates_seas
 
 
 def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, remove_global_trend = False, global_deg = 3, global_area = 'global'):
