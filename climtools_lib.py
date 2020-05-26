@@ -1930,20 +1930,26 @@ def remove_local_lineartrend(lat, lon, var, dates, season, print_trend = True):
 
     trendmat, errtrendmat, cmat, errcmat = local_lineartrend_climate(lat, lon, var, dates, season, print_trend = print_trend)
 
-    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
-    years = np.array([da.year for da in dates_set])
+    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
+    try:
+        var_set_avg = np.nanmean(var_set, axis = 1)
+    except Exception as czz:
+        print(czz)
+        var_set_avg = np.stack([np.nanmean(va, axis = 0) for va in var_set])
+
+    years = np.array([da[0].year for da in dates_set])
 
     #fitted = np.stack([cmat + trendmat*ye for ye in years])
-    fitted = cmat[:,:, np.newaxis] + trendmat[:,:, np.newaxis] * years
-    fitted = np.rollaxis(fitted, 2)
-    
+    fitted = cmat[np.newaxis, ...] + trendmat[np.newaxis, ...] * years[:, np.newaxis, np.newaxis]
+    #fitted = np.rollaxis(fitted, 2)
+
     var_set_notr = []
     for va, ye, cos in zip(var_set, years, fitted):
         #print(ye, np.nanmean(va), np.sum(np.isnan(va)), cos)
-        var_set_notr.append(va - cos[np.newaxis,:,:])
+        var_set_notr.append(va - cos[np.newaxis, ...])
 
     var_set_notr = np.concatenate(var_set_notr, axis = 0)
-    dates_seas = np.concatenate(dates_set, axis = 0)
+    dates_seas = np.concatenate(dates_set)
 
     return var_set_notr, trend, dates_seas
 
