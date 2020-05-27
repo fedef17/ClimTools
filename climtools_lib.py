@@ -4495,27 +4495,29 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if draw_grid:
         gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
 
+    if add_vector_field is not None:
+        add_vector_field_0, add_vector_field_1 = add_vector_field
+
     cyclic = False
 
     grid_step = np.unique(np.diff(lon))
-    if len(grid_step) == 1: # lon grid equally spaced
-        if (lon[0]-lon[-1]) % 360 == grid_step[0]: # global longitudes
-            if verbose: print('Adding cyclic point\n')
-            cyclic = True
-            #lon = np.append(lon, 360)
-            #data = np.c_[data,data[:,0]]
-            lon_o = lon
-            data, lon = cutil.add_cyclic_point(data, coord = lon)
+    if len(grid_step) == 1 and (lon[0]-lon[-1]) % 360 == grid_step[0]: # lon grid equally spaced and global longitudes
+        if verbose: print('Adding cyclic point\n')
+        cyclic = True
+        #lon = np.append(lon, 360)
+        #data = np.c_[data,data[:,0]]
+        lon_o = lon
+        data, lon = cutil.add_cyclic_point(data, coord = lon)
 
-            if add_contour_field is not None:
-                add_contour_field, lon = cutil.add_cyclic_point(add_contour_field, coord = lon_o)
+        if add_contour_field is not None:
+            add_contour_field, lon = cutil.add_cyclic_point(add_contour_field, coord = lon_o)
 
-            if add_vector_field is not None:
-                add_vector_field_0, lon = cutil.add_cyclic_point(add_vector_field[0], coord = lon_o)
-                add_vector_field_1, lon = cutil.add_cyclic_point(add_vector_field[1], coord = lon_o)
+        if add_vector_field is not None:
+            add_vector_field_0, lon = cutil.add_cyclic_point(add_vector_field_0, coord = lon_o)
+            add_vector_field_1, lon = cutil.add_cyclic_point(add_vector_field_1, coord = lon_o)
 
-            if add_hatching is not None:
-                add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
+        if add_hatching is not None:
+            add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
 
     xi,yi = np.meshgrid(lon,lat)
 
