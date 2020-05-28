@@ -4527,8 +4527,6 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         if nskip == 0: nskip = 1
         if draw_contour_lines:
             map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
-        if add_contour_field is not None:
-            map_plot_lines = ax.contour(xi, yi, add_contour_field, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
     elif plot_type == 'pcolormesh':
         map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree(), vmin = clevels[0], vmax = clevels[-1])
     elif plot_type == 'contour':
@@ -4538,13 +4536,18 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     else:
         raise ValueError('plot_type <{}> not recognised. Only available: filled_contour, pcolormesh, contour'.format(plot_type))
 
+    if add_contour_field is not None:
+        if plot_type == 'contour':
+            raise ValueError('if add_contour_field is set, the plot_type cannot be contour')
+        map_plot_lines = ax.contour(xi, yi, add_contour_field, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+
     if add_hatching is not None:
         if verbose: print('adding hatching')
         #pickle.dump([lat, lon, add_hatching], open('hatchdimerda.p','wb'))
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none', extend = 'both')
 
     if add_vector_field is not None:
-        vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale)
+        vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale) # quiver_scale è inversamente proporzionale alla lunghezza delle frecce
         vecfi._init()
         qk = ax.quiverkey(vecfi, 0.95, 0.95, 10, r'$10 \frac{m}{s}$', labelpos='E', coordinates='figure')
         print('quiverscale!', vecfi.scale)
