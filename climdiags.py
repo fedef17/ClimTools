@@ -2410,7 +2410,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     return
 
 
-def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None):
+def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'contourf'):
     """
     Nice regime plot.
     """
@@ -2437,7 +2437,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type)
 
     return
 
