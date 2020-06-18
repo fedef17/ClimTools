@@ -3766,7 +3766,7 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
     """
 
     if calc_anomaly:
-        var_anom = remove_seasonal_cycle(field, lat, lon, dates, detrend_global = detrend_global, deg_dtr = deg_dtr, area_dtr = area_dtr, detrend_local_linear = detrend_local_linear)
+        var_anom = remove_seasonal_cycle(field, lat, lon, dates_field, detrend_global = detrend_global, deg_dtr = deg_dtr, area_dtr = area_dtr, detrend_local_linear = detrend_local_linear)
 
     dates_ok, okinds1, okinds2 = np.intersect1d(dates_field, dates_labels, assume_unique = True, return_indices = True)
     print('Found {} matching dates'.format(len(dates_ok)))
