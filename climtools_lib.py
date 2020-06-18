@@ -3769,24 +3769,24 @@ def remove_seasonal_cycle(var, lat, lon, dates, wnd_days = 20, detrend_global = 
     return var_anom
 
 
-def intersect_dates(dates1, dates2):
-    """
-    Intersects dates disregarding hours and minutes.
-    """
-    dates1cop = dcopy(dates1)
-    dates2cop = dcopy(dates2)
-    for i in range(len(dates1cop)):
-        dates1cop[i].hour = 12
-        dates1cop[i].minute = 0
-
-    for i in range(len(dates2cop)):
-        dates2cop[i].hour = 12
-        dates2cop[i].minute = 0
-
-    dates_ok, okinds1, okinds2 = np.intersect1d(dates1cop, dates2cop, assume_unique = True, return_indices = True)
-    print('Found {} matching dates'.format(len(dates_ok)))
-
-    return dates_ok, okinds1, okinds2
+# def intersect_dates(dates1, dates2):
+#     """
+#     Intersects dates disregarding hours and minutes.
+#     """
+#     dates1cop = dcopy(dates1)
+#     dates2cop = dcopy(dates2)
+#     for i in range(len(dates1cop)):
+#         dates1cop[i].hour = 12
+#         dates1cop[i].minute = 0
+#
+#     for i in range(len(dates2cop)):
+#         dates2cop[i].hour = 12
+#         dates2cop[i].minute = 0
+#
+#     dates_ok, okinds1, okinds2 = np.intersect1d(dates1cop, dates2cop, assume_unique = True, return_indices = True)
+#     print('Found {} matching dates'.format(len(dates_ok)))
+#
+#     return dates_ok, okinds1, okinds2
 
 
 def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels, comp_moment = 'mean', comp_percentile = 90, calc_anomaly = True, detrend_global = False, deg_dtr = 1, area_dtr = 'global', detrend_local_linear = False):
@@ -3798,9 +3798,10 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
     if calc_anomaly:
         var_anom = remove_seasonal_cycle(field, lat, lon, dates_field, detrend_global = detrend_global, deg_dtr = deg_dtr, area_dtr = area_dtr, detrend_local_linear = detrend_local_linear)
 
-    dates_ok, okinds1, okinds2 = intersect_dates(dates_field, dates_labels)
-    var_ok = var_anom[okinds1]
-    lab_ok = labels[okinds2]
+    # dates_ok, okinds1, okinds2 = intersect_dates(dates_field, dates_labels)
+    # var_ok = var_anom[okinds1]
+    # lab_ok = labels[okinds2]
+    var_ok, lab_ok, dates_ok = extract_common_dates(dates_field, dates_labels, field, labels, ignore_HHMM = True)
 
     numclus = np.max(labels)+1
     comps = []
