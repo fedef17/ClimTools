@@ -2112,7 +2112,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
 
     dates_pdh = pd.to_datetime(dates)
 
-    if season is not None:
+    if (season is not None) and season != 'year':
         if len(var) <= len(season): cut = False
         var_season, dates_season = sel_season(var, dates, season, cut = cut, remove_29feb = True)
     else:
@@ -2121,9 +2121,19 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         dates_season = dates
 
     dates_diff = dates_season[1:] - dates_season[:-1]
-    if check_daily(dates):
+    if check_daily(dates) and season != 'year':
         jump = dates_diff > pd.Timedelta('3 days')
         okju = np.where(jump)[0] + 1
+        okju = np.append([0], okju)
+        okju = np.append(okju, [len(dates_season)])
+        n_seas = len(okju) - 1
+
+        all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
+        all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
+    elif check_daily(dates) and season == 'year':
+        raise ValueError('COMPLETE THIS !')
+        jump = (dates_season.mon == 1) & (dates_season.day == 1)
+        okju = np.where(jump)[0] + 1 # is this +1 or not?
         okju = np.append([0], okju)
         okju = np.append(okju, [len(dates_season)])
         n_seas = len(okju) - 1
@@ -3773,7 +3783,7 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
     var_ok = var_anom[okinds1]
     lab_ok = labels[okinds2]
 
-    numclus = np.max(labels)
+    numclus = np.max(labels)+1
     comps = []
     for reg in range(numclus):
         okreg = lab_ok == reg
