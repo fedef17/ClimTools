@@ -4,6 +4,7 @@
 import numpy as np
 import sys
 import os
+import glob
 
 try:
     import ctool, ctp
@@ -93,6 +94,10 @@ def str_to_bool(s):
 def mkdir(cart):
     if not os.path.exists(cart): os.mkdir(cart)
     return
+
+def find_file(cart, fil):
+    lista_oks = glob.glob(cart+fil)
+    return lista_oks
 
 def load_wrtool(ifile):
     """
@@ -2154,6 +2159,22 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
     return all_vars, all_dates
 
 
+def simple_bootstrap_err(var, n_choice, n_bootstrap = 200):
+    """
+    Stupid simple bootstrap, returns std dev of the mean of bootstrapped quantities.
+    """
+    lencos = np.arange(len(var))
+    quant = []
+    for i in range(n_bootstrap):
+        ok_yea = np.sort(np.random.choice(lencos, n_choice))
+        var_ok = var[ok_yea]
+        quant.append(np.mean(var_ok, axis = 0))
+
+    errcos = np.std(quant, axis = 0)
+
+    return errcos
+
+
 def bootstrap(var, dates, season, y = None, apply_func = None, func_args = None, n_choice = 30, n_bootstrap = 100):
     """
     Performs a bootstrapping picking a set of n_choice seasons, n_bootstrap times. Optionally add a second variable y which has the same dates. apply_func is an external function that performs some operation on the bootstrapped quantities and takes var as input. If y is set, the function needs 2 inputs: var and y.
@@ -2329,7 +2350,7 @@ def extract_common_dates(dates1, dates2, arr1, arr2, ignore_HHMM = True):
     return arr1_ok, arr2_ok, dates_common
 
 
-def running_mean(var, wnd):
+def running_mean(var, wnd, remove_nans = False):
     """
     Performs a running mean (if multidim, the mean is done on the first axis).
 
@@ -2338,10 +2359,12 @@ def running_mean(var, wnd):
     if var.ndim == 1:
         tempser = pd.Series(var)
         rollpi_temp = tempser.rolling(wnd, center = True).mean()
+        if remove_nans: rollpi_temp = rollpi_temp[~np.isnan(rollpi_temp)]
     else:
         rollpi_temp = []
         for i in range(len(var)):
             if i-wnd//2 < 0 or i + wnd//2 > len(var)-1:
+                if remove_nans: continue
                 rollpi_temp.append(np.nan*np.ones(var[0].shape))
             else:
                 rollpi_temp.append(np.mean(var[i-wnd//2:i+wnd//2+1, ...], axis = 0))
@@ -3715,6 +3738,56 @@ def calc_max_gradient_series(var, lat, lon):
     allgrads = np.array([calc_max_gradient(map, lat, lon) for map in var])
 
     return allgrads
+
+
+def remove_seasonal_cycle(var, lat, lon, dates, wnd_days = 20, detrend_global = False, deg_dtr = 1, area_dtr = 'global', detrend_local_linear = False):
+    """
+    Removes seasonal cycle and trend.
+    """
+
+    if detrend_global:
+        print('Detrending polynomial global tendencies over area {}'.format(area_dtr))
+        var, coeffs_dtr, var_dtr, dates = ctl.remove_global_polytrend(lat, lon, var, dates, None, deg = deg_dtr, area = area_dtr)
+
+    if detrend_local_linear:
+        print('Detrending local linear tendencies')
+        var, local_trend, dates = ctl.remove_local_lineartrend(lat, lon, var, dates, None)
+
+    climat_mean, dates_climate_mean, climat_std = daily_climatology(var, dates, wnd_days)
+    var_anom = ctl.anomalies_daily(var, dates, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+
+    return var_anom
+
+
+def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels, comp_moment = 'mean', comp_percentile = 90, calc_anomaly = True, detrend_global = False, deg_dtr = 1, area_dtr = 'global', detrend_local_linear = False):
+    """
+    Calculates regime composites of a given field. Returns a list of composites.
+    comp_moment can be either 'mean', 'std' or 'percentile'
+    """
+
+    if calc_anomaly:
+        var_anom = remove_seasonal_cycle(field, lat, lon, dates, detrend_global = detrend_global, deg_dtr = deg_dtr, area_dtr = area_dtr, detrend_local_linear = detrend_local_linear)
+
+    dates_ok, okinds1, okinds2 = np.intersect1d(dates_field, dates_labels, assume_unique = True, return_indices = True)
+    print('Found {} matching dates'.format(len(dates_ok)))
+    var_ok = var_anom[okinds1]
+    lab_ok = labels[okinds2]
+
+    numclus = np.max(labels)
+    comps = []
+    for reg in range(numclus):
+        okreg = lab_ok == reg
+        if comp_moment == 'mean':
+            comp = np.mean(var_ok[okreg], axis = 0)
+        elif comp_moment == 'std':
+            comp = np.std(var_ok[okreg], axis = 0)
+        elif comp_moment == 'percentile':
+            comp = np.percentile(var_ok[okreg], comp_percentile, axis = 0)
+        else:
+            raise ValueError('{} is not a valid comp_moment'.format(comp_moment))
+        comps.append(comp)
+
+    return np.stack(comps)
 
 
 def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
@@ -5849,7 +5922,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     return fig6, fig7
 
 
-def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = None, format = 'pdf'):
+def plotcorr(x, y, filename = None, xlabel = 'x', ylabel = 'y', xlim = None, ylim = None, format = 'pdf'):
     """
     Plots correlation graph between x and y, fitting a line and calculating Pearson's R coeff.
     :param filename: abs. path of the graph
@@ -5861,7 +5934,7 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
 
     fig = plt.figure(figsize=(8, 6), dpi=150)
-    ax = fig.add_subplot(111)
+    #ax = fig.add_subplot(111)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid()
@@ -5883,8 +5956,10 @@ def plotcorr(x, y, filename, xlabel = 'x', ylabel = 'y', xlim = None, ylim = Non
     plt.plot(xlin, xlin*m+c, color='red', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
     plt.title("Pearson's R = {:5.2f}".format(pearR))
     plt.legend(loc=4,fancybox =1)
-    fig.savefig(filename, format=format, dpi=150)
-    plt.close()
+
+    if filename is not None:
+        fig.savefig(filename, format=format, dpi=150)
+        plt.close()
 
     return
 
