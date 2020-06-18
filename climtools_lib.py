@@ -3747,14 +3747,14 @@ def remove_seasonal_cycle(var, lat, lon, dates, wnd_days = 20, detrend_global = 
 
     if detrend_global:
         print('Detrending polynomial global tendencies over area {}'.format(area_dtr))
-        var, coeffs_dtr, var_dtr, dates = ctl.remove_global_polytrend(lat, lon, var, dates, None, deg = deg_dtr, area = area_dtr)
+        var, coeffs_dtr, var_dtr, dates = remove_global_polytrend(lat, lon, var, dates, None, deg = deg_dtr, area = area_dtr)
 
     if detrend_local_linear:
         print('Detrending local linear tendencies')
-        var, local_trend, dates = ctl.remove_local_lineartrend(lat, lon, var, dates, None)
+        var, local_trend, dates = remove_local_lineartrend(lat, lon, var, dates, None)
 
     climat_mean, dates_climate_mean, climat_std = daily_climatology(var, dates, wnd_days)
-    var_anom = ctl.anomalies_daily(var, dates, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+    var_anom = anomalies_daily(var, dates, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
 
     return var_anom
 
