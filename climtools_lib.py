@@ -4568,7 +4568,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2):
     """
     Plots field contours on the axis of a figure.
 
@@ -4642,7 +4642,9 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if add_contour_field is not None:
         if plot_type == 'contour':
             raise ValueError('if add_contour_field is set, the plot_type cannot be contour')
-        map_plot_lines = ax.contour(xi, yi, add_contour_field, n_lines, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+        nskip = (len(clevels)-1)//n_lines
+        if nskip == 0: nskip = 1
+        map_plot_lines = ax.contour(xi, yi, add_contour_field, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
 
     if add_hatching is not None:
         if verbose: print('adding hatching')
