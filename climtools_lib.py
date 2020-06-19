@@ -3801,7 +3801,7 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
     # dates_ok, okinds1, okinds2 = intersect_dates(dates_field, dates_labels)
     # var_ok = var_anom[okinds1]
     # lab_ok = labels[okinds2]
-    var_ok, lab_ok, dates_ok = extract_common_dates(dates_field, dates_labels, field, labels, ignore_HHMM = True)
+    var_ok, lab_ok, dates_ok = extract_common_dates(dates_field, dates_labels, var_anom, labels, ignore_HHMM = True)
 
     numclus = np.max(labels)+1
     comps = []
