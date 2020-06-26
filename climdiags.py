@@ -406,6 +406,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     if detrend_local_linear:
         print('Detrending local linear tendencies')
         var_season, local_trend, dates_season = ctl.remove_local_lineartrend(lat, lon, var_season, dates_season, None)
+        climat_mean = None # need to recalculate climate_mean
 
     if is_daily:
         if climat_mean is None:
@@ -519,6 +520,8 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         results['var_dtr'] = var_dtr
     if detrend_local_linear:
         results['local_trend'] = local_trend
+    results['climate_mean'] = climat_mean
+    results['climate_mean_dates'] = dates_climate_mean
 
     effcen = []
     for clus in range(numclus):
