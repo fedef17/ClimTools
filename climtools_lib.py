@@ -1866,7 +1866,7 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     Performs daily_climatology on a running window of n years, in order to take into account possible trends in the mean state.
     """
     dates_pdh = pd.to_datetime(dates)
-    climat_mean = []
+    climate_mean = []
     dates_climate_mean = []
     allyears = np.unique(dates_pdh.year)
     years = allyears[::step_year]
@@ -1879,10 +1879,10 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
             print('skipped')
             continue
         clm, dtclm, _ = daily_climatology(var[okye], dates[okye], window_days, refyear = yea)
-        climat_mean.append(clm)
+        climate_mean.append(clm)
         dates_climate_mean.append(dtclm)
 
-    return climat_mean, dates_climate_mean
+    return climate_mean, dates_climate_mean
 
 
 def remove_global_polytrend(lat, lon, var, dates, season, deg = 3, area = 'global', print_trend = True):
@@ -2003,7 +2003,7 @@ def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
     """
     dates_pdh = pd.to_datetime(dates)
-    climat_mean = []
+    climate_mean = []
     dates_climate_mean = []
 
     allyears = np.unique(dates_pdh.year)
@@ -2017,10 +2017,10 @@ def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
             print('skipped')
             continue
         clm, dtclm, _ = monthly_climatology(var[okye], dates[okye], refyear = yea)
-        climat_mean.append(clm)
+        climate_mean.append(clm)
         dates_climate_mean.append(dtclm)
 
-    return climat_mean, dates_climate_mean
+    return climate_mean, dates_climate_mean
 
 
 def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
@@ -2428,18 +2428,18 @@ def lowpass_lanczos(var, wnd, nan_extremes = True):
     return low_var
 
 
-def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_days = 5, window_years = 20, step_year = 5):
+def anomalies_daily_detrended(var, dates, climate_mean = None, dates_climate_mean = None, window_days = 5, window_years = 20, step_year = 5):
     """
-    Calculates the daily anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_daily_climat().
+    Calculates the daily anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_daily_climat().
     """
     dates_pdh = pd.to_datetime(dates)
 
     print('DENTRO ANOMALIES DETRENDED: {} {}\n'.format(len(dates), len(dates_pdh)))
 
-    if climat_mean is None or dates_climate_mean is None:
-        climat_mean, dates_climate_mean = trend_daily_climat(var, dates, window_days = window_days, window_years = window_years, step_year = step_year)
+    if climate_mean is None or dates_climate_mean is None:
+        climate_mean, dates_climate_mean = trend_daily_climat(var, dates, window_days = window_days, window_years = window_years, step_year = step_year)
 
-    if len(climat_mean) == 0:
+    if len(climate_mean) == 0:
         raise ValueError('ERROR in calculation of detrended climatology. Too few years? Try lowering wnd_years or set detrending to False')
 
     var_anom_tot = []
@@ -2454,13 +2454,13 @@ def anomalies_daily_detrended(var, dates, climat_mean = None, dates_climate_mean
         #     print('This year {} has only one day.. If you really want to take it in, change this line\n')
         #     continue
 
-        var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
+        var_anom = anomalies_daily(var[okye], dates[okye], climate_mean = climate_mean[yearef], dates_climate_mean = dates_climate_mean[yearef], window = window_days)
         var_anom_tot.append(var_anom)
 
-    # for yea, clm, dtclm in zip(year_steps, climat_mean, dates_climate_mean):
+    # for yea, clm, dtclm in zip(year_steps, climate_mean, dates_climate_mean):
     #     okye = (dates_pdh.year >= yea - step_year/2.) & (dates_pdh.year < yea + step_year/2.)
     #     print(dates[okye][0], dates[okye][-1])
-    #     var_anom = anomalies_daily(var[okye], dates[okye], climat_mean = clm, dates_climate_mean = dtclm, window = window_days)
+    #     var_anom = anomalies_daily(var[okye], dates[okye], climate_mean = clm, dates_climate_mean = dtclm, window = window_days)
     #
     #     #okyetot = okyetot | okye
     #     var_anom_tot.append(var_anom)
@@ -2489,13 +2489,13 @@ def anomalies_daily_detrended_global(lat, lon, var, dates, season, area_dtr = 'g
     return var_anom
 
 
-def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, window = 5):
+def anomalies_daily(var, dates, climate_mean = None, dates_climate_mean = None, window = 5):
     """
-    Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a daily or monthly climatology on var with the specified window.
+    Computes anomalies for a field with respect to the climatological mean (climate_mean). If climate_mean is not set, it is calculated making a daily or monthly climatology on var with the specified window.
 
     Works only for daily datasets.
 
-    :param climat_mean: the climatological mean to be subtracted.
+    :param climate_mean: the climatological mean to be subtracted.
     :param dates_climate_mean: the
     :param window: int. Calculate the running mean on N day window.
     """
@@ -2504,32 +2504,32 @@ def anomalies_daily(var, dates, climat_mean = None, dates_climate_mean = None, w
         if not check_daily(dates):
             raise ValueError('Not a daily dataset')
 
-    if climat_mean is None or dates_climate_mean is None:
-        climat_mean, dates_climate_mean, _ = daily_climatology(var, dates, window)
+    if climate_mean is None or dates_climate_mean is None:
+        climate_mean, dates_climate_mean, _ = daily_climatology(var, dates, window)
 
     dates_pdh = pd.to_datetime(dates)
     dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
     var_anom = np.empty_like(var)
 
-    for el, dat in zip(climat_mean, dates_climate_mean_pdh):
+    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
         mask = (dates_pdh.month == dat.month) & (dates_pdh.day == dat.day)
         var_anom[mask, ...] = var[mask, ...] - el
 
     mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
     okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
 
-    var_anom[mask, ...] = var[mask, ...] - climat_mean[okel, ...]
+    var_anom[mask, ...] = var[mask, ...] - climate_mean[okel, ...]
 
     return var_anom
 
 
-def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_mean = None, window_years = 20, step_year = 5):
+def anomalies_monthly_detrended(var, dates, climate_mean = None, dates_climate_mean = None, window_years = 20, step_year = 5):
     """
-    Calculates the monthly anomalies wrt a trending climatology. climat_mean and dates_climate_mean are the output of trend_monthly_climat().
+    Calculates the monthly anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_monthly_climat().
     """
     dates_pdh = pd.to_datetime(dates)
-    if climat_mean is None or dates_climate_mean is None:
-        climat_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
+    if climate_mean is None or dates_climate_mean is None:
+        climate_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
 
     var_anom_tot = []
     #year_steps = np.unique(dates_pdh.year)[::step_year]
@@ -2539,7 +2539,7 @@ def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_me
         #yearef = np.argmin(abs(year_steps - yea))
         yearef = np.argmin(abs(year_ref_all - yea))
         okye = dates_pdh.year == yea
-        var_anom = anomalies_monthly(var[okye], dates[okye], climat_mean = climat_mean[yearef], dates_climate_mean = dates_climate_mean[yearef])
+        var_anom = anomalies_monthly(var[okye], dates[okye], climate_mean = climate_mean[yearef], dates_climate_mean = dates_climate_mean[yearef])
         var_anom_tot.append(var_anom)
 
     var_anom_tot = np.concatenate(var_anom_tot)
@@ -2549,27 +2549,27 @@ def anomalies_monthly_detrended(var, dates, climat_mean = None, dates_climate_me
     return var_anom_tot
 
 
-def anomalies_monthly(var, dates, climat_mean = None, dates_climate_mean = None):
+def anomalies_monthly(var, dates, climate_mean = None, dates_climate_mean = None):
     """
-    Computes anomalies for a field with respect to the climatological mean (climat_mean). If climat_mean is not set, it is calculated making a monthly climatology on var.
+    Computes anomalies for a field with respect to the climatological mean (climate_mean). If climate_mean is not set, it is calculated making a monthly climatology on var.
 
     Works only for monthly datasets.
 
-    :param climat_mean: the climatological mean to be subtracted.
+    :param climate_mean: the climatological mean to be subtracted.
     :param dates_climate_mean: the
     """
 
     if check_daily(dates):
         raise ValueError('Not a monthly dataset')
 
-    if climat_mean is None or dates_climate_mean is None:
-        climat_mean, dates_climate_mean, _ = monthly_climatology(var, dates)
+    if climate_mean is None or dates_climate_mean is None:
+        climate_mean, dates_climate_mean, _ = monthly_climatology(var, dates)
 
     dates_pdh = pd.to_datetime(dates)
     dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
     var_anom = np.empty_like(var)
 
-    for el, dat in zip(climat_mean, dates_climate_mean_pdh):
+    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
         mask = (dates_pdh.month == dat.month)
         var_anom[mask, ...] = var[mask, ...] - el
 
@@ -3763,8 +3763,8 @@ def remove_seasonal_cycle(var, lat, lon, dates, wnd_days = 20, detrend_global = 
         print('Detrending local linear tendencies')
         var, local_trend, dates = remove_local_lineartrend(lat, lon, var, dates, None)
 
-    climat_mean, dates_climate_mean, climat_std = daily_climatology(var, dates, wnd_days)
-    var_anom = anomalies_daily(var, dates, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+    climate_mean, dates_climate_mean, climat_std = daily_climatology(var, dates, wnd_days)
+    var_anom = anomalies_daily(var, dates, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
 
     return var_anom
 

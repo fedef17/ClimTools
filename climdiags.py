@@ -170,22 +170,22 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
         del var_full, var_sel, dates_full, dates_sel
 
-    #HERE calculate climat_mean
+    #HERE calculate climate_mean
     print('Calculating mean climatology\n')
     if ctl.check_daily(dates):
-        climat_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
+        climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
 
-        # climat_mean_dtr, dates_climate_mean_dtr = None, None
+        # climate_mean_dtr, dates_climate_mean_dtr = None, None
         # if kwargs['detrended_eof_calculation']:
         #     print('Calculating detrended climatology')
-        #     climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var, dates, window_days = kwargs['wnd_days'], window_years = kwargs['wnd_years'])
+        #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var, dates, window_days = kwargs['wnd_days'], window_years = kwargs['wnd_years'])
     else:
-        climat_mean, dates_climate_mean, _ = ctl.monthly_climatology(var, dates)
+        climate_mean, dates_climate_mean, _ = ctl.monthly_climatology(var, dates)
 
-        # climat_mean_dtr, dates_climate_mean_dtr = None, None
+        # climate_mean_dtr, dates_climate_mean_dtr = None, None
         # if kwargs['detrended_eof_calculation']:
         #     print('Calculating detrended climatology')
-        #     climat_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
+        #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
 
     # if sel_yr_range is not None:
     #     print('Selecting date range {}\n'.format(sel_yr_range))
@@ -199,8 +199,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     #     dates = dates[okdat]
     del var
 
-    #results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, climat_mean_dtr = climat_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
-    results = WRtool_core(var_season, lat, lon, dates_season, area, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, **kwargs)
+    #results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, climate_mean_dtr = climate_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
+    results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, **kwargs)
 
     results['dates_allyear'] = dates
     if netcdf4_read:
@@ -358,7 +358,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climat_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -376,7 +376,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
 
     < detrend_only_global > : detrends only the global tendencies over area <area_dtr>, which defaults to global.
 
-    Note on the anomaly calculation: it is suggested to calculate the climatological mean (climat_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
+    Note on the anomaly calculation: it is suggested to calculate the climatological mean (climate_mean or climate_mean_dtr if detrending is active) before the season selection, so outside WRtool_core. This is especially suggested when using a large wnd_days (like 15, 20 days).
     """
 
     is_daily = ctl.check_daily(dates_season)
@@ -401,21 +401,21 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     if detrend_only_global:
         print('Detrending polynomial global tendencies over area {}'.format(area_dtr))
         var_season, coeffs_dtr, var_dtr, dates_season = ctl.remove_global_polytrend(lat, lon, var_season, dates_season, None, deg = deg_dtr, area = area_dtr)
-        climat_mean = None # need to recalculate climate_mean
+        climate_mean = None # need to recalculate climate_mean
 
     if detrend_local_linear:
         print('Detrending local linear tendencies')
         var_season, local_trend, dates_season = ctl.remove_local_lineartrend(lat, lon, var_season, dates_season, None)
-        climat_mean = None # need to recalculate climate_mean
+        climate_mean = None # need to recalculate climate_mean
 
     if is_daily:
-        if climat_mean is None:
-            climat_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
-        var_anom = ctl.anomalies_daily(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+        if climate_mean is None:
+            climate_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
+        var_anom = ctl.anomalies_daily(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
     else:
-        if climat_mean is None:
-            climat_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
-        var_anom = ctl.anomalies_monthly(var_season, dates_season, climat_mean = climat_mean, dates_climate_mean = dates_climate_mean)
+        if climate_mean is None:
+            climate_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
+        var_anom = ctl.anomalies_monthly(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
 
     if select_area_first:
         var_area = var_anom
@@ -520,7 +520,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         results['var_dtr'] = var_dtr
     if detrend_local_linear:
         results['local_trend'] = local_trend
-    results['climate_mean'] = climat_mean
+    results['climate_mean'] = climate_mean
     results['climate_mean_dates'] = dates_climate_mean
 
     effcen = []
@@ -592,12 +592,12 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         for ens in range(n_ens):
             # Detrending
             print('Detrended eof calculation\n')
-            climat_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season_set[ens], dates_season_set[ens], window_days = wnd)
+            climate_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season_set[ens], dates_season_set[ens], window_days = wnd)
             trace_ens.append(len(var_season_set[ens]))
             if heavy_output:
-                results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climat_mean_dtr), axis = 1)
+                results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climate_mean_dtr), axis = 1)
                 results[ens_names[ens]]['climate_mean_dtr_dates'] = pd.to_datetime(dates_climat_dtr).year
-            var_anom_dtr.append(ctl.anomalies_daily_detrended(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean_dtr, dates_climate_mean = dates_climat_dtr))
+            var_anom_dtr.append(ctl.anomalies_daily_detrended(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean_dtr, dates_climate_mean = dates_climat_dtr))
 
         var_anom_dtr = np.concatenate(var_anom_dtr)
 
@@ -614,11 +614,11 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
             # Use anomalies wrt total time mean for clustering calculations
             for ens in range(n_ens):
                 # Detrending
-                climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
+                climate_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
                 if heavy_output:
-                    results[ens_names[ens]]['climate_mean'] = np.mean(climat_mean, axis = 1)
+                    results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis = 1)
                     results[ens_names[ens]]['climate_mean_dates'] = dates_climat
-                var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean, dates_climate_mean = dates_climat))
+                var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean, dates_climate_mean = dates_climat))
 
             var_anom = np.concatenate(var_anom)
             var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
@@ -628,11 +628,11 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         trace_ens = []
         for ens in range(n_ens):
             trace_ens.append(len(var_season_set[ens]))
-            climat_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
+            climate_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
             if heavy_output:
-                results[ens_names[ens]]['climate_mean'] = np.mean(climat_mean, axis = 1)
+                results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis = 1)
                 results[ens_names[ens]]['climate_mean_dates'] = dates_climat
-            var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climat_mean = climat_mean, dates_climate_mean = dates_climat))
+            var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean, dates_climate_mean = dates_climat))
 
         var_anom = np.concatenate(var_anom)
         var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
