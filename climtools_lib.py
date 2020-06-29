@@ -4499,6 +4499,15 @@ def change_of_base_matrix(old_basis, new_basis):
 #
 #######################################################
 
+def plot_timeseries(serie, dates):
+    """
+    Plots with dates.
+    """
+    ts = pd.Series(serie, dates)
+    gigi = ts.plot()
+
+    return gigi
+
 def color_brightness(color):
     return (color[0] * 299 + color[1] * 587 + color[2] * 114)/1000
 
