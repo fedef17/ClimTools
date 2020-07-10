@@ -351,14 +351,33 @@ def get_size(obj, seen=None):
 #######################################################
 
 
-def readlines_to_matrix(lines, n_skip = 0, dtype = float):
+def read_from_txt(ifile, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None):
     """
-    Given readlines output of a datafile, returns a matrix. Skip the lines to be avoided (file header, non matrix lines). Very simple, won't work if the data lines are interrupted by comments or blank lines.
+    Read data from a text file, return matrix.
+    """
+
+    with open(ifile, 'r') as ifi:
+        lines = ifi.readlines()
+        cose = readlines_to_matrix(lines, n_skip = n_skip, dtype = dtype, first_column_header = first_column_header, sep = sep, n_stop = n_stop)
+
+    return cose
+
+def readlines_to_matrix(lines, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None):
+    """
+    Given readlines output of a datafile, returns a matrix. Skip the lines to be avoided (i.e. file header). Very simple, won't work if the data lines are interrupted by comments or blank lines.
     """
     # read all the file and transform it into a matrix of floats
-    data = np.array([list(map(dtype, lin.rstrip().split())) for lin in lines[n_skip:]])
+    lines_ok = []
+    for lin in lines[n_skip:n_stop]:
+        lines_ok.append(lin.replace(sep, ' '))
 
-    return data
+    if not first_column_header:
+        data = np.array([list(map(dtype, lin.rstrip().split())) for lin in lines_ok])
+        return data
+    else:
+        headers = np.array([lin.rstrip().split()[0] for lin in lines_ok])
+        data = np.array([list(map(dtype, lin.rstrip().split()[1:])) for lin in lines_ok])
+        return headers, data
 
 def repeat(matrix, num):
     """
