@@ -6021,7 +6021,7 @@ def plotcorr(x, y, filename = None, xlabel = 'x', ylabel = 'y', xlim = None, yli
         fig.savefig(filename, format=format, dpi=150)
         plt.close()
 
-    return
+    return pearR
 
 
 def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False, eof_axis_lim = None, lw = 1):
