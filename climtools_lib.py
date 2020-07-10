@@ -5990,7 +5990,7 @@ def plotcorr(x, y, filename = None, xlabel = 'x', ylabel = 'y', xlim = None, yli
     """
     pearR = np.corrcoef(x,y)[1,0]
     A = np.vstack([x,np.ones(len(x))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
-    m,c = np.linalg.lstsq(A,y)[0]
+    m,c = np.linalg.lstsq(A, y, rcond = None)[0]
     xlin = np.linspace(min(x)-0.05*(max(x)-min(x)),max(x)+0.05*(max(x)-min(x)),11)
 
     fig = plt.figure(figsize=(8, 6), dpi=150)
