@@ -171,21 +171,24 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         del var_full, var_sel, dates_full, dates_sel
 
     #HERE calculate climate_mean
-    print('Calculating mean climatology\n')
-    if ctl.check_daily(dates):
-        climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
+    if not rebase_to_historical:
+        print('Calculating mean climatology\n')
+        if ctl.check_daily(dates):
+            climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
 
-        # climate_mean_dtr, dates_climate_mean_dtr = None, None
-        # if kwargs['detrended_eof_calculation']:
-        #     print('Calculating detrended climatology')
-        #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var, dates, window_days = kwargs['wnd_days'], window_years = kwargs['wnd_years'])
+            # climate_mean_dtr, dates_climate_mean_dtr = None, None
+            # if kwargs['detrended_eof_calculation']:
+            #     print('Calculating detrended climatology')
+            #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_daily_climat(var, dates, window_days = kwargs['wnd_days'], window_years = kwargs['wnd_years'])
+        else:
+            climate_mean, dates_climate_mean, _ = ctl.monthly_climatology(var, dates)
+
+            # climate_mean_dtr, dates_climate_mean_dtr = None, None
+            # if kwargs['detrended_eof_calculation']:
+            #     print('Calculating detrended climatology')
+            #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
     else:
-        climate_mean, dates_climate_mean, _ = ctl.monthly_climatology(var, dates)
-
-        # climate_mean_dtr, dates_climate_mean_dtr = None, None
-        # if kwargs['detrended_eof_calculation']:
-        #     print('Calculating detrended climatology')
-        #     climate_mean_dtr, dates_climate_mean_dtr = ctl.trend_monthly_climat(var, dates, window_years = kwargs['wnd_years'])
+        print('Using historical climate mean!\n')
 
     # if sel_yr_range is not None:
     #     print('Selecting date range {}\n'.format(sel_yr_range))
@@ -358,7 +361,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -385,7 +388,6 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     else:
         print('Analyzing a set of monthly data..\n')
 
-
     if use_reference_clusters:
         print('\n\n <<<<< Using reference cluster centers! No KMeans is run on the models. (use_reference_clusters set to True)>>>>> \n\n\n')
         use_reference_eofs = True
@@ -401,12 +403,14 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     if detrend_only_global:
         print('Detrending polynomial global tendencies over area {}'.format(area_dtr))
         var_season, coeffs_dtr, var_dtr, dates_season = ctl.remove_global_polytrend(lat, lon, var_season, dates_season, None, deg = deg_dtr, area = area_dtr)
-        climate_mean = None # need to recalculate climate_mean
+        if not rebase_to_historical:
+            climate_mean = None # need to recalculate climate_mean
 
     if detrend_local_linear:
         print('Detrending local linear tendencies')
         var_season, local_trend, dates_season = ctl.remove_local_lineartrend(lat, lon, var_season, dates_season, None)
-        climate_mean = None # need to recalculate climate_mean
+        if not rebase_to_historical:
+            climate_mean = None # need to recalculate climate_mean
 
     if is_daily:
         if climate_mean is None:
