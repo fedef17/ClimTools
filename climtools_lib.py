@@ -2117,7 +2117,7 @@ def find_point(data, lat, lon, lat_ok, lon_ok):
     return data[..., indla, indlo]
 
 
-def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_average = False):
+def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_average = False, verbose = False):
     """
     Cuts var and dates, creating a list of variables relative to each season and a list of dates.
     Works both on monthly and daily datasets.
@@ -2175,8 +2175,9 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         print(czz)
         print('Seasons are not all of the same length: \n')
         lengths = np.unique([len(coso) for coso in all_dates_seas])
-        if len(lengths) > 1:
-            for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
+        if verbose:
+            if len(lengths) > 1:
+                for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
         all_vars = np.array(all_var_seas)
 
     all_dates = np.array(all_dates_seas)
