@@ -5815,7 +5815,7 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     return
 
 
-def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 18):
+def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 18, n_err = 1):
     """
     Produces a plot with ellipse patches indicating error bars.
 
@@ -5840,7 +5840,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
 
     all_artists = []
     for i, (xu, yu, errxu, erryu) in enumerate(zip(x, y, errx, erry)):
-        ell = mpl.patches.Ellipse(xy = (xu, yu), width = errxu, height = erryu, angle = 0.0)
+        ell = mpl.patches.Ellipse(xy = (xu, yu), width = 2*n_err*errxu, height = 2*n_err*erryu, angle = 0.0)
         ax.add_artist(ell)
         ell.set_clip_box(ax.bbox)
         ell.set_alpha(alpha)
