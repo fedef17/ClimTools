@@ -49,7 +49,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -203,7 +203,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     del var
 
     #results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, climate_mean_dtr = climate_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
-    results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, **kwargs)
+    results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, rebase_to_historical = rebase_to_historical, **kwargs)
 
     results['dates_allyear'] = dates
     if netcdf4_read:
