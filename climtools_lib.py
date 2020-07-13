@@ -5849,9 +5849,9 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
             ell.set_label(labels[i])
         all_artists.append(ell)
 
-    if not polar:
-        ax.set_xlim(min(x)-abs(max(errx)), max(x)+abs(max(errx)))
-        ax.set_ylim(min(y)-abs(max(erry)), max(y)+abs(max(erry)))
+    # if not polar:
+    #     ax.set_xlim(min(x)-abs(max(errx)), max(x)+abs(max(errx)))
+    #     ax.set_ylim(min(y)-abs(max(erry)), max(y)+abs(max(erry)))
 
     if labels is not None:
         ax.legend(handles = all_artists, fontsize = legendfontsize)
