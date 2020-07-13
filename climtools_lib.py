@@ -5840,7 +5840,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
 
     all_artists = []
     for i, (xu, yu, errxu, erryu) in enumerate(zip(x, y, errx, erry)):
-        ell = mpl.patches.Ellipse(xy = (xu, yu), width = 2*errxu, height = 2*erryu, angle = 0.0)
+        ell = mpl.patches.Ellipse(xy = (xu, yu), width = errxu, height = erryu, angle = 0.0)
         ax.add_artist(ell)
         ell.set_clip_box(ax.bbox)
         ell.set_alpha(alpha)
