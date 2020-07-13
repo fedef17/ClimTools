@@ -5827,6 +5827,14 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     else:
         filename = None
 
+    if type(x) not in [list, np.array]:
+        x = [x]
+        y = [y]
+        errx = [errx]
+        erry = [erry]
+        if colors is not None:
+            colors = [colors]
+
     if colors is None:
         colors = color_set(len(x))
 
@@ -5854,7 +5862,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     return
 
 
-def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None):
+def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None, plot_ellipse = False, ellipse_color = 'blue'):
     """
     Produces two figures:
     - a Taylor diagram
@@ -5920,6 +5928,13 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
+
+    if plot_ellipse:
+        meang = np.mean(angles)
+        meang_std = np.std(angles)
+        mesig = np.mean(sigmas_pred)
+        mesig_std = np.std(sigmas_pred)
+        ellipse_plot(meang, mesig, meang_std, mesig_std, ax = ax, polar = True, colors = ellipse_color, alpha = 0.5)
 
     if max_val_sd is None:
         max_val_sd = 1.1 * np.max(sigmas_pred)
