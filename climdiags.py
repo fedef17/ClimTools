@@ -49,7 +49,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, **kwargs):
     """
     Wrapper for inputing a filename.
 
