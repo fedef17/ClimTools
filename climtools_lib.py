@@ -5925,6 +5925,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     if labels is None:
         labels = [None]*len(angles)
     for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
+        print(ang, sig, col, sym, lab)
         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
