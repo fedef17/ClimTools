@@ -6058,6 +6058,46 @@ def plotcorr(x, y, filename = None, xlabel = 'x', ylabel = 'y', xlim = None, yli
     return pearR
 
 
+def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups = None, colors = None, plot_group_mean = True):
+    """
+    Same as before, but differentiating different groups in the graph (not in the correlation)
+
+    Plots correlation graph between x and y, fitting a line and calculating Pearson's R coeff.
+    :param filename: abs. path of the graph
+    :params xlabel, ylabel: labels for x and y axes
+    """
+
+    if colors is None:
+        colors = ctl.color_set(len(groups))
+    xtot = np.concatenate(x)
+    ytot = np.concatenate(y)
+
+    pearR = np.corrcoef(xtot,ytot)[1,0]
+    A = np.vstack([xtot,np.ones(len(xtot))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
+    m,c = np.linalg.lstsq(A, ytot, rcond = None)[0]
+    xlin = np.linspace(min(xtot)-0.05*(max(xtot)-min(xtot)),max(xtot)+0.05*(max(xtot)-min(xtot)),11)
+
+    fig = plt.figure(figsize=(8, 6), dpi=150)
+    #ax = fig.add_subplot(111)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid()
+    for xu, yu, gro, col in zip(x, y, groups, colors):
+        plt.scatter(x, y, label=gro, color=col, s=4, zorder=3)
+        if plot_group_mean:
+            plt.scatter(x.mean(), y.mean(), color=col, s=10, zorder=3, marker = '*')
+
+    plt.plot(xlin, xlin*m+c, color='black', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
+    plt.title("Pearson's R = {:5.2f}".format(pearR))
+    plt.legend(loc=4,fancybox =1)
+
+    if filename is not None:
+        fig.savefig(filename)
+        plt.close()
+
+    return pearR
+
+
 def plot_regime_pdf_onax(ax, labels, pcs, reg, eof_proj = (0,1), color = None, fig_label = None, xi_grid = None, yi_grid = None, n_grid_points = 100, levels = None, normalize_pdf = True, plot_centroid = False, eof_axis_lim = None, lw = 1):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
