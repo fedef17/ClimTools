@@ -6083,7 +6083,7 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
     plt.ylabel(ylabel)
     plt.grid()
     for xu, yu, gro, col in zip(x, y, groups, colors):
-        plt.scatter(x, y, label=gro, color=col, s=4, zorder=3)
+        plt.scatter(xu, yu, label=gro, color=col, s=4, zorder=3)
         if plot_group_mean:
             plt.scatter(np.mean(x), np.mean(y), color=col, s=10, zorder=3, marker = '*')
 
