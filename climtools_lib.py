@@ -2928,7 +2928,10 @@ def linear_regre(x, y, return_resids = False):
     """
     Makes a linear regression of dataset y in function of x. Returns the coefficient m and c: y = mx + c.
     """
-
+    if type(x) is list:
+        x = np.array(x)
+        y = np.array(y)
+    
     xord = np.argsort(x)
     x = x[xord]
     y = y[xord]
@@ -2948,6 +2951,10 @@ def linear_regre_witherr(x, y):
     """
     Makes a linear regression of dataset y in function of x using numpy.polyfit. Returns the coefficient m and c: y = mx + c. And their estimated error.
     """
+
+    if type(x) is list:
+        x = np.array(x)
+        y = np.array(y)
 
     xord = np.argsort(x)
     x = x[xord]
