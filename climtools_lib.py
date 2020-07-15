@@ -6058,7 +6058,7 @@ def plotcorr(x, y, filename = None, xlabel = 'x', ylabel = 'y', xlim = None, yli
     return pearR
 
 
-def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups = None, colors = None, plot_group_mean = True):
+def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups = None, colors = None, plot_group_mean = True, single_group_corr = False):
     """
     Same as before, but differentiating different groups in the graph (not in the correlation)
 
@@ -6073,8 +6073,9 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
     ytot = np.concatenate(y)
 
     pearR = np.corrcoef(xtot,ytot)[1,0]
-    A = np.vstack([xtot,np.ones(len(xtot))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
-    m,c = np.linalg.lstsq(A, ytot, rcond = None)[0]
+    # A = np.vstack([xtot,np.ones(len(xtot))]).T  # A = [x.T|1.T] dove 1 = [1,1,1,1,1,..]
+    # m,c = np.linalg.lstsq(A, ytot, rcond = None)[0]
+    m, c, err_m, err_c = linear_regre_witherr(xtot, ytot)
     xlin = np.linspace(min(xtot)-0.05*(max(xtot)-min(xtot)),max(xtot)+0.05*(max(xtot)-min(xtot)),11)
 
     fig = plt.figure(figsize=(8, 6), dpi=150)
@@ -6085,10 +6086,17 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
     for xu, yu, gro, col in zip(x, y, groups, colors):
         plt.scatter(xu, yu, label=gro, color=col, s=4, zorder=3)
         if plot_group_mean:
-            plt.scatter(np.mean(xu), np.mean(yu), color=col, s=10, zorder=3, marker = '*')
+            plt.scatter(np.mean(xu), np.mean(yu), color=col, s=30, zorder=3, marker = '*')
 
-    plt.plot(xlin, xlin*m+c, color='black', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
-    plt.title("Pearson's R = {:5.2f}".format(pearR))
+    if not single_group_corr:
+        plt.plot(xlin, xlin*m+c, color='black', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
+        plt.title("Pearson's R = {:5.2f}".format(pearR))
+    else:
+        for xu, yu, gro, col in zip(x, y, groups, colors):
+            m, c, err_m, err_c = linear_regre_witherr(xu, yu)
+            pearR = np.corrcoef(xu,yu)[1,0]
+            plt.plot(xlin, xlin*m+c, color=col, label='{} corr.: {}'.format(gro, pearR))
+
     plt.legend(loc=4,fancybox =1)
 
     if filename is not None:
