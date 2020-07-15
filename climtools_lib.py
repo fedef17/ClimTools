@@ -2931,7 +2931,7 @@ def linear_regre(x, y, return_resids = False):
     if type(x) is list:
         x = np.array(x)
         y = np.array(y)
-    
+
     xord = np.argsort(x)
     x = x[xord]
     y = y[xord]
@@ -6090,19 +6090,22 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid()
-    for xu, yu, gro, col in zip(x, y, groups, colors):
-        plt.scatter(xu, yu, label=gro, color=col, s=4, zorder=3)
-        if plot_group_mean:
-            plt.scatter(np.mean(xu), np.mean(yu), color=col, s=30, zorder=3, marker = '*')
 
     if not single_group_corr:
+        for xu, yu, gro, col in zip(x, y, groups, colors):
+            plt.scatter(xu, yu, label=gro, color=col, s=4, zorder=3)
+            if plot_group_mean:
+                plt.scatter(np.mean(xu), np.mean(yu), color=col, s=30, zorder=3, marker = '*')
         plt.plot(xlin, xlin*m+c, color='black', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
         plt.title("Pearson's R = {:5.2f}".format(pearR))
     else:
         for xu, yu, gro, col in zip(x, y, groups, colors):
+            plt.scatter(xu, yu, color=col, s=4, zorder=3)
+            if plot_group_mean:
+                plt.scatter(np.mean(xu), np.mean(yu), color=col, s=30, zorder=3, marker = '*')
             m, c, err_m, err_c = linear_regre_witherr(xu, yu)
             pearR = np.corrcoef(xu,yu)[1,0]
-            plt.plot(xlin, xlin*m+c, color=col, label='{} corr.: {}'.format(gro, pearR))
+            plt.plot(xlin, xlin*m+c, color=col, label='{} : corr {:5.2f}'.format(gro, pearR))
 
     plt.legend(loc=4,fancybox =1)
 
