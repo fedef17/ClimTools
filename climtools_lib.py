@@ -3566,7 +3566,7 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_mean', matching_hierarchy = None):
+def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
     """
     Find the best possible match between two sets of PCs.
 
@@ -3577,6 +3577,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
     - "patcor_mean" (mean of pattern correlation among reference centroids and centroids pcs);
     - "rms_hierarchy" (matches the clusters with c-to-c dist following a hierarchy (matches the first, than the second, ...). The hierarchy can be specified by matching_hierarchy, defaults to reference cluster order [0, 1, 2, ...]);
     - "patcor_hierarchy" (same for pattern correlation);
+    - "rms_mean_w_pos_patcor" (uses rms_mean, but first only over combinations that give positive correlations for all patterns. If this is not possible, considers the usual rms_mean rule)
 
     The first set of PCs is left in the input order and the second set of PCs is re-arranged.
     Output:
@@ -3598,6 +3599,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
 
     mean_rms = []
     mean_patcor = []
+    sign_patcor = []
     for p in perms:
         all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
         all_patcor = [Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)]
@@ -3607,9 +3609,11 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
             print(all_patcor)
         mean_patcor.append(np.mean(all_patcor))
         mean_rms.append(np.mean(all_rms))
+        sign_patcor.append(np.all(all_patcor > 0))
 
     mean_rms = np.array(mean_rms)
     mean_patcor = np.array(mean_patcor)
+    sign_patcor = np.array(sign_patcor)
 
     jmin = mean_rms.argmin()
     jmin2 = mean_patcor.argmax()
@@ -3639,9 +3643,16 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
     if verbose: print(rms_hi_best_perm)
     jrmshi = [perms.index(p) for p in perms if p == tuple(rms_hi_best_perm)][0]
 
+    if np.any(sign_patcor):
+        # considers first combinations where the patcor is always positive
+        jlui = np.argmin(mean_rms[sign_patcor])
+        jrmshi_wpp = np.arange(len(sign_patcor))[sign_patcor][jlui]
+    else:
+        jrmshi_wpp = jrmshi
+
     jok = jmin
 
-    if len(np.unique([jmin, jmin2, jpathi, jrmshi])) > 1:
+    if len(np.unique([jmin, jmin2, jpathi, jrmshi, jrmshi_wpp])) > 1:
         print('WARNING: bad matching. Best permutation with rule rms_mean is {}, with patcor_mean is {}, with rms_hierarchy is {}, with patcor_hierarchy is {}'.format(perms[jmin], perms[jmin2], perms[jrmshi], perms[jpathi]))
 
         if bad_matching_rule == 'rms_mean':
@@ -3652,8 +3663,10 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
             jok = jrmshi
         elif bad_matching_rule == 'patcor_hierarchy':
             jok = jpathi
+        elif bad_matching_rule == 'rms_mean_w_pos_patcor':
+            jok = jrmshi_wpp
 
-        for jii, rule in zip([jmin, jmin2, jrmshi, jpathi], ['rms_mean', 'patcor_mean', 'rms_hierarchy', 'patcor_hierarchy']):
+        for jii, rule in zip([jmin, jmin2, jrmshi, jpathi, jrmshi_wpp], ['rms_mean', 'patcor_mean', 'rms_hierarchy', 'patcor_hierarchy', 'rms_mean_w_pos_patcor']):
             all_rms = [LA.norm(pcset_ref[i] - pcset[perms[jii][i]]) for i in range(numclus)]
             all_patcor = [Rcorr(pcset_ref[i], pcset[perms[jii][i]]) for i in range(numclus)]
             if verbose: print('All RMS with rule {}: {}'.format(rule, all_rms))
