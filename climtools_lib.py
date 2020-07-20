@@ -6112,6 +6112,7 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
         plt.plot(xlin, xlin*m+c, color='black', label='y = {:8.2f} x + {:8.2f}'.format(m,c))
         plt.title("Pearson's R = {:5.2f}".format(pearR))
     else:
+        plt.plot(xlin, xlin*m+c, color='black', label='tot : corr {}'.format(pearR))
         for xu, yu, gro, col in zip(x, y, groups, colors):
             plt.scatter(xu, yu, color=col, s=4, zorder=3)
             if plot_group_mean:
