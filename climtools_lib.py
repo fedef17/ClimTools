@@ -3601,8 +3601,8 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
     mean_patcor = []
     sign_patcor = []
     for p in perms:
-        all_rms = [LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)]
-        all_patcor = [Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)]
+        all_rms = np.array([LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)])
+        all_patcor = np.array([Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)])
         if verbose:
             print('Permutation: ', p)
             print(all_rms)
