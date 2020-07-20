@@ -3620,11 +3620,11 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_hi
     for clus in matching_hierarchy:
         all_patcor = np.array([Rcorr(pcset_ref[clus], pcset[mat]) for mat in all_match])
         mat_ok = all_match[all_patcor.argmax()]
-        print(clus, all_patcor, all_match, mat_ok)
+        if verbose: print(clus, all_patcor, all_match, mat_ok)
         all_match = all_match[all_match != mat_ok]
         patcor_hi_best_perm[clus] = mat_ok
 
-    print(patcor_hi_best_perm)
+    if verbose: print(patcor_hi_best_perm)
     jpathi = [perms.index(p) for p in perms if p == tuple(patcor_hi_best_perm)][0]
 
     all_match = np.arange(numclus)
@@ -3632,11 +3632,11 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_hi
     for clus in matching_hierarchy:
         all_rms = np.array([LA.norm(pcset_ref[clus] - pcset[mat]) for mat in all_match])
         mat_ok = all_match[all_rms.argmin()]
-        print(clus, all_rms, all_match, mat_ok)
+        if verbose: print(clus, all_rms, all_match, mat_ok)
         all_match = all_match[all_match != mat_ok]
         rms_hi_best_perm[clus] = mat_ok
 
-    print(rms_hi_best_perm)
+    if verbose: print(rms_hi_best_perm)
     jrmshi = [perms.index(p) for p in perms if p == tuple(rms_hi_best_perm)][0]
 
     jok = jmin
@@ -3656,10 +3656,10 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_hi
         for jii, rule in zip([jmin, jmin2, jrmshi, jpathi], ['rms_mean', 'patcor_mean', 'rms_hierarchy', 'patcor_hierarchy']):
             all_rms = [LA.norm(pcset_ref[i] - pcset[perms[jii][i]]) for i in range(numclus)]
             all_patcor = [Rcorr(pcset_ref[i], pcset[perms[jii][i]]) for i in range(numclus)]
-            print('All RMS with rule {}: {}'.format(rule, all_rms))
-            print('All patcor with rule {}: {}\n'.format(rule, all_patcor))
+            if verbose: print('All RMS with rule {}: {}'.format(rule, all_rms))
+            if verbose: print('All patcor with rule {}: {}\n'.format(rule, all_patcor))
 
-        print('Using the rule: {}\n'.format(bad_matching_rule))
+        if verbose: print('Using the rule: {}\n'.format(bad_matching_rule))
 
     return np.array(perms[jok])
 
