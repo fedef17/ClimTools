@@ -3653,7 +3653,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
     jok = jmin
 
     if len(np.unique([jmin, jmin2, jpathi, jrmshi, jrmshi_wpp])) > 1:
-        print('WARNING: bad matching. Best permutation with rule rms_mean is {}, with patcor_mean is {}, with rms_hierarchy is {}, with patcor_hierarchy is {}'.format(perms[jmin], perms[jmin2], perms[jrmshi], perms[jpathi]))
+        print('WARNING: bad matching. Best permutation with rule rms_mean is {}, with patcor_mean is {}, with rms_hierarchy is {}, with patcor_hierarchy is {}, with rms_mean_w_pos_patcor is {}'.format(perms[jmin], perms[jmin2], perms[jrmshi], perms[jpathi], perms[jrmshi_wpp]))
 
         if bad_matching_rule == 'rms_mean':
             jok = jmin
