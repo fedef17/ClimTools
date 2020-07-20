@@ -3566,7 +3566,7 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_hierarchy', matching_hierarchy = None):
+def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_mean', matching_hierarchy = None):
     """
     Find the best possible match between two sets of PCs.
 
