@@ -3659,7 +3659,7 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
             if verbose: print('All RMS with rule {}: {}'.format(rule, all_rms))
             if verbose: print('All patcor with rule {}: {}\n'.format(rule, all_patcor))
 
-        if verbose: print('Using the rule: {}\n'.format(bad_matching_rule))
+        print('Using the rule: {}\n'.format(bad_matching_rule))
 
     return np.array(perms[jok])
 
