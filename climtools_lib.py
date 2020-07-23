@@ -5853,7 +5853,7 @@ def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_
     return
 
 
-def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 18, n_err = 1):
+def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, polar = False, colors = None, alpha = 0.5, legendfontsize = 28, n_err = 1):
     """
     Produces a plot with ellipse patches indicating error bars.
 
