@@ -351,24 +351,26 @@ def get_size(obj, seen=None):
 #######################################################
 
 
-def read_from_txt(ifile, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None):
+def read_from_txt(ifile, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None, debug = False):
     """
     Read data from a text file, return matrix.
     """
 
     with open(ifile, 'r') as ifi:
         lines = ifi.readlines()
-        cose = readlines_to_matrix(lines, n_skip = n_skip, dtype = dtype, first_column_header = first_column_header, sep = sep, n_stop = n_stop)
+        cose = readlines_to_matrix(lines, n_skip = n_skip, dtype = dtype, first_column_header = first_column_header, sep = sep, n_stop = n_stop, debug = debug)
 
     return cose
 
-def readlines_to_matrix(lines, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None):
+def readlines_to_matrix(lines, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None, debug = True):
     """
     Given readlines output of a datafile, returns a matrix. Skip the lines to be avoided (i.e. file header). Very simple, won't work if the data lines are interrupted by comments or blank lines.
     """
     # read all the file and transform it into a matrix of floats
     lines_ok = []
-    for lin in lines[n_skip:n_stop]:
+    for ii, lin in enumerate(lines[n_skip:n_stop]):
+        if len(lin.strip()) == 0: continue
+        if debug: print(ii+n_skip, lin)
         lines_ok.append(lin.replace(sep, ' '))
 
     if not first_column_header:
@@ -3860,7 +3862,7 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
     return np.stack(comps)
 
 
-def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_singleday_pause = True):
+def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_singleday_pause = True, numclus = None):
     """
     Calculates residence times given a set of indices indicating cluster numbers.
 
@@ -3872,7 +3874,8 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
     < skip_singleday_pause > : If a regime stops for a single day and then starts again, the two periods will be summed on. The single day is counted as another regime's day, to preserve the total number.
     """
     indices = np.array(indices)
-    numclus = int(indices.max() + 1)
+    if numclus is None:
+        numclus = int(indices.max() + 1)
     numseq = np.arange(len(indices))
 
     resid_times = []
