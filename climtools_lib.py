@@ -884,6 +884,34 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
     #     return vars, level, lat, lon, dates, time_units, var_units, time_cal
 
 
+def read_timeseries_nc(filename, var_name = None):
+    fh = nc.Dataset(filename,'r')
+    ### TIME ###
+    time = fh.variables['time'][:]
+    time_units = fh.variables['time'].units # Reading in the time units
+    time_cal = fh.variables['time'].calendar # Calendar in use (proleptic_gregorian))
+    dates = nc.num2date(time, time_units, time_cal)
+
+    try:
+        if time_cal == '365_day' or time_cal == 'noleap':
+            dates = adjust_noleap_dates(dates)
+        elif time_cal == '360_day':
+            dates = adjust_360day_dates(dates)
+    except pd.errors.OutOfBoundsDatetime:
+        print('Dates outside pandas range! falling back to cftime dates')
+
+    if var_name is not None:
+        var = fh.variables[var_name][:]
+    else:
+        #print(fh.variables.keys())
+        #print('Returning the last variable')
+        var_name = list(fh.variables.keys())[-1]
+        var = fh.variables[var_name][:]
+
+    fh.close()
+    return var, dates
+
+
 def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True, increasing_plev = True):
     '''
     GOAL
