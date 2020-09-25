@@ -333,6 +333,11 @@ def export_results_to_json(filename, results):
         try:
             json.dump(nures, fp)
         except Exception as expc:
+            mod = list(results.keys())[0]
+            if mod == 'reference':
+                mod = list(results.keys())[1]
+            print(results.keys())
+            print(mod, results[mod])
             ens = nures[mod]['ens_names'][0]
             for ke in nures[mod].keys():
                 tip = type(nures[mod][ke][ens])
