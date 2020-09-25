@@ -330,7 +330,17 @@ def export_results_to_json(filename, results):
 
 
     with open(filename, 'w') as fp:
-        json.dump(nures, fp)
+        try:
+            json.dump(nures, fp)
+        except Exception as expc:
+            ens = nures[mod]['ens_names'][0]
+            for ke in nures[mod].keys():
+                tip = type(nures[mod][ke][ens])
+                if tip == list:
+                    print(ke, tip, type(nures[mod][ke][ens][0]))
+                else:
+                    print(ke, tip)
+            raise expc
 
     return nures
 
