@@ -339,12 +339,17 @@ def export_results_to_json(filename, results):
             print(results.keys())
             print(mod, results[mod])
             ens = nures[mod]['ens_names'][0]
+            print(nures[mod]['ens_names'])
             for ke in nures[mod].keys():
-                tip = type(nures[mod][ke][ens])
-                if tip == list:
-                    print(ke, tip, type(nures[mod][ke][ens][0]))
+                if type(nures[mod][ke]) is dict:
+                    tip = type(nures[mod][ke][ens])
+                    if tip == list:
+                        print(ke, tip, type(nures[mod][ke][ens][0]))
+                    else:
+                        print(ke, tip)
                 else:
-                    print(ke, tip)
+                    print(ke, type(nures[mod][ke]))
+
             raise expc
 
     return nures
