@@ -315,6 +315,9 @@ def export_results_to_json(filename, results):
             for ke in nures[mod]:
                 if type(nures[mod][ke]) == np.ndarray:
                     nures[mod][ke] = nures[mod][ke].tolist()
+                if type(nures[mod][ke]) is list:
+                    if type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                        nures[mod][ke] = [cos.isoformat() for cos in nures[mod][ke]]
 
             for ke in alkeens:
                 if ke not in nures[mod]: continue
@@ -334,8 +337,8 @@ def export_results_to_json(filename, results):
             json.dump(nures, fp)
         except Exception as expc:
             print(results.keys())
-            for mod in results.keys():
-                print(mod, results[mod])
+            for mod in nures.keys():
+                #print(mod, results[mod])
                 if 'ens_names' in nures[mod]:
                     ens = nures[mod]['ens_names'][0]
                     print(nures[mod]['ens_names'])
