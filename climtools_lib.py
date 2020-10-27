@@ -802,8 +802,6 @@ def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regr
     for fil in ifilez:
         if fil[-3:] == '.nc':
             if netcdf4_read:
-                if regrid_to_reference_cube is not None:
-                    print('WARNING! Unable to perform regridding with netcdf4_read set to True')
                 var, coords, aux_info = readxDncfield(fil, extract_level = extract_level_hPa)
                 lat = coords['lat']
                 lon = coords['lon']
