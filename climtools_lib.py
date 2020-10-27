@@ -669,7 +669,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
 
     """
 
-    if not regrid_to_reference_file is None:
+    if regrid_to_reference_file is not None:
         print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
         netcdf4_read = False
 
@@ -786,7 +786,7 @@ def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regr
     """
 
     ref_cube = None
-    if regrid_to_reference_file is not None
+    if regrid_to_reference_file is not None:
         if not netcdf4_read:
             print('Loading reference cube for regridding..')
             ref_cube = iris.load(regrid_to_reference_file)[0]
