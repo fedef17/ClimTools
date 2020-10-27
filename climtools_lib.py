@@ -655,7 +655,7 @@ def check_available_cmip6_data(varname, mip_table, experiment, base_cart_cmip6 =
     return all_data
 
 
-def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first', base_cart_cmip6 = None, cmip_family_dirs = False, grid_dir = False, version_dir = False, extract_level_hPa = None, regrid_to_reference_file = None, adjust_nonstd_dates = True, verbose = False, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
+def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first', base_cart_cmip6 = None, cmip_family_dirs = False, grid_dir = False, version_dir = False, extract_level_hPa = None, regrid_to_reference_file = None, adjust_nonstd_dates = True, verbose = False, netcdf4_read = True, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
     """
     Reads all data of selected variable from the disk.
 
@@ -668,6 +668,11 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
     < sel_member > : can be either 'first' (the first member is selected), 'all' (a dict with all members is returned), or a specific member name (e.g. r1i2p1f1)
 
     """
+
+    if regrid_to_reference_file is not None:
+        print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
+        netcdf4_read = False
+
     if base_cart_cmip6 is None:
         if os.uname()[1] == 'hobbes':
             base_cart_cmip6 = '/data-hobbes/fabiano/CMIP6/CMIP6/model-output/'
@@ -740,7 +745,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
                 listafil = glob.glob(pathok + '*.nc')
                 listafil.sort()
                 if len(listafil) > 0:
-                    var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True)
+                    var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
                     data[member] = (var, coords, aux_info)
 
         return data
@@ -770,7 +775,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
             listafil.sort()
 
             if len(listafil) > 0:
-                var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True)
+                var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
 
         return var, coords, aux_info
 
@@ -781,9 +786,13 @@ def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regr
     """
 
     ref_cube = None
-    if regrid_to_reference_file is not None and not netcdf4_read:
-        print('Loading reference cube for regridding..')
-        ref_cube = iris.load(regrid_to_reference_file)[0]
+    if regrid_to_reference_file is not None
+        if not netcdf4_read:
+            print('Loading reference cube for regridding..')
+            ref_cube = iris.load(regrid_to_reference_file)[0]
+        else:
+            print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
+            netcdf4_read = False
 
     print('Concatenating {} input files..\n'.format(len(ifilez)))
     var_sel = []
