@@ -780,7 +780,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
         return var, coords, aux_info
 
 
-def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
+def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = True, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
     """
     Read a list of netCDF files using the iris library.
     """
