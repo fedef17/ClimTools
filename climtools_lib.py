@@ -544,7 +544,13 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
                     datacoords['level'] = datacoords['level'][okind]
                     data = data.take(first(okind), axis = ax_coord['level'])
                 else:
-                    raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+                    mincos = np.min(np.abs(datacoords['level']-extract_level_hPa))
+                    if mincos < 1: # tolerance 1 hPa
+                        okind = np.argmin(np.abs(datacoords['level']-extract_level_hPa))
+                        datacoords['level'] = datacoords['level'][okind]
+                        data = data.take(okind, axis = ax_coord['level'])
+                    else:
+                        raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
             else:
                 raise ValueError('File contains more levels. select level to keep if in hPa or give a single level file as input')
 
