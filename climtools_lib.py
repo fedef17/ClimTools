@@ -669,7 +669,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
 
     """
 
-    if regrid_to_reference_file is not None:
+    if not regrid_to_reference_file is None:
         print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
         netcdf4_read = False
 
