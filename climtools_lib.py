@@ -5586,8 +5586,8 @@ def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', t
     cmappa = cm.get_cmap(cmap)
 
     if cbar_range is None:
-        mi = np.percentile(data, color_percentiles[0])
-        ma = np.percentile(data, color_percentiles[1])
+        mi = np.nanpercentile(data, color_percentiles[0])
+        ma = np.nanpercentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
