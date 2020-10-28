@@ -47,6 +47,7 @@ import iris
 from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
+plt.rcParams['lines.dashed_pattern'] = [5, 5]
 #mpl.rcParams['hatch.color'] = 'black'
 # plt.rcParams['xtick.labelsize'] = 30
 # plt.rcParams['ytick.labelsize'] = 30
@@ -518,9 +519,9 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         for std_nam in allconames:
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
-                print(coor)
-                print(pressure_levels)
-                print(std_nam)
+                #print(coor)
+                #print(pressure_levels)
+                #print(std_nam)
                 if pressure_levels and std_nam == 'level':
                     print('Converting units to hPa')
                     coor.convert_units('hPa')
@@ -543,7 +544,13 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
                     datacoords['level'] = datacoords['level'][okind]
                     data = data.take(first(okind), axis = ax_coord['level'])
                 else:
-                    raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+                    mincos = np.min(np.abs(datacoords['level']-extract_level_hPa))
+                    if mincos < 1: # tolerance 1 hPa
+                        okind = np.argmin(np.abs(datacoords['level']-extract_level_hPa))
+                        datacoords['level'] = datacoords['level'][okind]
+                        data = data.take(okind, axis = ax_coord['level'])
+                    else:
+                        raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
             else:
                 raise ValueError('File contains more levels. select level to keep if in hPa or give a single level file as input')
 
@@ -575,6 +582,278 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     #print('FINE')
 
     return data, datacoords, aux_info
+
+
+def check_available_cmip6_data(varname, mip_table, experiment, base_cart_cmip6 = None, cmip_family_dirs = False, grid_dir = False, version_dir = False):
+    """
+    Checks all models/members available for the selected variable.
+
+    The base_cart_cmip6 is the model-output directory. The default directory structure from there is institute/model/experiment/realm/mip_table/
+
+    < cmip_family_dirs > : set to true if the different experiments are in different folders depending to the scenario. The path from base_cart_cmip6 is then: cmip_family/institute/model/experiment/realm/mip_table/
+    < grid_dir > : set to True if the folder structure contains the grid type, like institute/model/experiment/realm/mip_table/varname/gr/
+    < version_dir > : set to True if the folder structure contains the cmor version, as in institute/model/experiment/realm/mip_table/varname/gr/v20200101/
+    """
+
+    if base_cart_cmip6 is None:
+        if os.uname()[1] == 'hobbes':
+            base_cart_cmip6 = '/data-hobbes/fabiano/CMIP6/CMIP6/model-output/'
+        elif os.uname()[1] == 'wilma':
+            base_cart_cmip6 = '/archive/paolo/cmip6/CMIP6/model-output/'
+        elif 'jasmin.ac.uk' in os.uname()[1]:
+            base_cart_cmip6 = '/badc/cmip6/data/CMIP6/'
+            cmip_family_dirs = True
+            grid_dir = True
+            version_dir = True
+
+    if cmip_family_dirs:
+        ok_cmip = None
+        all_cmips = os.listdir(base_cart_cmip6)
+        for cmip in all_cmips:
+            all_exps = np.unique([pi.split('/')[-1] for pi in glob.glob(cmip + '/*/*/*')])
+            if experiment in all_exps:
+                ok_cmip = cmip
+
+        if ok_cmip is None:
+            raise ValueError('Experiment {} not found in any cmip folder'.format(experiment))
+        else:
+            base_cart_cmip6 = base_cart_cmip6 + cmip + '/'
+
+
+    if mip_table in ['day', 'Amon', '6hr', '3hr']:
+        realm = 'atmos'
+    elif mip_table == 'Omon':
+        realm = 'ocean'
+    elif mip_table == 'SImon':
+        realm = 'seaIce'
+    else:
+        raise ValueError('Unknown mip_table {}, please update function check_available_cmip6_data'.format(mip_table))
+
+    all_data = [] # I save tuples: (inst, model, member)
+
+    subdirs = '{}/{}/{}/{}/{}/{}/{}/'
+
+    all_inst = os.listdir(base_cart_cmip6)
+    for inst in all_inst:
+        all_mods = os.listdir(base_cart_cmip6 + inst)
+        for model in all_mods:
+            pathmem = base_cart_cmip6 + inst + '/' + model + '/' + experiment + '/' + realm + '/' + mip_table
+            if os.path.exists(pathmem):
+                all_mems = os.listdir(pathmem)
+
+                for member in all_mems:
+                    pathok = base_cart_cmip6 + subdirs.format(inst, model, experiment, realm, mip_table, member, varname)
+                    if os.path.exists(pathok):
+                        if grid_dir:
+                            grid = os.listdir(pathok)[0]
+                            pathok = pathok + grid + '/'
+                        if version_dir:
+                            all_vers = os.listdir(pathok)
+                            if len(all_vers) > 1:
+                                num_best = np.argmax([len(os.listdir(pathok + vers + '/')) for vers in all_vers])
+                                version = all_vers[num_best]
+                            else:
+                                version = all_vers[0]
+                            pathok = pathok + version + '/'
+                        if len(glob.glob(pathok + '*.nc')) > 0:
+                            all_data.append((inst, model, member))
+
+    return all_data
+
+
+def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first', base_cart_cmip6 = None, cmip_family_dirs = False, grid_dir = False, version_dir = False, extract_level_hPa = None, regrid_to_reference_file = None, adjust_nonstd_dates = True, verbose = False, netcdf4_read = True, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
+    """
+    Reads all data of selected variable from the disk.
+
+    The base_cart_cmip6 is the model-output directory. The default directory structure from there is institute/model/experiment/realm/mip_table/
+
+    < cmip_family_dirs > : set to true if the different experiments are in different folders depending to the scenario. The path from base_cart_cmip6 is then: cmip_family/institute/model/experiment/realm/mip_table/
+    < grid_dir > : set to True if the folder structure contains the grid type, like institute/model/experiment/realm/mip_table/varname/gr/
+    < version_dir > : set to True if the folder structure contains the cmor version, as in institute/model/experiment/realm/mip_table/varname/gr/v20200101/
+
+    < sel_member > : can be either 'first' (the first member is selected), 'all' (a dict with all members is returned), or a specific member name (e.g. r1i2p1f1)
+
+    """
+
+    if regrid_to_reference_file is not None:
+        print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
+        netcdf4_read = False
+
+    if base_cart_cmip6 is None:
+        if os.uname()[1] == 'hobbes':
+            base_cart_cmip6 = '/data-hobbes/fabiano/CMIP6/CMIP6/model-output/'
+        elif os.uname()[1] == 'wilma':
+            base_cart_cmip6 = '/archive/paolo/cmip6/CMIP6/model-output/'
+        elif 'jasmin.ac.uk' in os.uname()[1]:
+            base_cart_cmip6 = '/badc/cmip6/data/CMIP6/'
+            cmip_family_dirs = True
+            grid_dir = True
+            version_dir = True
+
+    if mip_table in ['day', 'Amon', '6hr', '3hr']:
+        realm = 'atmos'
+    elif mip_table == 'Omon':
+        realm = 'ocean'
+    elif mip_table == 'SImon':
+        realm = 'seaIce'
+    else:
+        raise ValueError('Unknown mip_table {}, please update function check_available_cmip6_data'.format(mip_table))
+
+    if cmip_family_dirs:
+        ok_cmip = None
+        all_cmips = os.listdir(base_cart_cmip6)
+        for cmip in all_cmips:
+            all_exps = np.unique([pi.split('/')[-1] for pi in glob.glob(cmip + '/*/*/*')])
+            if experiment in all_exps:
+                ok_cmip = cmip
+
+        if ok_cmip is None:
+            raise ValueError('Experiment {} not found in any cmip folder'.format(experiment))
+        else:
+            base_cart_cmip6 = base_cart_cmip6 + cmip + '/'
+
+    subdirs = '{}/{}/{}/{}/{}/{}/{}/'
+
+    all_inst = os.listdir(base_cart_cmip6)
+    inst_ok = None
+    for inst in all_inst:
+        all_mods = os.listdir(base_cart_cmip6 + inst)
+        if model in all_mods:
+            inst_ok = inst
+
+    if inst_ok is None:
+        raise ValueError('No data for model {}'.format(model))
+
+    all_mems = os.listdir(base_cart_cmip6 + inst_ok + '/' + model + '/' + experiment + '/' + realm + '/' + mip_table)
+    all_mems.sort()
+
+    if len(all_mems) == 0:
+        raise ValueError('NO data found for model {}, var {}, exp {}, miptab {}!'.format(model, varname, experiment, mip_table))
+
+    if sel_member == 'all':
+        data = dict()
+        for member in all_mems:
+            pathok = base_cart_cmip6 + subdirs.format(inst_ok, model, experiment, realm, mip_table, member, varname)
+
+            if os.path.exists(pathok):
+                if grid_dir:
+                    grid = os.listdir(pathok)[0]
+                    pathok = pathok + grid + '/'
+                if version_dir:
+                    all_vers = os.listdir(pathok)
+                    if len(all_vers) > 1:
+                        num_best = np.argmax([len(os.listdir(pathok + vers + '/')) for vers in all_vers])
+                        version = all_vers[num_best]
+                    else:
+                        version = all_vers[0]
+                    pathok = pathok + version + '/'
+
+                listafil = glob.glob(pathok + '*.nc')
+                listafil.sort()
+                if len(listafil) > 0:
+                    var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
+                    data[member] = (var, coords, aux_info)
+
+        return data
+    else:
+        if sel_member == 'first':
+            member = all_mems[0]
+        else:
+            member = sel_member
+            if member not in all_mems:
+                raise ValueError('NO data found for member {} of model {}, var {}, exp {}, miptab {}!'.format(member, model, varname, experiment, mip_table))
+
+        pathok = base_cart_cmip6 + subdirs.format(inst_ok, model, experiment, realm, mip_table, member, varname)
+        if os.path.exists(pathok):
+            if grid_dir:
+                grid = os.listdir(pathok)[0]
+                pathok = pathok + grid + '/'
+            if version_dir:
+                all_vers = os.listdir(pathok)
+                if len(all_vers) > 1:
+                    num_best = np.argmax([len(os.listdir(pathok + vers + '/')) for vers in all_vers])
+                    version = all_vers[num_best]
+                else:
+                    version = all_vers[0]
+                pathok = pathok + version + '/'
+
+            listafil = glob.glob(pathok + '*.nc')
+            listafil.sort()
+
+            if len(listafil) > 0:
+                var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
+
+        return var, coords, aux_info
+
+
+def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = True, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
+    """
+    Read a list of netCDF files using the iris library.
+    """
+
+    ref_cube = None
+    if regrid_to_reference_file is not None:
+        if not netcdf4_read:
+            print('Loading reference cube for regridding..')
+            ref_cube = iris.load(regrid_to_reference_file)[0]
+        else:
+            print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
+            netcdf4_read = False
+
+    print('Concatenating {} input files..\n'.format(len(ifilez)))
+    var_sel = []
+    var_full = []
+    dates_sel = []
+    dates_full = []
+    for fil in ifilez:
+        if fil[-3:] == '.nc':
+            if netcdf4_read:
+                var, coords, aux_info = readxDncfield(fil, extract_level = extract_level_hPa)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+            else:
+                var, coords, aux_info = read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = ref_cube, pressure_levels = pressure_levels)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+        elif fil[-4:] == '.grb' or fil[-5:] == '.grib':
+            if ref_cube is not None or extract_level_hPa is not None:
+                print('WARNING! Unable to perform regridding or extracting level with grib file')
+            var, coords, aux_info = read3D_grib(fil)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
+
+        if sel_yr_range is not None:
+            var, dates = sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+
+        if select_area_first:
+            print('Selecting area first for saving memory')
+            var, lat, lon = sel_area(lat, lon, var, area)
+
+        if select_season_first:
+            var_season, dates_season = sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+            var_sel.append(var_season)
+            dates_sel.append(dates_season)
+        else:
+            ### inefficient for memory: I just need 20 days at both ends to calculate climatology
+            dates_full.append(dates)
+            var_full.append(var)
+
+    if select_season_first:
+        var = np.concatenate(var_sel)
+        dates = np.concatenate(dates_sel)
+    else:
+        var = np.concatenate(var_full)
+        dates = np.concatenate(dates_full)
+
+    coords = dict()
+    coords['lat'] = lat
+    coords['lon'] = lon
+    coords['dates'] = dates
+
+    return var, coords, aux_info
 
 
 def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False):
@@ -4648,7 +4927,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots field contours on the axis of a figure.
 
@@ -4705,7 +4984,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     xi,yi = np.meshgrid(lon,lat)
 
     if plot_type == 'filled_contour':
-        map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = 'both', corner_mask = False, colors = colors, alpha = alphamap)
+        map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = extend_opt, corner_mask = False, colors = colors, alpha = alphamap)
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
         if draw_contour_lines:
@@ -4727,8 +5006,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
             if nskip == 0: nskip = 1
             levs = clevels[::nskip]
         else:
-            mi = np.percentile(add_contour_field, 1)
-            ma = np.percentile(add_contour_field, 99)
+            mi = np.percentile(add_contour_field, 0)
+            ma = np.percentile(add_contour_field, 100)
             if add_contour_plot_anomalies:
                 # making a symmetrical color axis
                 oko = max(abs(mi), abs(ma))
@@ -4740,9 +5019,20 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
                 oko1 = mi
                 oko2 = ma
             cb2 = (oko1, oko2)
-            levs = np.linspace(cb2[0], cb2[1], n_lines)
 
-        map_plot_lines = ax.contour(xi, yi, add_contour_field, levs, colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+            if add_contour_lines_step is None:
+                levs = np.linspace(cb2[0], cb2[1], n_lines)
+            else:
+                if add_contour_plot_anomalies:
+                    levs = np.append(np.arange(0, cb2[0]-add_contour_lines_step/2, -add_contour_lines_step)[::-1], np.arange(0, cb2[1]+add_contour_lines_step/2, add_contour_lines_step)[1:])
+                else:
+                    levs = np.arange(cb2[0], cb2[1]+add_contour_lines_step/2, add_contour_lines_step)
+                print(levs)
+
+        print(levs)
+        print(len(levs))
+        print(np.min(add_contour_field), np.max(add_contour_field))
+        map_plot_lines = ax.contour(xi, yi, add_contour_field, levs, colors = 'black', transform = ccrs.PlateCarree(), linewidths = lw_contour)
 
     if add_hatching is not None:
         if verbose: print('adding hatching')
@@ -5100,7 +5390,7 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
     return
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = True):
+def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = True, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots a single map to a figure.
 
@@ -5149,7 +5439,7 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, extend_opt = extend_opt)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -5382,7 +5672,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = True):
+def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = True, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = True, add_contour_lines_step = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -5487,7 +5777,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step)
 
             if number_subplots:
                 subtit = nens
