@@ -842,7 +842,7 @@ def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regr
             dates = coords['dates']
 
         if sel_yr_range is not None:
-            var, dates = sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+            var, dates = sel_time_range(var, dates, range_years(sel_yr_range[0], sel_yr_range[1]))
 
         if select_area_first:
             print('Selecting area first for saving memory')
@@ -2826,10 +2826,10 @@ def anomalies_daily_detrended_global(lat, lon, var, dates, season, area_dtr = 'g
     area_dtr indicates the area in which the global trend is calculated. Has to be in the form needed by sel_area.
     """
 
-    var_season, dates_season = ctl.sel_season(var, dates, season)
-    var_season = ctl.trend_climate_linregress(lat, lon, var_season, dates_season, season, area_dtr)
+    var_season, dates_season = sel_season(var, dates, season)
+    var_season = trend_climate_linregress(lat, lon, var_season, dates_season, season, area_dtr)
 
-    var_anom = ctl.anomalies_daily(var_season, dates_season, window = window_days)
+    var_anom = anomalies_daily(var_season, dates_season, window = window_days)
 
     return var_anom
 
@@ -6425,7 +6425,7 @@ def plotcorr_wgroups(x, y, filename = None, xlabel = 'x', ylabel = 'y', groups =
     """
 
     if colors is None:
-        colors = ctl.color_set(len(groups))
+        colors = color_set(len(groups))
     xtot = np.concatenate(x)
     ytot = np.concatenate(y)
 
