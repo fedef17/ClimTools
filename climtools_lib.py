@@ -43,8 +43,8 @@ from datetime import datetime
 import pickle
 from copy import deepcopy as dcopy
 
-import iris
-from cf_units import Unit
+#import iris
+#from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
@@ -558,7 +558,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     if 'time' in coord_names:
         time = cube.coord('time').points
         time_units = cube.coord('time').units
-        dates = time_units.num2date(time) # this is a set of cftime._cftime.real_datetime objects
+        dates = time_units.num2date(time, only_use_cftime_datetimes = False) # this is a set of cftime._cftime.real_datetime objects
         time_cal = time_units.calendar
 
         if adjust_nonstd_dates:
@@ -1048,7 +1048,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
             time_cal    = fh.variables['time'].calendar
 
             time = list(time)
-            dates = nc.num2date(time,time_units,time_cal)
+            dates = nc.num2date(time,time_units,time_cal, only_use_cftime_datetimes = False)
 
             if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
@@ -1184,7 +1184,7 @@ def read_timeseries_nc(filename, var_name = None):
     time = fh.variables['time'][:]
     time_units = fh.variables['time'].units # Reading in the time units
     time_cal = fh.variables['time'].calendar # Calendar in use (proleptic_gregorian))
-    dates = nc.num2date(time, time_units, time_cal)
+    dates = nc.num2date(time, time_units, time_cal, only_use_cftime_datetimes = False)
 
     try:
         if time_cal == '365_day' or time_cal == 'noleap':
@@ -1283,7 +1283,7 @@ def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True, increa
     print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
 
     time = list(time)
-    dates = nc.num2date(time,time_units,time_cal)
+    dates = nc.num2date(time,time_units,time_cal, only_use_cftime_datetimes = False)
     fh.close()
 
     if time_cal == '365_day' or time_cal == 'noleap':
@@ -1430,7 +1430,7 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
         var = var.squeeze()
     #print(fh.variables)
     time = list(time)
-    dates = nc.num2date(time, time_units, time_cal)
+    dates = nc.num2date(time, time_units, time_cal, only_use_cftime_datetimes = False)
     fh.close()
 
     if time_cal == '365_day' or time_cal == 'noleap':
