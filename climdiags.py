@@ -2610,3 +2610,110 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     ctl.plot_pdfpages(filename, all_figures)
 
     return
+
+
+#################### EnsClus
+def EnsClus_light(var_anom, lat, flag_perc = False, numpcs = 4, perc = 80, numclus = 4):
+    '''
+    var_anom is a list of lat-lon objects.
+
+    < flag_perc > : set to True to automatically find the number of pcs that explain a < perc > of the variance.
+
+    Find the most representative ensemble member for each cluster.
+    METHODS:
+    - Empirical Orthogonal Function (EOF) analysis of the input file
+    - K-means cluster analysis applied to the retained Principal Components (PCs)
+
+    TODO:
+    - Order clusters per frequency
+    - Give the anomalies in input (not from file)
+
+    '''
+
+    if isinstance(var_anom, list):
+        var_anom = np.stack(var_anom)
+
+    numens = var_anom.shape[0]
+
+    # Either perc (cluster analysis is applied on a number of PCs such as they explain
+    # 'perc' of total variance) or numpcs (number of PCs to retain) is set:
+    if flag_perc:
+        print('Considering percentage of explained variance: {0}%'.format(int(perc)))
+    else:
+        print('Considering fixed number of principal components: {0}'.format(numpcs))
+
+    print('------------ EOF analysis -------------- \n')
+    #----------------------------------------------------------------------------------------
+    solver = ctl.eof_computation(var_anom, lat)
+
+    varfrac = solver.varianceFraction()
+    acc = np.cumsum(varfrac*100)
+    if flag_perc:
+        numpcs = min(enumerate(acc), key=lambda x: x[1]<=perc)[0]+1
+        print('\nThe number of PCs that explain at least {}% of variance is {}'.format(perc,numpcs))
+        exctperc=min(enumerate(acc), key=lambda x: x[1]<=perc)[1]
+    if numpcs is not None:
+        exctperc=acc[numpcs-1]
+    if np.isnan(exctperc):
+        print(acc)
+        raise ValueError('NaN in evaluation of variance explained by first pcs')
+    print('(the first {} PCs explain the {:5.2f}% of variance)'.format(numpcs,exctperc))
+
+
+    #____________Compute k-means analysis using a subset of PCs
+    print('__________________________________________________\n')
+    print('k-means analysis')
+    print('_____________________________________________\n')
+    #----------------------------------------------------------------------------------------
+
+    centroids, labels = ctl.Kmeans_clustering_from_solver(solver, numclus, numpcs)
+
+    #____________Save labels
+    stringo = '{:10s} {:10s}\n'.format('ens #', 'cluster')
+    print(stringo)
+    for ii, lab in zip(range(numens), labels):
+        stringo = 'ens: {:6d} -> {:8d}\n'.format(ii, lab)
+        print(stringo)
+
+    #____________Compute cluster frequencies
+    L=[]
+    for nclus in range(numclus):
+        cl=list(np.where(labels==nclus)[0])
+        fr=len(cl)*100/len(labels)
+        L.append([nclus,fr,cl])
+
+    print('Cluster labels:')
+    print([L[ncl][0] for ncl in range(numclus)])
+    print('Cluster frequencies (%):')
+    print([round(L[ncl][1],3) for ncl in range(numclus)])
+    print('Cluster members:')
+    print([L[ncl][2] for ncl in range(numclus)])
+
+    #____________Find the most representative ensemble member for each cluster
+    print('___________________________________________________________________________________')
+    print('             Closest member to cluster centroid                              ')
+    print('_______________________________________________________________________________')
+    # 1)
+
+    PCs = solver.pcs()[:,:numpcs]
+
+    distances = ctl.compute_centroid_distance(PCs, centroids, labels)
+    cluspatterns = ctl.compute_clusterpatterns(var_anom, labels)
+
+    repres = []
+    for nclus in range(numclus):
+        labok = (labels == nclus)
+        repr_clus = np.arange(numens)[labok][np.argmin(distances[labok])]
+        repres.append(repr_clus)
+
+    #____________Save the most representative ensemble members
+    print('List of cluster representatives\n')
+    #stringo = '{:10s} {:8s} -> {:20s}\n'.format('', '#', 'filename')
+    stringo = '{:12s} {:10s}\n'.format('', '#')
+    print(stringo)
+    for ii in range(numclus):
+        okin = repres[ii]
+        stringo = 'Cluster {:2d}: ens {:8d}\n'.format(ii, okin)
+        print(stringo)
+
+    return centroids, labels, cluspatterns, repres, distances

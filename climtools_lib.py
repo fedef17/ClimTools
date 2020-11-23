@@ -2426,6 +2426,7 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
 
     return seas_mean, seas_std
 
+
 def find_point(data, lat, lon, lat_ok, lon_ok):
     """
     Finds closest point in data to lat_ok, lon_ok. Extracts the corresponding slice.
@@ -2943,7 +2944,7 @@ def anomalies_ensemble(var_ens, extreme = 'mean'):
     elif len(extreme.split("_"))==2:
         #Compute the chosen percentile over the period, for each ensemble member
         q=int(extreme.partition("th")[0])
-        varextreme_ens=[np.percentile(var_ens[i],q,axis=0) for i in range(numens)]
+        varextreme_ens=[np.nanpercentile(var_ens[i],q,axis=0) for i in range(numens)]
     elif extreme=='maximum':
         #Compute the maximum value over the period, for each ensemble member
         varextreme_ens=[np.max(var_ens[i],axis=0) for i in range(numens)]
@@ -4177,7 +4178,7 @@ def composites_regimes_daily(lat, lon, field, dates_field, labels, dates_labels,
         elif comp_moment == 'std':
             comp = np.std(var_ok[okreg], axis = 0)
         elif comp_moment == 'percentile':
-            comp = np.percentile(var_ok[okreg], comp_percentile, axis = 0)
+            comp = np.nanpercentile(var_ok[okreg], comp_percentile, axis = 0)
         else:
             raise ValueError('{} is not a valid comp_moment'.format(comp_moment))
         comps.append(comp)
@@ -5022,8 +5023,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
             if nskip == 0: nskip = 1
             levs = clevels[::nskip]
         else:
-            mi = np.percentile(add_contour_field, 0)
-            ma = np.percentile(add_contour_field, 100)
+            mi = np.nanpercentile(add_contour_field, 0)
+            ma = np.nanpercentile(add_contour_field, 100)
             if add_contour_plot_anomalies:
                 # making a symmetrical color axis
                 oko = max(abs(mi), abs(ma))
@@ -5241,6 +5242,8 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
 
     if bnd_box is not None:
         if isinstance(proj, ccrs.PlateCarree):
+            if type(bnd_box) == str:
+                bnd_box = sel_area_translate(bnd_box)
             print(bnd_box)
             ax.set_extent(bnd_box, crs = ccrs.PlateCarree())
 
@@ -5439,8 +5442,8 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     cmappa = cm.get_cmap(cmap)
 
     if cbar_range is None:
-        mi = np.percentile(data, color_percentiles[0])
-        ma = np.percentile(data, color_percentiles[1])
+        mi = np.nanpercentile(data, color_percentiles[0])
+        ma = np.nanpercentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -5515,8 +5518,8 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     if cbar_range is None:
         data = np.concatenate([data1.flatten(),data2.flatten()])
-        mi = np.percentile(data, color_percentiles[0])
-        ma = np.percentile(data, color_percentiles[1])
+        mi = np.nanpercentile(data, color_percentiles[0])
+        ma = np.nanpercentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -5610,8 +5613,8 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
 
     if cbar_range is None:
         data = np.concatenate([data1.flatten(),data2.flatten()])
-        mi = np.percentile(data, color_percentiles[0])
-        ma = np.percentile(data, color_percentiles[1])
+        mi = np.nanpercentile(data, color_percentiles[0])
+        ma = np.nanpercentile(data, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -5736,8 +5739,8 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         cmappa = cmap
 
     if cbar_range is None:
-        mi = np.percentile(dataset, color_percentiles[0])
-        ma = np.percentile(dataset, color_percentiles[1])
+        mi = np.nanpercentile(dataset, color_percentiles[0])
+        ma = np.nanpercentile(dataset, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
@@ -5846,7 +5849,7 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     return all_figures
 
 
-def plot_pdfpages(filename, figs, save_single_figs = True, fig_names = None):
+def plot_pdfpages(filename, figs, save_single_figs = False, fig_names = None):
     """
     Saves a list of figures to a pdf file.
     """
@@ -5971,8 +5974,8 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     cmappa = cm.get_cmap(cmap)
 
     if cbar_range is None:
-        mi = np.percentile(maps, color_percentiles[0])
-        ma = np.percentile(maps, color_percentiles[1])
+        mi = np.nanpercentile(maps, color_percentiles[0])
+        ma = np.nanpercentile(maps, color_percentiles[1])
         if plot_anomalies:
             # making a symmetrical color axis
             oko = max(abs(mi), abs(ma))
