@@ -2427,6 +2427,31 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
     return seas_mean, seas_std
 
 
+def zonal_seas_climatology(var, dates, season, dates_range = None, cut = True):
+    """
+    Performs a seasonal climatological mean of the dataset, but taking zonal means first. In this way we have a proper estimation of the std_dev as well.
+    
+    Works both on monthly and daily datasets.
+
+    Dates of the climatology are referred to year <refyear>, has no effect on the calculation.
+
+    < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
+    """
+
+    if season != 'year':
+        all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+        all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+    else:
+        all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
+
+    all_zonal = [zonal_mean(vvv) for vvv in all_seas]
+
+    seas_mean = np.mean(all_zonal, axis = 0)
+    seas_std = np.std(all_zonal, axis = 0)
+
+    return seas_mean, seas_std
+
+
 def find_point(data, lat, lon, lat_ok, lon_ok):
     """
     Finds closest point in data to lat_ok, lon_ok. Extracts the corresponding slice.
