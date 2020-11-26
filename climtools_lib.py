@@ -2452,7 +2452,7 @@ def zonal_seas_climatology(var, dates, season, dates_range = None, cut = True):
     return seas_mean, seas_std
 
 
-def global_seas_climatology(var, dates, season, dates_range = None, cut = True):
+def global_seas_climatology(var, lat, dates, season, dates_range = None, cut = True):
     """
     Performs a seasonal climatological mean of the dataset, but taking global means first. In this way we have a proper estimation of the std_dev as well.
     """
@@ -2463,7 +2463,7 @@ def global_seas_climatology(var, dates, season, dates_range = None, cut = True):
     else:
         all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
 
-    all_zonal = [global_mean(vvv) for vvv in all_seas]
+    all_zonal = [global_mean(vvv, lat) for vvv in all_seas]
 
     seas_mean = np.mean(all_zonal, axis = 0)
     seas_std = np.std(all_zonal, axis = 0)
