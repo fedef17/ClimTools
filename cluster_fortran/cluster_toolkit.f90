@@ -11,7 +11,7 @@ MODULE CLUSTER_TOOLKIT
 !                                              all subroutines have full
 !                                              interfaces and support Python
 !                                              via f2py.
-!      
+!
 ! Notes:
 !     To compile with f2py:
 !         f2py --fcompiler=gfortran --f90flags="-cpp"\
@@ -22,7 +22,7 @@ MODULE CLUSTER_TOOLKIT
 
 
     IMPLICIT NONE
-    
+
 
     PRIVATE
     PUBLIC :: ADRAN1, SEED_ADRAN1, CLUS_OPT, GAUSTS, TSSTAT, CLUS_SIG
@@ -108,7 +108,7 @@ MODULE CLUSTER_TOOLKIT
         REAL :: STAT2
         REAL, DIMENSION(NPC, NFLD)     :: DPC
         REAL, DIMENSION(NPC, PSIZE+1)  :: CENTR
-        
+
         ! Array of random number generators.
 !        TYPE(ADRNG_T), DIMENSION(NRSAMP) :: RNGS
         !TYPE(RNG_T), DIMENSION(NRSAMP) :: RNGS
@@ -192,7 +192,7 @@ MODULE CLUSTER_TOOLKIT
     ! Compute the optimal cluster partition for a given number of clusters.
     !
     !-------------------------------------------------------------------------
-        
+
         IMPLICIT NONE
 
         ! Input variables.
@@ -437,7 +437,7 @@ MODULE CLUSTER_TOOLKIT
                 IF (RNORM .LE. R2SEED) THEN
                     COSTF = COSTF + 1.
                 END IF
-                
+
                 R2J = PC(1, JSEED) * PC(1, JSEED) + PC(2, JSEED) * PC(2, JSEED)
 
                 DO KCL = 1, JCL - 1
@@ -455,7 +455,7 @@ MODULE CLUSTER_TOOLKIT
 
                     DOTP = PC(1, JSEED) * PC(1, KSEED) +                     &
                             PC(2, JSEED) * PC(2, KSEED)
-                    
+
                     R2K = PC(1, KSEED) * PC(1, KSEED) +                      &
                             PC(2, KSEED) * PC(2, KSEED)
 
@@ -532,7 +532,7 @@ MODULE CLUSTER_TOOLKIT
             CT_ADRAN1_SEED = MOD(IC + ABS(CT_ADRAN1_SEED), IM)
 
             DO J = 1, CT_ADRAN1_IR_LEN
-              
+
                 CT_ADRAN1_SEED = MOD(IA * CT_ADRAN1_SEED + IC, IM)
 
                 CT_ADRAN1_IR(J) = CT_ADRAN1_SEED
@@ -554,9 +554,9 @@ MODULE CLUSTER_TOOLKIT
         CT_ADRAN1_SEED = MOD(IA * CT_ADRAN1_SEED + IC, IM)
 
         CT_ADRAN1_IR(J) = CT_ADRAN1_SEED
-         
+
     END FUNCTION ADRAN1
-      
+
 
 !*****************************************************************************
     SUBROUTINE GAUSTS (NT, AV, SD, AC, NDIS, TS)
@@ -569,9 +569,9 @@ MODULE CLUSTER_TOOLKIT
     ! sub-series.
     !
     !------------------------------------------------------------------------
-        
+
         IMPLICIT NONE
-        
+
         !Input variables.
         INTEGER, INTENT(IN) :: NT
         REAL,    INTENT(IN) :: AV
@@ -610,7 +610,7 @@ MODULE CLUSTER_TOOLKIT
 
             J = 0
             DO JD = 1, NDIS
-                
+
                 J = J + 1
 
                 DO J2 = 2, NT2
@@ -636,7 +636,7 @@ MODULE CLUSTER_TOOLKIT
     SUBROUTINE TSSTAT (TS, NT, NDIS, AV, SD, AC)
 
         IMPLICIT NONE
-        
+
         ! Input variables.
         INTEGER,             INTENT(IN) :: NT
         REAL, DIMENSION(NT), INTENT(IN) :: TS

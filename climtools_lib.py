@@ -43,8 +43,8 @@ from datetime import datetime
 import pickle
 from copy import deepcopy as dcopy
 
-#import iris
-#from cf_units import Unit
+import iris
+from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
