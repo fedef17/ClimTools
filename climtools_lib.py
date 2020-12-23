@@ -872,7 +872,7 @@ def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regr
     return var, coords, aux_info
 
 
-def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False):
+def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False):
     """
     Read a netCDF file using the iris library.
 
@@ -881,6 +881,10 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
 
     < keep_only_maxdim_vars > : keeps only variables with maximum size (excludes variables like time_bnds, lat_bnds, ..)
     """
+
+    if regrid_to_reference_file is not None:
+        print('Loading reference cube for regridding..')
+        regrid_to_reference = iris.load(regrid_to_reference_file)[0]
 
     print('Reading {}\n'.format(ifile))
     is_ensemble = False
