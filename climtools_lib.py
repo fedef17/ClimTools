@@ -110,10 +110,15 @@ def load_wrtool(ifile):
     if 'models' in res and 'reference' in res:
         results = res['models']
         results_ref = res['reference']
-    else:
+
+        return results, results_ref
+    elif len(res) == 2: # old version
         results, results_ref = res
 
-    return results, results_ref
+        return results, results_ref
+    else: # reference file
+        return res
+
 
 def openlog(cart_out, tag = None, redirect_stderr = True):
     """
