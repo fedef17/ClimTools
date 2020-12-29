@@ -2922,6 +2922,23 @@ def anomalies_daily(var, dates, climate_mean = None, dates_climate_mean = None, 
     return var_anom
 
 
+def restore_fullfield_from_anomalies_daily(var, dates, climate_mean, dates_climate_mean):
+    dates_pdh = pd.to_datetime(dates)
+    dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    var_anom = np.empty_like(var)
+
+    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
+        mask = (dates_pdh.month == dat.month) & (dates_pdh.day == dat.day)
+        var_anom[mask, ...] = var[mask, ...] + el
+
+    mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
+    okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
+
+    var_anom[mask, ...] = var[mask, ...] + climate_mean[okel, ...]
+
+    return var_anom
+
+
 def anomalies_monthly_detrended(var, dates, climate_mean = None, dates_climate_mean = None, window_years = 20, step_year = 5):
     """
     Calculates the monthly anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_monthly_climat().
