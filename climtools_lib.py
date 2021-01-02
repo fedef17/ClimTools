@@ -801,6 +801,21 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
             listafil = glob.glob(pathok + '*.nc')
             listafil.sort()
 
+            if sel_yr_range is not None:
+                # remove datafile completely outside the period
+                listafil_ok = []
+                for fi in listafil:
+                    metafi = cmip6_naming(fi.split('/')[-1])
+                    ye1 = int(metafi['dates'][0][:4])
+                    ye2 = int(metafi['dates'][1][:4])
+
+                    if ye2 < sel_yr_range[0] or ye1 > sel_yr_range[1]:
+                        pass
+                    else:
+                        listafil_ok.append(fi)
+
+                listafil = listafil_ok
+
             if len(listafil) > 0:
                 var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
 
