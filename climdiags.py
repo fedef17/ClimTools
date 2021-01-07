@@ -80,7 +80,6 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
-
             else:
                 var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
                 lat = coords['lat']

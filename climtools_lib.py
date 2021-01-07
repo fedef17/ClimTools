@@ -6752,7 +6752,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 15, bottom_margin_per_line = 0.05):
+def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 18, bottom_margin_per_line = 0.05):
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
     plt.subplots_adjust(bottom = bottom_margin_per_line*np.ceil(1.0*len(labels)/ncol))
