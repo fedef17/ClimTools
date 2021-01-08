@@ -6325,7 +6325,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     return
 
 
-def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None, plot_ellipse = False, ellipse_color = 'blue'):
+def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None, plot_ellipse = False, ellipse_color = 'blue', alpha_markers = 1.0):
     """
     Produces two figures:
     - a Taylor diagram
@@ -6388,7 +6388,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     if labels is None:
         labels = [None]*len(angles)
     for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
-        ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False)
+        ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False, alpha = alpha_markers)
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
 
