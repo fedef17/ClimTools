@@ -5026,7 +5026,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
                 for i in range(n - max_sns_paired):
                     colors[max_sns_paired+i] = cm.colors.ColorConverter.to_rgb(other_colors[i])
 
-        for i in len(colors):
+        for i in range(len(colors)):
             colors[i] = tuple(list(colors[i])+[1.0])
 
     return colors
