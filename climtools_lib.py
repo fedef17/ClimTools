@@ -2535,7 +2535,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
 
     dates_diff = dates_season[1:] - dates_season[:-1]
     if check_daily(dates) and season != 'year':
-        jump = dates_diff > pd.Timedelta('3 days')
+        jump = dates_diff > pd.Timedelta('15 days')
         okju = np.where(jump)[0] + 1
         okju = np.append([0], okju)
         okju = np.append(okju, [len(dates_season)])
@@ -5026,6 +5026,9 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
                 for i in range(n - max_sns_paired):
                     colors[max_sns_paired+i] = cm.colors.ColorConverter.to_rgb(other_colors[i])
 
+        for i in len(colors):
+            colors[i] = tuple(list(colors[i])+[1.0])
+
     return colors
 
 
@@ -6387,8 +6390,16 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         markers = ['o']*len(angles)
     if labels is None:
         labels = [None]*len(angles)
+
     for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False, alpha = alpha_markers)
+    # i = 0
+    # for ang, sig, col, sym, lab in zip(angles, sigmas_pred, colors, markers, labels):
+    #     if i < 10:
+    #         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False, alpha = alpha_markers)
+    #     else:
+    #         ax.scatter(ang, sig, s = mod_points_size, color = col, marker = sym, edgecolor = marker_edge, label = lab, clip_on=False, alpha = alpha_markers)
+    #     i += 1
 
     ax.scatter([0.], [sigma_obs], color = 'black', s = obs_points_size, marker = 'D', clip_on=False, label = obs_label)
 
