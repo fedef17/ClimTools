@@ -6293,13 +6293,14 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     else:
         filename = None
 
-    if type(x) not in [list, np.array]:
+    if type(x) not in [list, np.ndarray]:
         x = [x]
         y = [y]
         errx = [errx]
         erry = [erry]
         if colors is not None:
-            colors = [colors]
+            if type(colors) not in [list, np.ndarray]:
+                colors = [colors]
 
     if colors is None:
         colors = color_set(len(x))
