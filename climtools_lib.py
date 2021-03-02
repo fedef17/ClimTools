@@ -2784,6 +2784,7 @@ def running_mean(var, wnd, remove_nans = False):
         tempser = pd.Series(var)
         rollpi_temp = tempser.rolling(wnd, center = True).mean()
         if remove_nans: rollpi_temp = rollpi_temp[~np.isnan(rollpi_temp)]
+        rollpi_temp = np.array(rollpi_temp)
     else:
         rollpi_temp = []
         for i in range(len(var)):
@@ -5454,7 +5455,7 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
 
     iii += 1
     if obsperc is not None:
-        ax.axvline(positions[iii]-0.5, color = 'grey', alpha = 0.6, zorder = -1)
+        ax.axvline(positions[iii]-(positions[iii]-positions[iii-1])/2., color = 'grey', alpha = 0.6, zorder = -1)
         boxlist = []
         box = {'med': obsperc['p50'], 'q1': obsperc['p25'], 'q3': obsperc['p75'], 'whislo': obsperc['p10'], 'whishi': obsperc['p90'], 'showfliers' : False}
         boxlist.append(box)
