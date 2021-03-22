@@ -4162,7 +4162,7 @@ def calc_RMS_and_patcor(clusters_1, clusters_2):
         et.append(dist)
         #cosin = cosine(c1,c2)
         #this should be
-        cosin = ctl.Rcorr(c1, c2)
+        cosin = Rcorr(c1, c2)
         patcor.append(cosin)
 
     return np.array(et), np.array(patcor)
