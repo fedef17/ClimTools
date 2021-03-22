@@ -6461,12 +6461,12 @@ def Taylor_plot(models, observation, latitude = None, filename = None, ax = None
 
     if latitude is None:
         if relative_std:
-            sigma_obs_abs = np.std(obs)
+            sigma_obs_abs = np.std(observation)
             sigmas_pred = np.array([np.std(var)/sigma_obs_abs for var in models])
             sigma_obs = 1.0
         else:
             sigmas_pred = np.array([np.std(var) for var in models])
-            sigma_obs = np.std(obs)
+            sigma_obs = np.std(observation)
     else:
         if relative_std:
             sigma_obs_abs = np.sqrt(covar_w(observation, observation, latitude))
