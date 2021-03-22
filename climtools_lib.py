@@ -48,6 +48,13 @@ from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
+plt.rcParams['axes.axisbelow'] = True
+
+plt.rcParams['xtick.labelsize'] = 15
+plt.rcParams['ytick.labelsize'] = 15
+plt.rcParams['figure.titlesize'] = 24
+plt.rcParams['axes.titlesize'] = 28
+plt.rcParams['axes.labelsize'] = 18
 #mpl.rcParams['hatch.color'] = 'black'
 # plt.rcParams['xtick.labelsize'] = 30
 # plt.rcParams['ytick.labelsize'] = 30
@@ -3208,7 +3215,7 @@ def first(condition):
     return ind
 
 
-def Rcorr(x, y, latitude = None, masked = False):
+def Rcorr(x, y, latitude = None):
     """
     Returns correlation coefficient between two array of arbitrary shape.
 
@@ -3217,6 +3224,8 @@ def Rcorr(x, y, latitude = None, masked = False):
 
     if isinstance(x, list): x = np.array(x)
     if isinstance(y, list): y = np.array(y)
+    masked = False
+    if isinstance(x, np.ma.core.MaskedArray): masked = True
 
     if masked:
         if np.any(x.mask != y.mask):
@@ -3245,6 +3254,20 @@ def Rcorr(x, y, latitude = None, masked = False):
     return corrcoef[1,0]
 
 
+def covar_w(x, y, lats):
+    """
+    Weighted covariance.
+    Equivalent to np.cov(x, y, aweights = weights)[1,0].
+    """
+    xm = global_mean(x, lats)
+    ym = global_mean(y, lats)
+    weights_u = abs(np.cos(np.deg2rad(lats)))
+    weights = np.tile(weights_u, (x.shape[1], 1)).T
+    cov = 1/np.size(x) * np.vdot(weights*(x-xm), (y-ym))/np.mean(weights)
+
+    return cov
+
+
 def distance(x, y, latitude = None):
     """
     L2 distance.
@@ -3262,11 +3285,16 @@ def distance(x, y, latitude = None):
         return LA.norm(x-y)
 
 
-def E_rms(x, y, latitude = None, masked = False):
+def E_rms(x, y, latitude = None):
     """
     Returns root mean square deviation: sqrt(1/N sum (xn-yn)**2). This is consistent with the Dawson (2015) paper.
     < latitude > : if given, weights with the cosine of latitude (FIRST axis of the array).
     """
+
+    masked = False
+    if isinstance(x, np.ma.core.MaskedArray):
+        masked = True
+
     n = x.size
     if masked:
         n = len(x.compressed())
@@ -3334,6 +3362,33 @@ def cosine_cp(x, y):
     y1 = y - y.mean()
 
     return cosine(x1,y1)
+
+
+def scalar_product(patt1, patt2, lat):
+    """
+    Calculates the scalar product between two patterns, weighting for the cosine of latitude.
+
+    Assumes latitude is on the first axis (lat, lon)
+    """
+    if patt1.shape != patt2.shape:
+        raise ValueError('patterns have different shapes! {} {}'.format(patt1.shape, patt2.shape))
+    elif patt1.shape[0] != len(lat):
+        raise ValueError('length of latitudes dont match the first axis of patterns: {} {}'.format(patt1.shape, len(lat)))
+
+    #weights_array = np.sqrt(np.abs(np.cos(np.deg2rad(lat))))[:, np.newaxis]
+    weights_array = np.abs(np.cos(np.deg2rad(lat)))[:, np.newaxis]
+    #print(weights_array)
+    #print(weights_array.shape)
+
+    x = patt1*weights_array
+    y = patt2*weights_array
+
+    if isinstance(x, np.ma.core.MaskedArray):
+        scal = np.vdot(x.compressed(),y.compressed())/(LA.norm(x.compressed())*LA.norm(y.compressed()))
+    else:
+        scal = np.vdot(x,y)/(LA.norm(x)*LA.norm(y))
+
+    return scal
 
 
 def linear_regre(x, y, return_resids = False):
@@ -4105,7 +4160,8 @@ def calc_RMS_and_patcor(clusters_1, clusters_2):
     for c1, c2 in zip(clusters_1, clusters_2):
         dist = LA.norm(c1-c2)
         et.append(dist)
-        cosin = cosine(c1,c2)
+        #cosin = cosine(c1,c2)
+        #this should be
         patcor.append(cosin)
 
     return np.array(et), np.array(patcor)
@@ -5353,6 +5409,32 @@ def map_set_extent(ax, proj, bnd_box = None, bounding_lat = None):
     return
 
 
+def positions(names, w = 0.7, w2 = 0.4):
+    """
+    Spaces 0.7 between same model, 0.7+0.4 between different models.
+    """
+    mod_old = names[0]
+    positions = [0.]
+    modpos = [0.]
+    posticks = []
+    for mod in names[1:]:
+        if mod.split('-')[0] == mod_old.split('-')[0]:
+            newpos = positions[-1] + w
+            positions.append(newpos)
+            modpos.append(newpos)
+        else:
+            newpos = positions[-1] + w + w2
+            positions.append(newpos)
+            posticks.append(np.mean(modpos))
+
+            mod_old = mod
+            modpos = [newpos]
+
+    posticks.append(np.mean(modpos))
+
+    return positions, posticks
+
+
 def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers, ens_names, ens_colors, wi = 0.6, plot_mean = True):
     i = 0
 
@@ -6330,7 +6412,7 @@ def ellipse_plot(x, y, errx, erry, labels = None, ax = None, filename = None, po
     return
 
 
-def Taylor_plot(models, observation, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None, plot_ellipse = False, ellipse_color = 'blue', alpha_markers = 1.0):
+def Taylor_plot(models, observation, latitude = None, filename = None, ax = None, title = None, label_bias_axis = None, label_ERMS_axis = None, colors = None, markers = None, only_first_quarter = False, legend = True, marker_edge = None, labels = None, obs_label = None, mod_points_size = 60, obs_points_size = 90, enlarge_rmargin = True, relative_std = True, max_val_sd = None, plot_ellipse = False, ellipse_color = 'blue', alpha_markers = 1.0):
     """
     Produces two figures:
     - a Taylor diagram
@@ -6347,6 +6429,9 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     # elif filename is not None and ax is not None:
     #     raise ValueError('Where do I plot this? specify ax OR filename, not BOTH')
 
+    if latitude is None:
+        print('WARNING! latitude not set, computing pattern correlation and RMS without weighting! (this is ok if the region is small or these are not geographical patterns. If these are lat/lon patterns, this causes overweighting of high latitudes)')
+
     if ax is None:
         fig6 = plt.figure(figsize=(8,6))
         ax = fig6.add_subplot(111, polar = True)
@@ -6355,7 +6440,8 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         ax_specified = True
 
     if title is not None:
-        ax.set_title(title)
+        ax.text(0.95, 0.9, title, horizontalalignment='center', verticalalignment='center', rotation='horizontal',transform=ax.transAxes, fontsize = 20)
+        #ax.set_title(title)
     #ax.set_facecolor(bgcol)
 
     ax.set_thetamin(0)
@@ -6370,15 +6456,26 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     anggr = np.rad2deg(np.arccos(ok_cos))
 
     ax.set_thetagrids(anggr, labels=labgr)
+    #ax.set_axisbelow('line')
 
-    if relative_std:
-        sigma_obs_abs = np.std(observation)
-        sigmas_pred = np.array([np.std(var)/sigma_obs_abs for var in models])
-        sigma_obs = 1.0
+    if latitude is None:
+        if relative_std:
+            sigma_obs_abs = np.std(obs)
+            sigmas_pred = np.array([np.std(var)/sigma_obs_abs for var in models])
+            sigma_obs = 1.0
+        else:
+            sigmas_pred = np.array([np.std(var) for var in models])
+            sigma_obs = np.std(obs)
     else:
-        sigmas_pred = np.array([np.std(var) for var in models])
-        sigma_obs = np.std(observation)
-    corrs_pred = np.array([Rcorr(observation, var) for var in models])
+        if relative_std:
+            sigma_obs_abs = np.sqrt(covar_w(observation, observation, latitude))
+            sigmas_pred = np.array([np.sqrt(covar_w(var, var, latitude))/sigma_obs_abs for var in models])
+            sigma_obs = 1.0
+        else:
+            sigmas_pred = np.array([np.sqrt(covar_w(var, var, latitude)) for var in models])
+            sigma_obs = np.sqrt(covar_w(observation, observation, latitude))
+
+    corrs_pred = np.array([Rcorr(observation, var, latitude = latitude) for var in models])
 
     if colors is None:
         colors = color_set(len(models))
@@ -6420,7 +6517,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         circle = plt.Circle((sigma_obs, 0.), sig*sigma_obs, transform=ax.transData._b, fill = False, edgecolor = 'black', linestyle = '--')
         ax.add_artist(circle)
 
-    if legend:
+    if legend and labels[0] is not None:
         ax.legend(fontsize = 'small')
 
     if ax_specified:
@@ -6444,9 +6541,15 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
     ax = fig7.add_subplot(111)
     plt.title(title)
 
-    biases = np.array([np.mean(var) for var in models])
-    ctr_patt_RMS = np.array([E_rms_cp(var, observation) for var in models])
-    RMS = np.array([E_rms(var, observation) for var in models])
+    if latitude is None:
+        biases = np.array([np.mean(var) for var in models])
+        obsmea = np.mean(observation)
+    else:
+        biases = np.array([global_mean(var, latitude) for var in models])
+        obsmea = global_mean(observation, latitude)
+
+    ctr_patt_RMS = np.array([E_rms_cp(var, observation, latitude = latitude) for var in models])
+    RMS = np.array([E_rms(var, observation, latitude = latitude) for var in models])
 
     if markers is None:
         markers = ['o']*len(angles)
@@ -6462,7 +6565,7 @@ def Taylor_plot(models, observation, filename = None, ax = None, title = None, l
         circle = plt.Circle((np.mean(observation), 0.), sig*sigma_obs_abs, fill = False, edgecolor = 'black', linestyle = '--', clip_on=True)
         ax.add_artist(circle)
 
-    plt.scatter(np.mean(observation), 0., color = 'black', s = obs_points_size+20, marker = 'D', zorder = 5, label = obs_label)
+    plt.scatter(obsmea, 0., color = 'black', s = obs_points_size+20, marker = 'D', zorder = 5, label = obs_label)
 
     if legend:
         plt.legend(fontsize = 'small')
@@ -6765,12 +6868,21 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, loc = 'lower center', ncol = None, fontsize = 18, bottom_margin_per_line = 0.05, add_space_below = 0.0):
+def custom_legend(fig, colors, labels, markers = None, loc = 'lower center', ncol = None, fontsize = 18, bottom_margin_per_line = 0.05, add_space_below = 0.0):
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
-    plt.subplots_adjust(bottom = bottom_margin_per_line*np.ceil(1.0*len(labels)/ncol) + add_space_below)
-    proxy = [plt.Rectangle((0,0),1,1, fc = col) for col in colors]
-    fig.legend(proxy, labels, loc = loc, ncol = ncol, fontsize = fontsize)
+    if markers is None:
+        proxy = [plt.Rectangle((0,0),1,1, fc = col) for col in colors]
+    else:
+        proxy = [mpl.lines.Line2D([], [], color=col, marker=mark, linestyle='None', markersize=8) for col, mark in zip(colors, markers)]
+
+    if loc == 'lower center':
+        plt.subplots_adjust(bottom = bottom_margin_per_line*np.ceil(1.0*len(labels)/ncol) + add_space_below)
+        fig.legend(proxy, labels, loc = loc, ncol = ncol, fontsize = fontsize)
+    elif loc == 'right':
+        plt.subplots_adjust(right = 0.8)
+        fig.legend(proxy, labels, loc = loc, ncol = 1, fontsize = fontsize)
+
     return fig
 
 
