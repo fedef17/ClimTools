@@ -335,7 +335,7 @@ def export_results_to_json(filename, results):
         try:
             json.dump(nures, fp)
         except Exception as expc:
-            print(results.keys())
+            print(nures[list(nures.keys())[0]].keys())
             for mod in nures.keys():
                 #print(mod, results[mod])
                 if 'ens_names' in nures[mod]:
@@ -355,6 +355,8 @@ def export_results_to_json(filename, results):
                         tip = type(nures[mod][ke])
                         if tip == list:
                             print(ke, tip, type(nures[mod][ke][0]))
+                            if type(nures[mod][ke][0]) == list:
+                                print(type(nures[mod][ke][0][0]))
                         else:
                             print(ke, tip)
 
