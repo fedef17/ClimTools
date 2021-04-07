@@ -5533,8 +5533,8 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
         if plot_mean: ax.scatter(pos, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
 
         if plot_minmax:
-            ax.scatter(pos, allpercs['ens_min'][iii], color = mcol, marker = 'v', s = 20)
-            ax.scatter(pos, allpercs['ens_max'][iii], color = mcol, marker = '^', s = 20)
+            ax.scatter(pos, allpercs['min'][iii], color = mcol, marker = 'v', s = 20)
+            ax.scatter(pos, allpercs['max'][iii], color = mcol, marker = '^', s = 20)
 
     iii += 1
     if obsperc is not None:
@@ -5550,6 +5550,8 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
         bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
 
         boxplo = ax.bxp(boxlist, [positions[iii]], [wi], **bxp_kwargs)
+        if plot_mean: ax.scatter(positions[iii], obsperc['mean'], color = obs_color, marker = 'o', s = 20)
+        
         iii += 1
 
     if plot_ensmeans:

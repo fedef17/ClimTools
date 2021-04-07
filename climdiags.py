@@ -1066,15 +1066,15 @@ def calc_index_climatology(clim_psl, index_name):
 #############################################################################
 #############################################################################
 
-def out_WRtool_netcdf(cart_out, models, obs, inputs):
+def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotential height anomaly at 500 hPa', var_std_name = 'geopotential_height_anomaly', var_units = 'm'):
     """
     Output in netcdf format.
     """
     print('Saving netcdf output to {}\n'.format(cart_out))
     # Salvo EOFs, cluspattern_area, clus_pattern_global
-    long_name = 'geopotential height anomaly at 500 hPa'
-    std_name = 'geopotential_height_anomaly'
-    units = 'm'
+    long_name = var_long_name
+    std_name = var_std_name
+    units = var_units
     numclus = inputs['numclus']
 
     # print('obs: ', obs.keys())
@@ -1189,7 +1189,7 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
 
     # pcs
     std_name = None
-    units = 'm'
+    units = var_units
     if obs is not None:
         outfil = cart_out + 'pcs_timeseries_ref.nc'
 
@@ -1225,15 +1225,15 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs):
     return
 
 
-def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
+def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'geopotential height anomaly at 500 hPa', var_std_name = 'geopotential_height_anomaly', var_units = 'm'):
     """
     Output in netcdf format.
     """
     print('Saving netcdf output to {}\n'.format(cart_out))
     # Salvo EOFs, cluspattern_area, clus_pattern_global
-    long_name = 'geopotential height anomaly at 500 hPa'
-    std_name = 'geopotential_height_anomaly'
-    units = 'm'
+    long_name = var_long_name
+    std_name = var_std_name
+    units = var_units
     numclus = inputs['numclus']
 
     # print('obs: ', obs.keys())
@@ -1344,7 +1344,7 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs):
 
     # pcs
     std_name = None
-    units = 'm'
+    units = var_units
     if obs is not None:
         outfil = cart_out + 'pcs_timeseries_ref.nc'
 
@@ -1615,7 +1615,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', show_transitions = True, draw_grid = False, plot_type = 'pcolormesh'):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', show_transitions = True, draw_grid = False, plot_type = 'pcolormesh', cb_label = 'Geopotential height anomaly (m)'):
     """
     Plot the results of WRtool.
 
@@ -2268,7 +2268,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat_ref = result_obs['lat']
     lon_ref = result_obs['lon']
     filename = cart_out+'Allclus_OBSERVED.pdf'
-    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -2288,13 +2288,13 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         else:
             filename = None
 
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
         all_figures += figs
         if not out_only_main_figs:
             for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
                 nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
                 print(nunam)
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, [lat, lat_ref], [lon, lon_ref], filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = 'Geopotential height anomaly (m)', stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, use_different_grids = True, plot_type = plot_type)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, [lat, lat_ref], [lon, lon_ref], filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = cb_label, stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, use_different_grids = True, plot_type = plot_type)
                 all_figures.append(fig)
 
     if compare_models is not None and not out_only_main_figs:
@@ -2310,7 +2310,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
             for patuno, patuno_ref, pp, pps in zip(patt, patt2, patnames, patnames_short):
                 nunam = cart_out+'compare_clus_'+pps+'_'+coup[0]+'_vs_'+coup[1]+'.pdf'
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp, cb_label = 'Geopotential height anomaly (m)', stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp, cb_label = cb_label, stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
                 all_figures.append(fig)
 
 
@@ -2477,7 +2477,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     return
 
 
-def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False, plot_type = 'pcolormesh'):
+def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False, plot_type = 'pcolormesh', cb_label = 'Geopotential height anomaly (m)'):
     """
     Plot the results of WRtool.
 
@@ -2601,7 +2601,7 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     lat = results['lat']
     lon = results['lon']
     filename = cart_out+'Allclus_{}.pdf'.format(model_name)
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = 'Geopotential height anomaly (m)', color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
     all_figures += figs
     figs[0].savefig(filename)
 
