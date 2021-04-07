@@ -356,7 +356,9 @@ def export_results_to_json(filename, results):
                         if tip == list:
                             print(ke, tip, type(nures[mod][ke][0]))
                             if type(nures[mod][ke][0]) == list:
-                                print(type(nures[mod][ke][0][0]))
+                                print(1, type(nures[mod][ke][0][0]))
+                                if type(nures[mod][ke][0][0]) == list:
+                                    print(2, type(nures[mod][ke][0][0][0]))
                         else:
                             print(ke, tip)
 
