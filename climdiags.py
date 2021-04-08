@@ -49,7 +49,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, read_from_p = None, write_to_p = None, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -69,7 +69,55 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     # print(netcdf4_read)
 
     print('Running precompute\n')
-    if type(ifile) not in [list, np.ndarray]:
+    if read_from_p is not None:
+        print('Reading from pickle')
+        
+        var_full = []
+        dates_full = []
+        var_sel = []
+        dates_sel = []
+
+        var, dates, lat, lon = pickle.load(read_from_p)
+        if sel_yr_range is not None:
+            var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+        if select_area_first:
+            print('Selecting area first for saving memory')
+            var, lat, lon = ctl.sel_area(lat, lon, var, area)
+        var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+        var_full.append(var)
+        dates_full.append(dates)
+        var_sel.append(var_season)
+        dates_sel.append(dates_season)
+
+        while True:
+            try:
+                var, dates = pickle.load(read_from_p)
+            except EOFError:
+                break
+
+            if sel_yr_range is not None:
+                var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+            if select_area_first:
+                print('Selecting area first for saving memory')
+                var, lat, lon = ctl.sel_area(lat, lon, var, area)
+
+            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+            var_full.append(var)
+            dates_full.append(dates)
+            var_sel.append(var_season)
+            dates_sel.append(dates_season)
+
+        ens_lengths_sel = [len(vau) for vau in var_sel]
+        ens_lengths_full = [len(vau) for vau in var_full]
+
+        var_season = np.concatenate(var_sel)
+        dates_season = np.concatenate(dates_sel)
+        var = np.concatenate(var_full)
+        dates = np.concatenate(dates_full)
+
+        del var_full, var_sel, dates_full, dates_sel
+
+    elif type(ifile) not in [list, np.ndarray]:
         is_ensemble = False
         if ifile[-3:] == '.nc':
             if netcdf4_read:
@@ -93,12 +141,16 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             lon = coords['lon']
             dates = coords['dates']
 
+
         cond = np.abs(var) > thres_inf
         if np.any(cond):
             if np.sum(cond) > np.size(var)/100:
                 raise ValueError('Too many values larger than thres_inf = {:8.2e}. Check the threshold or the data file.'.format(thres_inf))
             print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found {:5d} points.'.format(thres_inf, np.sum(cond)))
             var[cond] = np.nan
+
+        if write_to_p is not None:
+            pickle.dump([var, dates, lat, lon], write_to_p)
 
         if sel_yr_range is not None:
             print('Selecting year range: {}'.format(sel_yr_range))
@@ -143,6 +195,12 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
+
+            if write_to_p is not None:
+                if fil == ifile[0]:
+                    pickle.dump([var, dates, lat, lon], write_to_p)
+                else:
+                    pickle.dump([var, dates], write_to_p)
 
             if sel_yr_range is not None:
                 var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
