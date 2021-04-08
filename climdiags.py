@@ -337,6 +337,7 @@ def export_results_to_json(filename, results):
         except Exception as expc:
             print(nures[list(nures.keys())[0]].keys())
             for mod in nures.keys():
+                print(mod)
                 #print(mod, results[mod])
                 if 'ens_names' in nures[mod]:
                     ens = nures[mod]['ens_names'][0]

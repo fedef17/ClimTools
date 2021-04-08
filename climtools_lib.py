@@ -1362,7 +1362,7 @@ def adjust_outofbound_dates(dates):
     dates_ok = []
     diff = 1700
 
-    syea = int(dates[0].strftime().split('-')[0])
+    syea = int(dates[0].strftime('%Y-%m-%d').split('-')[0])
     for ci in dates:
         # coso = ci.isoformat()
         coso = ci.strftime('%Y-%m-%d')
@@ -5551,7 +5551,7 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
 
         boxplo = ax.bxp(boxlist, [positions[iii]], [wi], **bxp_kwargs)
         if plot_mean: ax.scatter(positions[iii], obsperc['mean'], color = obs_color, marker = 'o', s = 20)
-        
+
         iii += 1
 
     if plot_ensmeans:
