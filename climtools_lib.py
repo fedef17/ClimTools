@@ -577,7 +577,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
                 # Remove 29 feb first
-                skipcose = np.array([(da.mon != 2 or da.day != 29) for da in dates])
+                skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
                 data = data[skipcose]
                 dates = dates[skipcose]
                 dates = adjust_outofbound_dates(dates)
@@ -1088,7 +1088,7 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
             if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
                 # Remove 29 feb first
-                skipcose = np.array([(da.mon != 2 or da.day != 29) for da in dates])
+                skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
                 for varna in vars.keys():
                     vars[varna] = vars[varna][skipcose]
                 dates = dates[skipcose]
@@ -2562,7 +2562,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
     elif check_daily(dates) and season == 'year':
         raise ValueError('COMPLETE THIS !')
-        jump = (dates_season.mon == 1) & (dates_season.day == 1)
+        jump = (dates_season.month== 1) & (dates_season.day == 1)
         okju = np.where(jump)[0] + 1 # is this +1 or not?
         okju = np.append([0], okju)
         okju = np.append(okju, [len(dates_season)])
