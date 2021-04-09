@@ -576,6 +576,10 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         if adjust_nonstd_dates:
             if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+                # Remove 29 feb first
+                skipcose = np.array([(da.mon != 2 or da.day != 29) for da in dates])
+                data = data[skipcose]
+                dates = dates[skipcose]
                 dates = adjust_outofbound_dates(dates)
 
             if time_cal == '365_day' or time_cal == 'noleap':
@@ -1083,6 +1087,11 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
 
             if dates[0].year < 1677 or dates[-1].year > 2256:
                 print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+                # Remove 29 feb first
+                skipcose = np.array([(da.mon != 2 or da.day != 29) for da in dates])
+                for varna in vars.keys():
+                    vars[varna] = vars[varna][skipcose]
+                dates = dates[skipcose]
                 dates = adjust_outofbound_dates(dates)
 
             if time_cal == '365_day' or time_cal == 'noleap':
@@ -1367,6 +1376,7 @@ def adjust_outofbound_dates(dates):
         # coso = ci.isoformat()
         coso = ci.strftime('%Y-%m-%d')
         listasp = coso.split('-')
+
         listasp[0] = '{:04d}'.format(int(listasp[0])+diff-syea)
         coso = '-'.join(listasp)
 
