@@ -2126,9 +2126,12 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
 
     """
 
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
     # day = pd.Timedelta('1 days')
     # dates_pdh_day[1]-dates_pdh_day[0] == day
+    years = np.array([da.year for da in dates])
+    months = np.array([da.month for da in dates])
+    days = np.array([da.day for da in dates])
 
     mesi_short = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     month_seq = 2*'JFMAMJJASOND'
@@ -2139,20 +2142,20 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
         indxs = np.arange(ind1,ind2)
         indxs = indxs % 12 + 1
 
-        mask = dates_pdh.month == indxs[0]
+        mask = months == indxs[0]
         for ind in indxs[1:]:
-            mask = (mask) | (dates_pdh.month == ind)
+            mask = (mask) | (months == ind)
     elif season in mesi_short:
-        mask = (dates_pdh.month == mesi_short.index(season)+1)
+        mask = (months == mesi_short.index(season)+1)
     else:
         raise ValueError('season not understood, should be in DJF, JJA, ND,... format or the short 3 letters name of a month (Jan, Feb, ...)')
 
     if 'F' in season and remove_29feb:
-        mask = (mask) & ((dates_pdh.month != 2) | (dates_pdh.day != 29))
+        mask = (mask) & ((months != 2) | (days != 29))
 
     var_season = var[mask, ...]
     dates_season = dates[mask]
-    dates_season_pdh = pd.to_datetime(dates_season)
+    #dates_season_pdh = pd.to_datetime(dates_season)
 
     #print(var_season.shape)
 
@@ -2168,7 +2171,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
         #print('cut!', indxs)
         if (12 in indxs) and (1 in indxs):
             #REMOVING THE FIRST MONTHS (for the first year) because there is no previuos december
-            start_cond = (dates_season_pdh.year == dates_pdh.year[0]) & (dates_season_pdh.month == indxs[0])
+            start_cond = (years == years[0]) & (months == indxs[0])
             if np.sum(start_cond):
                 start = np.argmax(start_cond)
             else:
@@ -2177,7 +2180,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
             #print(start)
 
             #REMOVING THE LAST MONTHS (for the last year) because there is no following january
-            end_cond = (dates_season_pdh.year == dates_pdh.year[-1]) & (dates_season_pdh.month == indxs[0]) # 0 is ok, I look for the beginning of the next (incomplete) season!
+            end_cond = (years == years[-1]) & (months == indxs[0]) # 0 is ok, I look for the beginning of the next (incomplete) season!
             if np.sum(end_cond):
                 end = np.argmax(end_cond)
             else:
@@ -2543,7 +2546,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
     if dates_range is not None:
         var, dates = sel_time_range(var, dates, dates_range)
 
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
 
     if (season is not None) and season != 'year':
         if len(var) <= len(season): cut = False
@@ -2553,7 +2556,8 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         var_season = var
         dates_season = dates
 
-    dates_diff = dates_season[1:] - dates_season[:-1]
+    #dates_diff = dates_season[1:] - dates_season[:-1]
+    dates_diff = np.array([da1-da0 for da1, da0 in zip(dates_season[1:], dates_season[:-1])])
     if check_daily(dates) and season != 'year':
         jump = dates_diff > pd.Timedelta('15 days')
         okju = np.where(jump)[0] + 1
