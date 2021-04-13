@@ -11,6 +11,7 @@ import matplotlib.patheffects as PathEffects
 from matplotlib.colors import LogNorm
 
 import iris
+
 import netCDF4 as nc
 import pandas as pd
 from datetime import datetime
@@ -71,7 +72,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     print('Running precompute\n')
     if read_from_p is not None:
         print('Reading from pickle')
-        
+
         var_full = []
         dates_full = []
         var_sel = []

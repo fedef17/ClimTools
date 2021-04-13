@@ -44,6 +44,7 @@ import pickle
 from copy import deepcopy as dcopy
 
 import iris
+
 from cf_units import Unit
 
 mpl.rcParams['hatch.linewidth'] = 0.1
@@ -1364,6 +1365,8 @@ def adjust_noleap_dates(dates):
 
 def adjust_outofbound_dates(dates):
     """
+    THIS HAS TO BE ELIMINATED, ALONG WITH ALL PARTS RELYING ON PANDAS DATETIME.
+
     Pandas datetime index is limited to 1677-2256.
     This temporary fix allows to handle with pandas outside that range, simply adding 1700 years to the dates.
     Still this will give problems with longer integrations... planned migration from pandas datetime to Datetime.datetime.
@@ -3083,14 +3086,16 @@ def yearly_average(var, dates, dates_range = None, cut = True):
     if dates_range is not None:
         var, dates = sel_time_range(var, dates, dates_range)
 
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
 
     nuvar = []
     nudates = []
-    for year in np.unique(dates_pdh.year):
-        data = pd.to_datetime('{}0101'.format(year), format='%Y%m%d')
-        okdates = (dates_pdh.year == year)
-        if cut and len(np.unique(dates_pdh[okdates].month)) < 12:
+    yearall = np.array([da.year for da in dates])
+    for year in np.unique(yearall):
+        #data = pd.to_datetime('{}0101'.format(year), format='%Y%m%d')
+        okdates = (yearall == year)
+        data = dates[okdates][0]
+        if cut and len(np.unique([da.month for da in dates[okdates]])) < 12:
             continue
         nuvar.append(np.mean(var[okdates, ...], axis = 0))
         nudates.append(data)
