@@ -498,8 +498,6 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     ax_coord = dict()
 
     #print(datetime.now())
-    if regrid_to_reference is not None:
-        cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
 
     #print(datetime.now())
     if convert_units_to:
@@ -512,7 +510,6 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
                 cube.convert_units(convert_units_to)
 
     #print(datetime.now())
-    data = cube.data
     #print(datetime.now())
     aux_info['var_units'] = cube.units.name
 
@@ -524,6 +521,8 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
     allconames['lon'] = np.array(['longitude', 'lon'])
     allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
 
+    oknames = dict()
+
     #print(datetime.now())
 
     for i, nam in enumerate(coord_names):
@@ -532,6 +531,7 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         for std_nam in allconames:
             if nam in allconames[std_nam]:
                 coor = cube.coord(nam)
+                oknames[std_nam] = nam
                 #print(coor)
                 #print(pressure_levels)
                 #print(std_nam)
@@ -545,9 +545,11 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
             print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
 
     #print(datetime.now())
+    squeeze = False
     if 'level' in datacoords.keys():
         if len(datacoords['level']) == 1:
-            data = data.squeeze()
+            #data = data.squeeze()
+            squeeze = True
             print('File contains only level {}'.format(datacoords['level'][0]))
         else:
             if extract_level_hPa is not None:
@@ -555,17 +557,29 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
 
                 if np.any(okind):
                     datacoords['level'] = datacoords['level'][okind]
-                    data = data.take(first(okind), axis = ax_coord['level'])
+                    # data = data.take(first(okind), axis = ax_coord['level'])
+                    cub_lev = iris.Constraint(coord_values = {oknames['level'] : extract_level_hPa})
+                    cube = cube.extract(cub_lev)
                 else:
                     mincos = np.min(np.abs(datacoords['level']-extract_level_hPa))
                     if mincos < 1: # tolerance 1 hPa
                         okind = np.argmin(np.abs(datacoords['level']-extract_level_hPa))
                         datacoords['level'] = datacoords['level'][okind]
-                        data = data.take(okind, axis = ax_coord['level'])
+
+                        cub_lev = iris.Constraint(coord_values = {oknames['level'] : datacoords['level'][okind]})
+                        cube = cube.extract(cub_lev)
+
+                        # data = data.take(okind, axis = ax_coord['level'])
                     else:
                         raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
             else:
                 raise ValueError('File contains more levels. select level to keep if in hPa or give a single level file as input')
+
+    if regrid_to_reference is not None:
+        cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
+
+    data = cube.data
+    if squeeze: data = data.squeeze()
 
     #print(datetime.now())
     if 'time' in coord_names:
