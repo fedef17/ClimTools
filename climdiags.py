@@ -71,6 +71,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     print('Running precompute\n')
     if read_from_p is not None:
+        is_ensemble = False
         print('Reading from pickle')
 
         var_full = []
