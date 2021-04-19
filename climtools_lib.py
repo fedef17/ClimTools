@@ -574,19 +574,19 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
         dates = time_units.num2date(time)#, only_use_cftime_datetimes = False) # this is a set of cftime._cftime.real_datetime objects
         time_cal = time_units.calendar
 
-        if adjust_nonstd_dates:
-            if dates[0].year < 1677 or dates[-1].year > 2256:
-                print('WARNING!!! Dates outside pandas range: 1677-2256\n')
-                # Remove 29 feb first
-                skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
-                data = data[skipcose]
-                dates = dates[skipcose]
-                dates = adjust_outofbound_dates(dates)
-
-            if time_cal == '365_day' or time_cal == 'noleap':
-                dates = adjust_noleap_dates(dates)
-            elif time_cal == '360_day':
-                dates = adjust_360day_dates(dates)
+        # if adjust_nonstd_dates:
+        #     if dates[0].year < 1677 or dates[-1].year > 2256:
+        #         print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+        #         # Remove 29 feb first
+        #         skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
+        #         data = data[skipcose]
+        #         dates = dates[skipcose]
+        #         dates = adjust_outofbound_dates(dates)
+        #
+        #     if time_cal == '365_day' or time_cal == 'noleap':
+        #         dates = adjust_noleap_dates(dates)
+        #     elif time_cal == '360_day':
+        #         dates = adjust_360day_dates(dates)
 
         datacoords['dates'] = dates
         aux_info['time_units'] = time_units.name
@@ -1002,7 +1002,7 @@ def read3D_grib(ifile):
     print('Reading {}\n'.format(ifile))
 
     ds = xr.open_dataset(ifile, engine='cfgrib')
-    dates = pd.to_datetime(ds.valid_time.data).to_pydatetime()
+    #dates = pd.to_datetime(ds.valid_time.data).to_pydatetime()
 
     lat = ds.latitude.data
     lon = ds.longitude.data
@@ -1086,22 +1086,22 @@ def readxDncfield(ifile, extract_level = None, select_var = None, pressure_in_Pa
             time = list(time)
             dates = nc.num2date(time,time_units,time_cal)#, only_use_cftime_datetimes = False)
 
-            if dates[0].year < 1677 or dates[-1].year > 2256:
-                print('WARNING!!! Dates outside pandas range: 1677-2256\n')
-                # Remove 29 feb first
-                skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
-                for varna in vars.keys():
-                    vars[varna] = vars[varna][skipcose]
-                dates = dates[skipcose]
-                dates = adjust_outofbound_dates(dates)
-
-            if time_cal == '365_day' or time_cal == 'noleap':
-                dates = adjust_noleap_dates(dates)
-            elif time_cal == '360_day':
-                if check_daily(dates):
-                    dates = adjust_360day_dates(dates)
-                else:
-                    dates = adjust_noleap_dates(dates)
+            # if dates[0].year < 1677 or dates[-1].year > 2256:
+            #     print('WARNING!!! Dates outside pandas range: 1677-2256\n')
+            #     # Remove 29 feb first
+            #     skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
+            #     for varna in vars.keys():
+            #         vars[varna] = vars[varna][skipcose]
+            #     dates = dates[skipcose]
+            #     dates = adjust_outofbound_dates(dates)
+            #
+            # if time_cal == '365_day' or time_cal == 'noleap':
+            #     dates = adjust_noleap_dates(dates)
+            # elif time_cal == '360_day':
+            #     if check_daily(dates):
+            #         dates = adjust_360day_dates(dates)
+            #     else:
+            #         dates = adjust_noleap_dates(dates)
 
             print('calendar: {0}, time units: {1}'.format(time_cal,time_units))
 
@@ -1227,13 +1227,13 @@ def read_timeseries_nc(filename, var_name = None):
     time_cal = fh.variables['time'].calendar # Calendar in use (proleptic_gregorian))
     dates = nc.num2date(time, time_units, time_cal)#, only_use_cftime_datetimes = False)
 
-    try:
-        if time_cal == '365_day' or time_cal == 'noleap':
-            dates = adjust_noleap_dates(dates)
-        elif time_cal == '360_day':
-            dates = adjust_360day_dates(dates)
-    except pd.errors.OutOfBoundsDatetime:
-        print('Dates outside pandas range! falling back to cftime dates')
+    # try:
+    #     if time_cal == '365_day' or time_cal == 'noleap':
+    #         dates = adjust_noleap_dates(dates)
+    #     elif time_cal == '360_day':
+    #         dates = adjust_360day_dates(dates)
+    # except pd.errors.OutOfBoundsDatetime:
+    #     print('Dates outside pandas range! falling back to cftime dates')
 
     if var_name is not None:
         var = fh.variables[var_name][:]
@@ -1327,10 +1327,10 @@ def read4Dncfield(ifile, extract_level = None, compress_dummy_dim = True, increa
     dates = nc.num2date(time,time_units,time_cal)#, only_use_cftime_datetimes = False)
     fh.close()
 
-    if time_cal == '365_day' or time_cal == 'noleap':
-        dates = adjust_noleap_dates(dates)
-    elif time_cal == '360_day':
-        dates = adjust_360day_dates(dates)
+    # if time_cal == '365_day' or time_cal == 'noleap':
+    #     dates = adjust_noleap_dates(dates)
+    # elif time_cal == '360_day':
+    #     dates = adjust_360day_dates(dates)
 
     if compress_dummy_dim:
         var = var.squeeze()
@@ -1477,8 +1477,8 @@ def read3Dncfield(ifile, compress_dummy_dim = True):
     dates = nc.num2date(time, time_units, time_cal)#, only_use_cftime_datetimes = False)
     fh.close()
 
-    if time_cal == '365_day' or time_cal == 'noleap':
-        dates = adjust_noleap_dates(dates)
+    # if time_cal == '365_day' or time_cal == 'noleap':
+    #     dates = adjust_noleap_dates(dates)
 
     var, lat, lon = check_increasing_latlon(var, lat, lon)
 
@@ -2213,13 +2213,17 @@ def daily_climatology(var, dates, window, refyear = 2001):
     if not check_daily(dates):
         raise ValueError('Not a daily dataset\n')
 
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
+    years = np.array([da.year for da in dates])
+    months = np.array([da.month for da in dates])
+    days = np.array([da.day for da in dates])
+    dayofyearz = np.array([da.dayofyear for da in dates])
 
-    months = np.unique(dates_pdh.month)
+    okmonths = np.unique(months)
     daysok = []
-    for mon in months:
-        mask = dates_pdh.month == mon
-        okday = np.unique(dates_pdh[mask].day)
+    for mon in okmonths:
+        mask = months == mon
+        okday = np.unique(days[mask])
         if mon == 2 and okday[-1] == 29:
             daysok.append(okday[:-1])
         else:
@@ -2231,20 +2235,22 @@ def daily_climatology(var, dates, window, refyear = 2001):
     filt_std = []
     dates_filt = []
 
-    for mon, daymon in zip(months, daysok):
+    for mon, daymon in zip(okmonths, daysok):
         for day in daymon:
-            data = pd.to_datetime('{:4d}{:02d}{:02d}'.format(refyear, mon,day), format='%Y%m%d')
+            #data = pd.to_datetime('{:4d}{:02d}{:02d}'.format(refyear, mon,day), format='%Y%m%d')
+            data = datetime.strptime('{:4d}-{:02d}-{:02d}'.format(refyear, mon, day), '%Y-%m-%d')
             if window > 2:
                 doy = data.dayofyear
-                okdates = ((dates_pdh.dayofyear - doy) % 365 <= delta) | ((doy - dates_pdh.dayofyear) % 365 <= delta)
+                okdates = ((dayofyearz - doy) % 365 <= delta) | ((doy - dayofyearz) % 365 <= delta)
             else:
-                okdates = (dates_pdh.month == mon) & (dates_pdh.day == day)
+                okdates = (months == mon) & (days == day)
             #print(mon,day,doy,np.sum(okdates))
             filt_mean.append(np.mean(var[okdates, ...], axis = 0))
             filt_std.append(np.std(var[okdates, ...], axis = 0))
             dates_filt.append(data)
 
-    dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
+    #dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
+    dates_ok = np.array(dates_filt)
 
     filt_mean = np.stack(filt_mean)
     filt_std = np.stack(filt_std)
@@ -2256,14 +2262,17 @@ def trend_daily_climat(var, dates, window_days = 5, window_years = 20, step_year
     """
     Performs daily_climatology on a running window of n years, in order to take into account possible trends in the mean state.
     """
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
     climate_mean = []
     dates_climate_mean = []
-    allyears = np.unique(dates_pdh.year)
-    years = allyears[::step_year]
 
-    for yea in years:
-        okye = (dates_pdh.year >= yea - window_years//2) & (dates_pdh.year <= yea + window_years//2)
+    years = np.array([da.year for da in dates])
+
+    allyears = np.unique(years)
+    okyears = allyears[::step_year]
+
+    for yea in okyears:
+        okye = (years >= yea - window_years//2) & (years <= yea + window_years//2)
         numyea = np.sum((allyears >= yea - window_years//2) & (allyears <= yea + window_years//2))
         print(yea, numyea)
         if numyea < window_years:
@@ -2393,15 +2402,17 @@ def trend_monthly_climat(var, dates, window_years = 20, step_year = 5):
     """
     Performs monthly_climatology on a running window of n years, in order to take into account possible trends in the mean state.
     """
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
+    years = np.array([da.year for da in dates])
+
     climate_mean = []
     dates_climate_mean = []
 
-    allyears = np.unique(dates_pdh.year)
-    years = allyears[::step_year]
+    allyears = np.unique(years)
+    okyears = allyears[::step_year]
 
-    for yea in years:
-        okye = (dates_pdh.year >= yea - window_years//2) & (dates_pdh.year <= yea + window_years//2)
+    for yea in okyears:
+        okye = (years >= yea - window_years//2) & (years <= yea + window_years//2)
         numyea = np.sum((allyears >= yea - window_years//2) & (allyears <= yea + window_years//2))
         print(yea, numyea)
         if numyea < window_years:
@@ -2428,23 +2439,27 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
         var, dates = sel_time_range(var, dates, dates_range)
         refyear = dates_range[1].year
 
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
+    months = np.array([da.month for da in dates])
+    days = np.array([da.day for da in dates])
 
-    months = np.unique(dates_pdh.month)
-    dayref = np.unique(dates_pdh.day)[0]
+    okmonths = np.unique(months)
+    dayref = np.unique(days)[0]
 
     filt_mean = []
     filt_std = []
     dates_filt = []
 
-    for mon in months:
-        data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,dayref), format='%Y%m%d')
-        okdates = (dates_pdh.month == mon)
+    for mon in okmonths:
+        #data = pd.to_datetime('2001{:02d}{:02d}'.format(mon,dayref), format='%Y%m%d')
+        data = datetime.strptime('2001-{:02d}-{:02d}'.format(mon,dayref), '%Y-%m-%d')
+        okdates = (months == mon)
         filt_mean.append(np.mean(var[okdates,...], axis = 0))
         filt_std.append(np.std(var[okdates,...], axis = 0))
         dates_filt.append(data)
 
-    dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
+    #dates_ok = pd.to_datetime(dates_filt).to_pydatetime()
+    dates_ok = np.array(dates_filt)
 
     filt_mean = np.stack(filt_mean)
     filt_std = np.stack(filt_std)
@@ -2664,8 +2679,10 @@ def bootstrap(var, dates, season, y = None, apply_func = None, func_args = None,
 
 
 def range_years(year1, year2):
-    data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
-    data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
+    # data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
+    # data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
+    data1 = datetime.strptime('{}0101'.format(year1), '%Y%m%d')
+    data2 = datetime.strptime('{}1231'.format(year2), '%Y%m%d')
     return data1, data2
 
 
@@ -2678,8 +2695,9 @@ def sel_time_range(var, dates, dates_range, ignore_HHMM = True):
     if ignore_HHMM:
         okdates = np.array([(da.date() >= dates_range[0].date()) & (da.date() <= dates_range[1].date()) for da in dates])
     else:
-        dates_pdh = pd.to_datetime(dates)
-        okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
+        #dates_pdh = pd.to_datetime(dates)
+        #okdates = (dates_pdh >= dates_range[0]) & (dates_pdh <= dates_range[1])
+        okdates = np.array([(da >= dates_range[0]) & (da <= dates_range[1]) for da in dates])
 
     return var[okdates, ...], dates[okdates]
 
@@ -2689,7 +2707,7 @@ def range_dates_monthly(first, last, monday = 15):
     Creates a sequence of monthly dates between first and last datetime objects.
     """
 
-    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+    strindata = '{:4d}-{:02d}-{:02d}'
     ye0 = first.year
     mo0 = first.month
     ye1 = last.year
@@ -2704,7 +2722,8 @@ def range_dates_monthly(first, last, monday = 15):
         elif ye == ye1:
             modue = mo1+1
         for mo in range(mouno,modue):
-            datesmon.append(pd.Timestamp(strindata.format(ye,mo,monday)).to_pydatetime())
+            #datesmon.append(pd.Timestamp(strindata.format(ye,mo,monday)).to_pydatetime())
+            datesmon.append(datetime.strptime(strindata.format(ye,mo,monday), '%Y-%m-%d'))
 
     datesmon = np.array(datesmon)
 
@@ -2871,7 +2890,8 @@ def anomalies_daily_detrended(var, dates, climate_mean = None, dates_climate_mea
     """
     Calculates the daily anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_daily_climat().
     """
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
+    years = np.array([da.year for da in dates])
 
     print('DENTRO ANOMALIES DETRENDED: {} {}\n'.format(len(dates), len(dates_pdh)))
 
@@ -2886,9 +2906,9 @@ def anomalies_daily_detrended(var, dates, climate_mean = None, dates_climate_mea
     #year_steps = np.unique(dates_pdh.year)[::step_year]
     #okyetot = np.zeros(len(var), dtype=bool)
 
-    for yea in np.unique(dates_pdh.year):
+    for yea in np.unique(years):
         yearef = np.argmin(abs(year_ref_all - yea))
-        okye = dates_pdh.year == yea
+        okye = years == yea
         # if np.sum(okye) <= 1:
         #     print('This year {} has only one day.. If you really want to take it in, change this line\n')
         #     continue
@@ -2946,16 +2966,22 @@ def anomalies_daily(var, dates, climate_mean = None, dates_climate_mean = None, 
     if climate_mean is None or dates_climate_mean is None:
         climate_mean, dates_climate_mean, _ = daily_climatology(var, dates, window)
 
-    dates_pdh = pd.to_datetime(dates)
-    dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    # dates_pdh = pd.to_datetime(dates)
+    years = np.array([da.year for da in dates])
+    months = np.array([da.month for da in dates])
+    days = np.array([da.day for da in dates])
+
+    #dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    cmmonths = np.array([da.month for da in dates_climate_mean])
+    cmdays = np.array([da.day for da in dates_climate_mean])
     var_anom = np.empty_like(var)
 
-    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
-        mask = (dates_pdh.month == dat.month) & (dates_pdh.day == dat.day)
+    for el, dat in zip(climate_mean, dates_climate_mean):
+        mask = (months == dat.month) & (days == dat.day)
         var_anom[mask, ...] = var[mask, ...] - el
 
-    mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
-    okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
+    mask = (months == 2) & (days == 29)
+    okel = (cmmonths == 2) & (cmdays == 28)
 
     var_anom[mask, ...] = var[mask, ...] - climate_mean[okel, ...]
 
@@ -2963,16 +2989,23 @@ def anomalies_daily(var, dates, climate_mean = None, dates_climate_mean = None, 
 
 
 def restore_fullfield_from_anomalies_daily(var, dates, climate_mean, dates_climate_mean):
-    dates_pdh = pd.to_datetime(dates)
-    dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    #dates_pdh = pd.to_datetime(dates)
+    #dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    years = np.array([da.year for da in dates])
+    months = np.array([da.month for da in dates])
+    days = np.array([da.day for da in dates])
+
+    cmmonths = np.array([da.month for da in dates_climate_mean])
+    cmdays = np.array([da.day for da in dates_climate_mean])
+
     var_anom = np.empty_like(var)
 
-    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
-        mask = (dates_pdh.month == dat.month) & (dates_pdh.day == dat.day)
+    for el, dat in zip(climate_mean, dates_climate_mean):
+        mask = (months == dat.month) & (days == dat.day)
         var_anom[mask, ...] = var[mask, ...] + el
 
-    mask = (dates_pdh.month == 2) & (dates_pdh.day == 29)
-    okel = (dates_climate_mean_pdh.month == 2) & (dates_climate_mean_pdh.day == 28)
+    mask = (months == 2) & (days == 29)
+    okel = (cmmonths == 2) & (cmdays == 28)
 
     var_anom[mask, ...] = var[mask, ...] + climate_mean[okel, ...]
 
@@ -2983,7 +3016,7 @@ def anomalies_monthly_detrended(var, dates, climate_mean = None, dates_climate_m
     """
     Calculates the monthly anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_monthly_climat().
     """
-    dates_pdh = pd.to_datetime(dates)
+    #dates_pdh = pd.to_datetime(dates)
     if climate_mean is None or dates_climate_mean is None:
         climate_mean, dates_climate_mean = trend_monthly_climat(var, dates, window_years = window_years, step_year = step_year)
 
@@ -3021,12 +3054,14 @@ def anomalies_monthly(var, dates, climate_mean = None, dates_climate_mean = None
     if climate_mean is None or dates_climate_mean is None:
         climate_mean, dates_climate_mean, _ = monthly_climatology(var, dates)
 
-    dates_pdh = pd.to_datetime(dates)
-    dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    # dates_pdh = pd.to_datetime(dates)
+    # dates_climate_mean_pdh = pd.to_datetime(dates_climate_mean)
+    months = np.array([da.month for da in dates])
+
     var_anom = np.empty_like(var)
 
-    for el, dat in zip(climate_mean, dates_climate_mean_pdh):
-        mask = (dates_pdh.month == dat.month)
+    for el, dat in zip(climate_mean, dates_climate_mean):
+        mask = (months == dat.month)
         var_anom[mask, ...] = var[mask, ...] - el
 
     return var_anom
@@ -3774,7 +3809,7 @@ def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100)
     numclus = centroids.shape[0]
     varopt = calc_varopt_molt(pcs, centroids, labels)
 
-    dates = pd.to_datetime(dates)
+    #dates = pd.to_datetime(dates)
     deltas = dates[1:]-dates[:-1]
     deltauno = dates[1]-dates[0]
     ndis = np.sum(abs(deltas) > 2*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
@@ -3964,19 +3999,22 @@ def calc_monthly_clus_freq(labels, dates, numclus):
     """
     #numclus = int(np.max(labels)+1)
 
-    dates_pdh = pd.to_datetime(dates)
-    years = dates_pdh.year
-    months = dates_pdh.month
+    #dates_pdh = pd.to_datetime(dates)
+    # years = dates_pdh.year
+    # months = dates_pdh.month
+    years = np.array([da.year for da in dates])
+    months = np.array([da.month for da in dates])
     yemon = np.unique([(ye,mo) for ye,mo in zip(years, months)], axis = 0)
 
-    strindata = '{:4d}-{:02d}-{:02d} 12:00:00'
+    strindata = '{:4d}-{:02d}-{:02d}'
 
     freqs = []
     datesmon = []
     for (ye, mo) in yemon:
-        dateok = (dates_pdh.year == ye) & (dates_pdh.month == mo)
+        dateok = (years == ye) & (months == mo)
         freqs.append(calc_clus_freq(labels[dateok], numclus = numclus))
-        datesmon.append(pd.Timestamp(strindata.format(ye,mo,15)).to_pydatetime())
+        #datesmon.append(pd.Timestamp(strindata.format(ye,mo,15)).to_pydatetime())
+        datesmon.append(datetime.strptime(strindata.format(ye,mo,15), '%Y-%m-%d'))
 
     freqs = np.stack(freqs)
     datesmon = np.stack(datesmon)
@@ -4391,7 +4429,7 @@ def calc_regime_residtimes(indices, dates = None, count_incomplete = True, skip_
             resid_times.append(np.array(clu_resids))
             regime_nums.append(np.array(clu_num_reg))
     else:
-        dates = pd.to_datetime(dates)
+        #dates = pd.to_datetime(dates)
         duday = pd.Timedelta('2 days 00:00:00')
         regime_dates = []
         for clu in range(numclus):

@@ -273,7 +273,8 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season, kwargs['numclus'])
     results['freq_clus_monthly'] = var
-    results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
+    #results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
+    results['freq_clus_monthly_dates'] = datesmon
 
     # separare qui gli ensembles? no
     if is_ensemble:
@@ -327,7 +328,8 @@ def extract_ensemble_results(results, ens_names):
         for nam in ens_names[mod]:
             var, datesmon = ctl.calc_monthly_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
             nures[mod]['freq_clus_monthly'][nam] = var
-            nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
+            #nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
+            nures[mod]['freq_clus_monthly_dates'][nam] = datesmon
 
             var, years = ctl.calc_seasonal_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
             nures[mod]['freq_clus_seasonal'][nam] = var
@@ -692,7 +694,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
             trace_ens.append(len(var_season_set[ens]))
             if heavy_output:
                 results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climate_mean_dtr), axis = 1)
-                results[ens_names[ens]]['climate_mean_dtr_dates'] = pd.to_datetime(dates_climat_dtr).year
+                results[ens_names[ens]]['climate_mean_dtr_dates'] = np.array([da.year for da in dates_climat_dtr])
             var_anom_dtr.append(ctl.anomalies_daily_detrended(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean_dtr, dates_climate_mean = dates_climat_dtr))
 
         var_anom_dtr = np.concatenate(var_anom_dtr)
