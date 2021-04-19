@@ -577,6 +577,8 @@ def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = Non
 
     if regrid_to_reference is not None:
         cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
+        for std_nam in ['lat', 'lon']:
+            datacoords[std_nam] = cube.coord(oknames[std_nam]).points
 
     data = cube.data
     if squeeze: data = data.squeeze()
