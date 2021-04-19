@@ -268,7 +268,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, rebase_to_historical = rebase_to_historical, **kwargs)
 
     results['dates_allyear'] = dates
-    if netcdf4_read:
+    if read_from_p is not None:
+        pass
+    elif netcdf4_read:
         results['time_cal'] = time_cal
         results['time_units'] = time_units
     else:
