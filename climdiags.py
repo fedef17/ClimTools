@@ -83,7 +83,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
         if select_area_first:
             print('Selecting area first for saving memory')
-            var, lat, lon = ctl.sel_area(lat, lon, var, area)
+            var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
         var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
         var_full.append(var)
         dates_full.append(dates)
@@ -100,13 +100,17 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
             if select_area_first:
                 print('Selecting area first for saving memory')
-                var, lat, lon = ctl.sel_area(lat, lon, var, area)
+                var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
 
             var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
             var_full.append(var)
             dates_full.append(dates)
             var_sel.append(var_season)
             dates_sel.append(dates_season)
+
+        if select_area_first:
+            lat = lat_area
+            lon = lon_area
 
         ens_lengths_sel = [len(vau) for vau in var_sel]
         ens_lengths_full = [len(vau) for vau in var_full]
