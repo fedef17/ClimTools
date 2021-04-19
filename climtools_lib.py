@@ -2217,7 +2217,7 @@ def daily_climatology(var, dates, window, refyear = 2001):
     years = np.array([da.year for da in dates])
     months = np.array([da.month for da in dates])
     days = np.array([da.day for da in dates])
-    dayofyearz = np.array([da.dayofyear for da in dates])
+    dayofyearz = np.array([da.dayofyr for da in dates])
 
     okmonths = np.unique(months)
     daysok = []
@@ -2240,7 +2240,7 @@ def daily_climatology(var, dates, window, refyear = 2001):
             #data = pd.to_datetime('{:4d}{:02d}{:02d}'.format(refyear, mon,day), format='%Y%m%d')
             data = datetime.strptime('{:4d}-{:02d}-{:02d}'.format(refyear, mon, day), '%Y-%m-%d')
             if window > 2:
-                doy = data.dayofyear
+                doy = data.dayofyr
                 okdates = ((dayofyearz - doy) % 365 <= delta) | ((doy - dayofyearz) % 365 <= delta)
             else:
                 okdates = (months == mon) & (days == day)
