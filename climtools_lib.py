@@ -2198,6 +2198,32 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
     return var_season, dates_season
 
 
+def calc_dayofyear(dates):
+    """
+    datetime.datetime object does not have the dayofyear attribute.
+    """
+    if isinstance(dates[0], datetime):
+        dayinmo = np.array([31,28,31,30,31,30,31,31,30,31,30,31])
+        daysofyear = -1*np.ones(len(dates))
+        months = np.array([da.month for da in dates])
+        days = np.array([da.day for da in dates])
+        for mo in np.unique(months):
+            okdat = months == mo
+            daysofyear[okdat] = np.sum(dayinmo[:mo-1])+days[okdat]
+
+        if np.any(daysofyear < 0):
+            print(dates[daysofyear < 0])
+            raise ValueError('daysofyear undefined!')
+    elif isinstance(dates[0], cftime.real_datetime):
+        daysofyear = np.array([da.dayofyr for da in dates])
+    elif isinstance(dates[0], pd.Timestamp):
+        daysofyear = np.array([da.dayofyear for da in dates])
+    else:
+        raise ValueError('date type not recognized: {}'.format(type(dates[0])))
+
+    return daysofyear
+
+
 def daily_climatology(var, dates, window, refyear = 2001):
     """
     Performs a daily climatological mean of the dataset using a window of n days around the day considered (specified in input). Example: with window = 5, the result for day 15/02 is done averaging days from 13/02 to 17/02 in the full dataset.
@@ -2217,7 +2243,7 @@ def daily_climatology(var, dates, window, refyear = 2001):
     years = np.array([da.year for da in dates])
     months = np.array([da.month for da in dates])
     days = np.array([da.day for da in dates])
-    dayofyearz = np.array([da.dayofyr for da in dates])
+    dayofyearz = calc_dayofyear(dates)
 
     okmonths = np.unique(months)
     daysok = []
@@ -2235,12 +2261,14 @@ def daily_climatology(var, dates, window, refyear = 2001):
     filt_std = []
     dates_filt = []
 
+    dayinmo = np.array([31,28,31,30,31,30,31,31,30,31,30,31])
     for mon, daymon in zip(okmonths, daysok):
         for day in daymon:
             #data = pd.to_datetime('{:4d}{:02d}{:02d}'.format(refyear, mon,day), format='%Y%m%d')
             data = datetime.strptime('{:4d}-{:02d}-{:02d}'.format(refyear, mon, day), '%Y-%m-%d')
+            doy = np.sum(dayinmo[:mon-1])+day
+
             if window > 2:
-                doy = data.dayofyr
                 okdates = ((dayofyearz - doy) % 365 <= delta) | ((doy - dayofyearz) % 365 <= delta)
             else:
                 okdates = (months == mon) & (days == day)
