@@ -271,9 +271,6 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     results['dates_allyear'] = dates
     if read_from_p is not None:
         pass
-    elif netcdf4_read:
-        results['time_cal'] = time_cal
-        results['time_units'] = time_units
     else:
         results['time_cal'] = aux_info['time_calendar']
         results['time_units'] = aux_info['time_units']
