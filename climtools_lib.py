@@ -37,6 +37,8 @@ import math
 from sklearn.cluster import KMeans
 
 import xarray as xr
+import xesmf as xe
+import xclim
 #import cfgrib
 
 from datetime import datetime
@@ -983,6 +985,136 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
     else:
         print('Read all variables: {}\n'.format(all_vars.keys()))
         return all_vars
+
+
+def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_deg = None, regrid_to_reference_file = None, regrid_scheme = 'bilinear', convert_units_to = None, verbose = True, keep_only_maxdim_vars = True):
+    """
+    Read a netCDF file using xarray and optionally xesmf for regridding. Usual output.
+
+    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
+    < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
+
+    < keep_only_maxdim_vars > : keeps only variables with maximum size (excludes variables like time_bnds, lat_bnds, ..)
+    """
+
+    if regrid_to_reference_file is not None:
+        print('Loading reference cube for regridding..')
+        regrid_to_reference = xr.load_dataset(regrid_to_reference_file)
+    elif regrid_to_deg is not None:
+        regrid_to_reference = xr.DataArray({'lat': np.arange(-90, 90.1, regrid_to_deg), 'lon': np.arange(0, 360,regrid_to_deg)})
+
+    if regrid_to_reference is not None:
+        keep_only_maxdim_vars = True
+
+    print('Reading {}\n'.format(ifile))
+    engine = 'netcdf4'
+    if type(ifile) in [list, np.ndarray]:
+        print('Reading an ENSEMBLE of input files..\n')
+        if ifile[0][-4:] == '.grb' or ifile[0][-5:] == '.grib': engine = 'cfgrib'
+        pino = xr.load_mfdataset(ifile, use_cftime = True, engine = engine)
+    else:
+        if ifile[-4:] == '.grb' or ifile[-5:] == '.grib': engine = 'cfgrib'
+        pino = xr.load_dataset(ifile, use_cftime = True, engine = engine)
+
+    var_names = [var for var in pino.data_vars]
+    coord_names = [coor for coor in pino.coords]
+
+    cudims = [pino[var].ndim for var in var_names]
+    ndim = np.max(cudims)
+
+    if verbose: print('Dimensions: {}\n'.format(coord_names))
+
+    if keep_only_maxdim_vars:
+        pino = pino.drop_vars([var for var, ndi in zip(var_names, cudims) if ndi < ndim])
+        var_names = [var for var in pino.data_vars]
+
+    if verbose: print('Variables: {}\n'.format(var_names))
+    nvars = len(var_names)
+    print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, var_names))
+
+    if nvars == 1:
+        print('Read variable: {}\n'.format(var_names[0]))
+        pino = pino[var_names[0]]
+    elif select_var is not None:
+        print('Read variable: {}\n'.format(select_var))
+        pino = pino[select_var]
+    else:
+        raise ValueError('Multiple variables not supported in this function!')
+
+    datacoords = dict()
+    aux_info = dict()
+
+    if convert_units_to:
+        if nvars == 1:
+            if pino.units != convert_units_to:
+                print('Converting data from {} to {}\n'.format(pino.units, convert_units_to))
+                if pino.units == 'm**2 s**-2' and convert_units_to == 'm':
+                    pino = pino/9.80665
+                    pino['units'] = 'm'
+                else:
+                    pino = xclim.units.convert_units_to(pino, convert_units_to)
+            aux_info['var_units'] = pino.units
+        else:
+            print('WARNING! Cannot convert units on multiple variables: {}'.format(var_names))
+            aux_info['var_units'] = [gi.units for gi in pino]
+
+    allco = ['lat', 'lon', 'level']
+    allconames = dict()
+    allconames['lat'] = np.array(['latitude', 'lat'])
+    allconames['lon'] = np.array(['longitude', 'lon'])
+    allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
+
+    oknames = dict()
+    for i, nam in enumerate(coord_names):
+        found = False
+        if nam == 'time': continue
+        for std_nam in allconames:
+            if nam in allconames[std_nam]:
+                coor = pino.coords[nam] # anche pino[nam] works
+                oknames[std_nam] = nam
+                pino = pino.rename({nam : std_nam})
+                datacoords[std_nam] = coor.values
+                found = True
+
+                if coor.units in ['Pa', 'mbar', 'bar'] and std_nam == 'level':
+                    print('Converting units to hPa')
+                    #print(pino.coords)
+                    plev2 = xclim.units.convert_units_to(pino[std_nam], 'hPa')
+                    pino = pino.assign_coords(level = plev2) # or ({'level' : plev2})
+                    datacoords[std_nam] = pino.coords[std_nam].values
+
+        if not found:
+            print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
+
+    if 'level' in datacoords.keys():
+        if len(datacoords['level']) == 1:
+            pino = pino.squeeze()
+            print('File contains only level {}'.format(datacoords['level'][0]))
+        else:
+            if extract_level_hPa is not None:
+                try:
+                    pino = pino.sel({'level' : extract_level_hPa}, 'nearest', tolerance = 1.).squeeze()
+                except:
+                    raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
+
+    if regrid_to_reference is not None:
+        regridder = xe.Regridder(pino, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+        pino = regridder(pino)
+        for std_nam in ['lat', 'lon']:
+            datacoords[std_nam] = pino[std_nam].values
+
+    if 'time' in coord_names:
+        datacoords['dates'] = pino.time.values
+        aux_info['time_units'] = None
+        aux_info['time_calendar'] = pino.time.values[0].calendar
+
+    #print(datetime.now())
+    data = pino.values
+    data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
+    datacoords['lat'] = lat
+    datacoords['lon'] = lon
+
+    return data, datacoords, aux_info
 
 
 def read_ensemble_xD(file_list, extract_level = None, select_var = None, pressure_in_Pa = True, force_level_units = None, verbose = True, keep_only_Ndim_vars = True):

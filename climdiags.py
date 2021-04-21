@@ -50,7 +50,7 @@ Rearth = 6371.0e3 # mean radius
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, read_from_p = None, write_to_p = None, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, iris_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, read_from_p = None, write_to_p = None, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -125,28 +125,24 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     elif type(ifile) not in [list, np.ndarray]:
         is_ensemble = False
-        if ifile[-3:] == '.nc':
-            if netcdf4_read:
-                if regrid_to_reference_cube is not None:
-                    print('WARNING! Unable to perform regridding with netcdf4_read set to True')
-                #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-                var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
-            else:
-                var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
-        elif ifile[-4:] == '.grb' or ifile[-5:] == '.grib':
-            if regrid_to_reference_cube is not None or extract_level_hPa is not None:
-                print('WARNING! Unable to perform regridding or extracting level with grib file')
-            var, coords, aux_info = ctl.read3D_grib(ifile)
+        if netcdf4_read:
+            if regrid_to_reference_cube is not None:
+                print('WARNING! Unable to perform regridding with netcdf4_read. Set it to False to use read_xr instead')
+            #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
-
+        elif iris_read:
+            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
+        else:
+            var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
 
         cond = np.abs(var) > thres_inf
         if np.any(cond):
@@ -180,24 +176,21 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         dates_full = []
         for fil in ifile:
             # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
-            if fil[-3:] == '.nc':
-                if netcdf4_read:
-                    if regrid_to_reference_cube is not None:
-                        print('WARNING! Unable to perform regridding with netcdf4_read set to True')
-                    var, coords, aux_info = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
-                    lat = coords['lat']
-                    lon = coords['lon']
-                    dates = coords['dates']
-                    # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-                else:
-                    var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
-                    lat = coords['lat']
-                    lon = coords['lon']
-                    dates = coords['dates']
-            elif fil[-4:] == '.grb' or fil[-5:] == '.grib':
-                if regrid_to_reference_cube is not None or extract_level_hPa is not None:
-                    print('WARNING! Unable to perform regridding or extracting level with grib file')
-                var, coords, aux_info = ctl.read3D_grib(fil)
+            if netcdf4_read:
+                if regrid_to_reference_cube is not None:
+                    print('WARNING! Unable to perform regridding with netcdf4_read set to True')
+                var, coords, aux_info = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+                # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            elif iris_read:
+                var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+            else:
+                var, coords, aux_info = ctl.read_xr(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
