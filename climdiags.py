@@ -126,7 +126,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
         del var_full, var_sel, dates_full, dates_sel
 
-        if ifile[-2:] == '.p'
+        if ifile[-2:] == '.p':
             read_from_p.close()
 
     elif type(ifile) not in [list, np.ndarray]:
