@@ -69,6 +69,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     # print(numpcs)
     # print(netcdf4_read)
 
+    if ifile[-2:] == '.p' and read_from_p is None:
+        read_from_p = open(ifile, 'rb')
+
     print('Running precompute\n')
     if read_from_p is not None:
         is_ensemble = False
@@ -122,6 +125,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         dates = np.concatenate(dates_full)
 
         del var_full, var_sel, dates_full, dates_sel
+
+        if ifile[-2:] == '.p'
+            read_from_p.close()
 
     elif type(ifile) not in [list, np.ndarray]:
         is_ensemble = False

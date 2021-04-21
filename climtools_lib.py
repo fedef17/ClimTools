@@ -1001,7 +1001,8 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
         print('Loading reference cube for regridding..')
         regrid_to_reference = xr.load_dataset(regrid_to_reference_file)
     elif regrid_to_deg is not None:
-        regrid_to_reference = xr.DataArray({'lat': np.arange(-90, 90.1, regrid_to_deg), 'lon': np.arange(0, 360,regrid_to_deg)})
+        regrid_to_reference = xr.Dataset({'lat': (['lat'], np.arange(-90, 90.1, regrid_to_deg)), 'lon': (['lon'], np.arange(0, 360, regrid_to_deg)), })
+        # regrid_to_reference = xr.DataArray({'lat': np.arange(-90, 90.1, regrid_to_deg), 'lon': np.arange(0, 360,regrid_to_deg)})
 
     if regrid_to_reference is not None:
         keep_only_maxdim_vars = True
