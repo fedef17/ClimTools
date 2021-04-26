@@ -2225,6 +2225,8 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     '''
 
     (lonW, lonE, latS, latN) = sel_area_translate(area)
+    if lon_type == '0-360' and (lonW < 0. or lonE < 0.):
+        raise ValueError('Negative longitude but lon_type is 0-360!!')
 
     var, lat, lon = check_increasing_latlon(var, lat, lon)
 
@@ -2240,7 +2242,10 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     latidx = (lat >= latS) & (lat <= latN)
     lat_new = lat[latidx]
 
-    if lonW < lonE: # Area does not cross lon_border
+    if lonW == 0. and lonE == 0.: # full globe, no selection
+        lon_new = lon
+        var_area = var[..., latidx, :]
+    elif lonW < lonE: # Area does not cross lon_border
         lonidx = (lon >= lonW) & (lon <= lonE)
         var_area = var[..., latidx, :][..., lonidx] # the double slicing is necessary here
 
