@@ -39,6 +39,7 @@ from sklearn.cluster import KMeans
 import xarray as xr
 import xesmf as xe
 import xclim
+import cftime
 #import cfgrib
 
 from datetime import datetime
@@ -1045,7 +1046,10 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
     datacoords = dict()
     aux_info = dict()
 
-    if convert_units_to:
+    if var_names[0] in ['z', 'geopotential', 'zg']:
+        convert_units_to = 'm'
+
+    if convert_units_to is not None:
         if nvars == 1:
             if pino.units != convert_units_to:
                 print('Converting data from {} to {}\n'.format(pino.units, convert_units_to))
@@ -2363,12 +2367,15 @@ def calc_dayofyear(dates):
         if np.any(daysofyear < 0):
             print(dates[daysofyear < 0])
             raise ValueError('daysofyear undefined!')
-    elif isinstance(dates[0], cftime.real_datetime):
-        daysofyear = np.array([da.dayofyr for da in dates])
     elif isinstance(dates[0], pd.Timestamp):
         daysofyear = np.array([da.dayofyear for da in dates])
+    elif isinstance(dates[0], cftime.real_datetime):
+        daysofyear = np.array([da.dayofyr for da in dates])
     else:
-        raise ValueError('date type not recognized: {}'.format(type(dates[0])))
+        try:
+            daysofyear = np.array([da.dayofyr for da in dates])
+        except:
+            raise ValueError('date type not recognized: {}'.format(type(dates[0])))
 
     return daysofyear
 
