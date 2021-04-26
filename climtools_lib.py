@@ -2225,8 +2225,6 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     '''
 
     (lonW, lonE, latS, latN) = sel_area_translate(area)
-    if lon_type == '0-360' and (lonW < 0. or lonE < 0.):
-        raise ValueError('Negative longitude but lon_type is 0-360!!')
 
     var, lat, lon = check_increasing_latlon(var, lat, lon)
 
