@@ -2336,7 +2336,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     patt = result_obs['cluspattern']
     lat_ref = result_obs['lat']
     lon_ref = result_obs['lon']
-    filename = cart_out+'Allclus_OBSERVED.pdf'
+    filename = cart_out+'Allclus_OBSERVED_{}.pdf'.format(tag)
     figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
     all_figures += figs
     figs[0].savefig(filename)

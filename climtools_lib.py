@@ -2791,6 +2791,7 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
 
     try:
         all_vars = np.stack(all_var_seas)
+        all_dates = np.array(all_dates_seas)
     except Exception as czz:
         print(czz)
         print('Seasons are not all of the same length: \n')
@@ -2798,9 +2799,9 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         if verbose:
             if len(lengths) > 1:
                 for cos in all_dates_seas: print(len(cos), cos[0], cos[-1])
-        all_vars = np.array(all_var_seas)
+        all_vars = np.array(all_var_seas, dtype = object)
+        all_dates = np.array(all_dates_seas, dtype = object)
 
-    all_dates = np.array(all_dates_seas)
     #print(np.shape(all_vars))
 
     if seasonal_average:
