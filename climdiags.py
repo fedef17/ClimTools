@@ -2408,7 +2408,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             label_ERMS_axis = 'Total RMS error (m)'
             label_bias_axis = 'Pattern mean (m)'
 
-            figs = ctl.Taylor_plot(modpats, obs, latitude = results_obs['lat_area'], filename = filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
+            figs = ctl.Taylor_plot(modpats, obs, latitude = result_obs['lat_area'], filename = filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
             all_figures += figs
 
     numens_ok = int(np.ceil(n_clus))
@@ -2427,7 +2427,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
         legok = False
-        ctl.Taylor_plot(modpats, obs, latitude = results_obs['lat_area'], ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
+        ctl.Taylor_plot(modpats, obs, latitude = result_obs['lat_area'], ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
 
 
     #Custom legend
