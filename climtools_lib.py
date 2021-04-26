@@ -1110,7 +1110,7 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
 
     if 'time' in coord_names:
         datacoords['dates'] = pino.time.values
-        aux_info['time_units'] = None
+        aux_info['time_units'] = 'hours since ' + str(pino.time.values[0])
         aux_info['time_calendar'] = pino.time.values[0].calendar
 
     #print(datetime.now())
