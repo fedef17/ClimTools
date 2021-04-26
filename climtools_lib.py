@@ -2058,7 +2058,7 @@ def sel_area_translate(area):
         lonE = 180.
     elif area=='NML':
         printarea='Northern Mid-Latitudes'
-        latN = 90.0
+        latN = 87.5
         latS = 30.0
         lonW = -180.
         lonE = 180.
