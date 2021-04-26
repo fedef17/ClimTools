@@ -372,14 +372,14 @@ def export_results_to_json(filename, results):
                 if type(nures[mod][ke]) in [np.ndarray, pd.DatetimeIndex]:
                     nures[mod][ke] = nures[mod][ke].tolist()
                 # le date
-                if type(nures[mod][ke]) == list and type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                if type(nures[mod][ke]) == list and (type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime] or issubclass(type(nures[mod][ke][0]), cftime._cftime.datetime)):
                     nures[mod][ke] = [cos.isoformat() for cos in nures[mod][ke]]
         else:
             for ke in nures[mod]:
                 if type(nures[mod][ke]) == np.ndarray:
                     nures[mod][ke] = nures[mod][ke].tolist()
                 if type(nures[mod][ke]) is list:
-                    if type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                    if type(nures[mod][ke][0]) in [cftime.real_datetime, pd.Timestamp, datetime] or issubclass(type(nures[mod][ke][0]), cftime._cftime.datetime):
                         nures[mod][ke] = [cos.isoformat() for cos in nures[mod][ke]]
 
             for ke in alkeens:
@@ -391,7 +391,7 @@ def export_results_to_json(filename, results):
                         nures[mod][ke][ens] = coso.tolist()
 
                     coso = nures[mod][ke][ens]
-                    if type(coso) == list and type(coso[0]) in [cftime.real_datetime, pd.Timestamp, datetime]:
+                    if type(coso) == list and (type(coso[0]) in [cftime.real_datetime, pd.Timestamp, datetime] or issubclass(type(coso[0]), cftime._cftime.datetime)):
                         nures[mod][ke][ens] = [cos.isoformat() for cos in coso]
 
 
