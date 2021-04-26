@@ -32,16 +32,16 @@ git pull origin master
 ```
 
 #### 0. Install Anaconda
-ClimTools needs a Conda environment, which is defined by the file **env_ctl3.yml**. If you don't have Conda installed, follow the instructions at https://conda.io/projects/conda/en/latest/user-guide/install/index.html?highlight=conda.
+ClimTools needs a Conda environment, which is defined by the file **env_ctl4.yml**. If you don't have Conda installed, follow the instructions at https://conda.io/projects/conda/en/latest/user-guide/install/index.html?highlight=conda.
 
-#### 1. Create the *ctl3* environment
+#### 1. Create the *ctl4* environment
 To create the environment, open a terminal from your ClimTools folder and do:
 ```
-conda env create -f env_ctl3.yml
+conda env create -f env_ctl4.yml
 ```
 Each time you want to use ClimTools, remember to activate the environment first:
 ```
-conda activate ctl3
+conda activate ctl4
 ```
 
 #### 2. Compile the Fortran routines
@@ -57,13 +57,13 @@ In alternative, you might just open the file compile_py3.sh and copy and run eac
 This operation will create two binary libraries *ctool.so* and *ctp.so* in your ClimTools folder.
 
 #### 3. Add permanently the path to ClimTools to your PYTHONPATH
-Open a terminal inside the ClimTools folder and activate the ctl3 environment (*conda activate ctl3*).
+Open a terminal inside the ClimTools folder and activate the ctl4 environment (*conda activate ctl4*).
 
 Then do:
 ```
 conda-develop .
 ```
-This commands adds the path to the ClimTools folder to the *ctl3* environment system paths.
+This commands adds the path to the ClimTools folder to the *ctl4* environment system paths.
 
 ### Usage
 
