@@ -2353,7 +2353,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         if not out_only_main_figs:
             cartout_mod = cart_out + 'mod_{}/'.format(lab)
             if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
-            filename = cartout_mod+'Allclus_'+lab+'.pdf'
+            filename = cartout_mod+'Allclus_'+lab+'_'+tag+'.pdf'
         else:
             filename = None
 
