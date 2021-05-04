@@ -2337,7 +2337,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat_ref = result_obs['lat']
     lon_ref = result_obs['lon']
     filename = cart_out+'Allclus_OBSERVED_{}.pdf'.format(tag)
-    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -2357,7 +2357,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         else:
             filename = None
 
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
         all_figures += figs
         if not out_only_main_figs:
             for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
@@ -2541,7 +2541,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
 
     return
 
