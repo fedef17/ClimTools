@@ -5828,6 +5828,21 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
     return
 
 
+def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1):
+    """
+    Creates a figure with a cartopy ax for plotting maps.
+    """
+    proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
+
+    fig = plt.figure(figsize = figsize)
+    ax = plt.subplot(projection = proj)
+
+    ax.set_global()
+    ax.coastlines(linewidth = coast_lw)
+
+    return fig, ax
+
+
 def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots a single map to a figure.
