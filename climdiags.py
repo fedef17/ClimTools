@@ -41,6 +41,125 @@ Rearth = 6371.0e3 # mean radius
 
 ###############################################################################
 
+def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_style = 'bil', grid = 'r144x73', gridtag = '25', merge = False, rechunk = False, verbose = False, remove_single_files = False, skip_existing = True, check_cmip6 = False):
+    """
+    Preselects levels, remaps to a different grid and optionally merges data in different files using cdo. Considers all nc files inside cart_in and outputs in cart_out.
+
+    sel_levels : float/list of levels to select
+    """
+
+    if type(sel_levels) is float:
+        sel_levels = [sel_levels]
+
+    listadir = os.listdir(cart_in)
+    file_list = [fi for fi in listadir if (fi[-3:] == '.nc')]
+    if check_cmip6:
+        file_list = [fi for fi in file_list if len(fi.split('_')) == 7]
+    file_list.sort()
+    print('Processing {}...\n'.format(cart_in))
+    if verbose: print(file_list)
+
+    if len(file_list) == 0:
+        print('\n\nEMPTY FOLDER\n\n')
+        return
+
+    provname = cart_out+'mmm.nc'
+    filenam = file_list[0]
+
+    cose = file_list[0][:-3].split('_')
+    filenam_base = '_'.join(cose[:-1])
+
+    alldates_ini = [fil.split('_')[-1].split('-')[0] for fil in file_list]
+    alldates_fin = [fil.split('_')[-1].split('-')[1] for fil in file_list]
+    alldates_ini.sort()
+    alldates_fin.sort()
+    datestag = '{}-{}'.format(alldates_ini[0][:6], alldates_fin[-1][:6])
+
+    mergefilenam = cart_out + filenam_base + '_' + datestag + '_r25.nc'
+    rcfilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '_rc.nc'
+
+    check_files = False
+    if skip_existing:
+        if os.path.exists(mergefilenam) or os.path.exists(rcfilenam):
+            print('{} already processed, skipping..\n'.format(cart_out))
+            return
+        elif os.path.exists(cart_out):
+            lista_done = os.listdir(cart_out)
+            lista_ok = [fi for fi in lista_done if varname in fi]
+            if len(lista_ok) > 0:
+                listatempi = [os.stat(cart_out + fil).st_mtime for fil in lista_ok]
+                tempi = np.argsort(listatempi)
+                fil_out_done = np.array(lista_ok)[tempi][:-1] # excludes last file
+                check_files = True
+
+    if regrid:
+        file_in = cart_in + file_list[0]
+        indpo = filenam.index('.nc')
+        file_out = cart_out + filenam[:indpo] + '_remap{}.nc'.format(gridtag)
+
+        if verbose: print('Processing {}\n'.format(file_in))
+        if sel_levels is not None:
+            if verbose: print('Selecting levels..\n')
+            command = 'cdo -s sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
+            if verbose: print(command)
+            os.system(command)
+            file_in = provname
+        if verbose: print('Calculating weights for interpolation....\n')
+        command = 'cdo -s gen{},{} {} {}remapweights.nc'.format(interp_style, grid, file_in, cart_out)
+        if verbose: print(command)
+        os.system(command)
+        command = 'cdo -s remap,{},{} {} {}'.format(grid, cart_out+'remapweights.nc', file_in, file_out)
+        if verbose: print(command)
+        os.system(command)
+
+        if len(file_list) > 1:
+            for filenam in file_list[1:]:
+                file_in = cart_in + filenam
+                indpo = filenam.index('.nc')
+                filepart = filenam[:indpo] + '_remap{}.nc'.format(gridtag)
+                file_out = cart_out + filepart
+
+                if check_files:
+                    if filepart in fil_out_done:
+                        if verbose: print('Already processed {}'.format(file_in))
+                        continue
+
+                if verbose: print('Processing {}\n'.format(file_in))
+                if sel_levels is not None:
+                    if verbose: print('Selecting levels..\n')
+                    command = 'cdo -s sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
+                    if verbose: print(command)
+                    os.system(command)
+                    file_in = provname
+                command = 'cdo -s remap,{},{} {} {}'.format(grid, cart_out+'remapweights.nc', file_in, file_out)
+                if verbose: print(command)
+                os.system(command)
+
+        os.remove(cart_out + 'remapweights.nc')
+        os.remove(provname)
+
+    if merge:
+        mergefilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '.nc'
+        #command = 'cdo -s cat {}*_remap*.nc {}'.format(cart_out, mergefilenam)
+        command = 'cdo -s mergetime {}*_remap*.nc {}'.format(cart_out, mergefilenam)
+        if verbose: print(command)
+        os.system(command)
+        if rechunk:
+            rcfilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '_rc.nc'
+            command = 'nccopy -4 -c time/100,lat/{},lon/{} -d 1 -h 100000000 {} {}'.format(latchunks, lonchunks, mergefilenam, rcfilenam)
+            if verbose: print(command)
+            os.system(command)
+            if remove_single_files:
+                os.remove(mergefilenam)
+
+        if remove_single_files:
+            for fi in os.listdir(cart_out):
+                if cart_out+fi not in [mergefilenam, rcfilenam]:
+                    os.remove(cart_out + fi)
+
+    return
+
+
 #############################################################################
 #############################################################################
 
