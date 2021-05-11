@@ -41,7 +41,7 @@ Rearth = 6371.0e3 # mean radius
 
 ###############################################################################
 
-def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_style = 'bil', grid = 'r144x73', gridtag = '25', merge = False, rechunk = False, verbose = False, remove_single_files = False, skip_existing = True, check_cmip6 = False):
+def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_style = 'bil', grid = 'r144x73', gridtag = '25', merge = False, rechunk = False, verbose = False, remove_single_files = False, skip_existing = True, check_cmip6 = False, taglev = ''):
     """
     Preselects levels, remaps to a different grid and optionally merges data in different files using cdo. Considers all nc files inside cart_in and outputs in cart_out.
 
@@ -49,7 +49,13 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
     """
 
     if type(sel_levels) is float:
+        if taglev == '':
+            taglev = '_' + str(int(sel_levels))
         sel_levels = [sel_levels]
+    elif type(sel_levels) in [list, np.ndarray]:
+        if taglev == '': taglev = '_{}levs'.format(len(sel_levels))
+    else:
+        taglev = ''
 
     listadir = os.listdir(cart_in)
     file_list = [fi for fi in listadir if (fi[-3:] == '.nc')]
@@ -75,8 +81,8 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
     alldates_fin.sort()
     datestag = '{}-{}'.format(alldates_ini[0][:6], alldates_fin[-1][:6])
 
-    mergefilenam = cart_out + filenam_base + '_' + datestag + '_r25.nc'
-    rcfilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '_rc.nc'
+    mergefilenam = cart_out + filenam_base + taglev + '_' + datestag + '_r25.nc'
+    rcfilenam = cart_out + filenam_base + taglev + '_' + datestag + '_r' + gridtag + '_rc.nc'
 
     check_files = False
     if skip_existing:
@@ -95,7 +101,8 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
     if regrid:
         file_in = cart_in + file_list[0]
         indpo = filenam.index('.nc')
-        file_out = cart_out + filenam[:indpo] + '_remap{}.nc'.format(gridtag)
+
+        file_out = cart_out + filenam[:indpo] + taglev + '_remap{}.nc'.format(gridtag)
 
         if verbose: print('Processing {}\n'.format(file_in))
         if sel_levels is not None:
@@ -116,7 +123,7 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
             for filenam in file_list[1:]:
                 file_in = cart_in + filenam
                 indpo = filenam.index('.nc')
-                filepart = filenam[:indpo] + '_remap{}.nc'.format(gridtag)
+                filepart = filenam[:indpo] + taglev +  '_remap{}.nc'.format(gridtag)
                 file_out = cart_out + filepart
 
                 if check_files:
