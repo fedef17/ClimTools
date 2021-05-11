@@ -48,6 +48,8 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
     sel_levels : float/list of levels to select
     """
 
+    ctl.mkdir(cart_out)
+
     if type(sel_levels) is float:
         if taglev == '':
             taglev = '_' + str(int(sel_levels))
