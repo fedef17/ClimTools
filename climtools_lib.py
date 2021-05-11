@@ -10,6 +10,10 @@ try:
     import ctool, ctp
 except ModuleNotFoundError:
     print('WARNING: ctool, ctp modules not found. Some functions may raise errors. Run the compiler in the cluster_fortran/ routine to avoid this.\n')
+except Exception as exp:
+    print(exp)
+    pass
+
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
