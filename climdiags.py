@@ -992,8 +992,8 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     lanc20 = lanc20/np.sum(lanc20)
 
     wind_low = np.zeros(var_area.shape)
-    for ila, la in enumerate(latsel):
-        for ilo, lo in enumerate(lonsel):
+    for ila, la in enumerate(lat_area):
+        for ilo, lo in enumerate(lon_area):
             wind_low[:, ila, ilo] = np.convolve(lanc20, var_area[:, ila, ilo], mode = 'same')
         #wind_low = ctl.running_mean(wind_area, 10)
 
