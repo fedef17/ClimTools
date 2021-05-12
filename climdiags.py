@@ -200,6 +200,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     if ifile[-2:] == '.p' and read_from_p is None:
         read_from_p = open(ifile, 'rb')
 
+    if type(ifile) is str:
+        if '*' in ifile:
+            ifile = glob.glob(ifile)
+            ifile.sort()
+
     print('Running precompute\n')
     if read_from_p is not None:
         is_ensemble = False
