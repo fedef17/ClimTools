@@ -94,7 +94,7 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
         elif os.path.exists(cart_out):
             lista_done = os.listdir(cart_out)
             #lista_ok = [fi for fi in lista_done if varname in fi]
-            if len(lista_ok) > 0:
+            if len(lista_done) > 0:
                 listatempi = [os.stat(cart_out + fil).st_mtime for fil in lista_done]
                 tempi = np.argsort(listatempi)
                 fil_out_done = np.array(lista_done)[tempi][:-1] # excludes last file
