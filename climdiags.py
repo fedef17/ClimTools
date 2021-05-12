@@ -959,6 +959,71 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 
 
 #############################################################################
+################ other for mid-lat flow #####################################
+
+def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None):
+    """
+    Wrapper for jli.
+    """
+    var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
+    lat = coords['lat']
+    lon = coords['lon']
+    dates = coords['dates']
+
+    jli, jspeed = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+
+    return jli, jspeed
+
+
+def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, remove_29feb = True):
+    """
+    Calculates jet speed and jet latitude index.
+    """
+
+    var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
+
+    if orogfile is None:
+        if os.uname()[1] == 'hobbes':
+            orogfile = '/data-hobbes/reference/ERAInterim/geopot_vegcover_25.nc'
+
+    cose = np.arange(-2, 2.01, 0.01)
+    lanczos = np.sinc(cose)*np.sinc(cose/2.)
+    lanc20 = lanczos[::20]
+    lanc20 = lanc20/np.sum(lanc20)
+
+    wind_low = np.zeros(var_area.shape)
+    for ila, la in enumerate(latsel):
+        for ilo, lo in enumerate(lonsel):
+            wind_low[:, ila, ilo] = np.convolve(lanc20, var_area[:, ila, ilo], mode = 'same')
+        #wind_low = ctl.running_mean(wind_area, 10)
+
+    wind_low, dates_season = ctl.sel_season(wind_low, dates, season, cut = False, remove_29feb = remove_29feb)
+
+    if orogfile is not None:
+        # masking Greenland
+        orog, coords, aux_info = ctl.readxDncfield(orogfile, select_var = 'z')
+        orogmask = orog > 1300.0
+        orogarea, _, _ = ctl.sel_area(coords['lat'], coords['lon'], orogmask, area)
+        print(orogarea.shape)
+        #orogarea = orogarea[0]
+        orogarea = orogarea.squeeze()
+
+    for co in range(wind_low.shape[0]):
+        wind_low[co][orogarea] = np.nan
+
+    wind_zon = np.nanmean(wind_low, axis = 2)
+
+    jspeed = np.max(wind_zon, axis = 1)
+    jli = lat_area[np.argmax(wind_zon, axis = 1)]
+
+    # plt.ion()
+    # pdf = ctl.calc_pdf(jli)
+    # plt.plot(latsel, pdf(latsel))
+
+    return jli, jspeed
+
+
+#############################################################################
 #############################################################################
 
 ##########          Energy balance, heat fluxes                    ##########
