@@ -7025,18 +7025,20 @@ def plot_allregime_pdfs(labels, pcs, eof_proj = [(0,1), (0,2), (1,2)], all_regim
 def custom_alphagradient_cmap(color):
     # define custom colormap with fixed colour and alpha gradient
     # use simple linear interpolation in the entire scale
-    if type(color) is str:
-        color = cm.colors.ColorConverter.to_rgb(color)
 
-    cm.register_cmap(name='custom', data={'red': [(0.,color[0],color[0]), (1.,color[0],color[0])], 'green': [(0.,color[1],color[1]), (1.,color[1],color[1])], 'blue':  [(0.,color[2],color[2]), (1.,color[2],color[2])], 'alpha': [(0.,0,0), (1.,1,1)]})
-
-    cmap = cm.get_cmap('custom')
+    cmap = sns.light_palette(color, as_cmap = True)
+    # if type(color) is str:
+    #     color = cm.colors.ColorConverter.to_rgb(color)
+    #
+    # cm.register_cmap(name='custom', data={'red': [(0.,color[0],color[0]), (1.,color[0],color[0])], 'green': [(0.,color[1],color[1]), (1.,color[1],color[1])], 'blue':  [(0.,color[2],color[2]), (1.,color[2],color[2])], 'alpha': [(0.,0,0), (1.,1,1)]})
+    #
+    # cmap = cm.get_cmap('custom')
 
     return cmap
 
 
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
-def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = True, fix_subplots_shape = None, fac = 1.5):
+def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = False, fix_subplots_shape = None, fac = 1.5):
     """
     Plots the 2D projection of the regime pdf on the two chosen eof axes (eof_proj).
 
@@ -7127,7 +7129,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     plt.tight_layout()
     if not nolegend:
         #plt.subplots_adjust(bottom = 0.12, top = 0.93)
-        fig = custom_legend(fig, colors, model_names)
+        fig = custom_legend(fig, colors, model_names, ncol = 4)
 
     if filename is not None:
         fig.savefig(filename)
@@ -7135,7 +7137,7 @@ def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), 
     return fig
 
 
-def custom_legend(fig, colors, labels, markers = None, loc = 'lower center', ncol = None, fontsize = 18, bottom_margin_per_line = 0.05, add_space_below = 0.0):
+def custom_legend(fig, colors, labels, markers = None, loc = 'lower center', ncol = None, fontsize = 18, bottom_margin_per_line = 0.05, add_space_below = 0.03):
     if ncol is None:
         ncol = int(np.ceil(len(labels)/2.0))
     if markers is None:

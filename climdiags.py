@@ -93,11 +93,11 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
             return
         elif os.path.exists(cart_out):
             lista_done = os.listdir(cart_out)
-            lista_ok = [fi for fi in lista_done if varname in fi]
+            #lista_ok = [fi for fi in lista_done if varname in fi]
             if len(lista_ok) > 0:
-                listatempi = [os.stat(cart_out + fil).st_mtime for fil in lista_ok]
+                listatempi = [os.stat(cart_out + fil).st_mtime for fil in lista_done]
                 tempi = np.argsort(listatempi)
-                fil_out_done = np.array(lista_ok)[tempi][:-1] # excludes last file
+                fil_out_done = np.array(lista_done)[tempi][:-1] # excludes last file
                 check_files = True
 
     if regrid:
@@ -2642,7 +2642,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     return
 
 
-def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'contourf'):
+def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour'):
     """
     Nice regime plot.
     """
