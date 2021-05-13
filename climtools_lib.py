@@ -1017,7 +1017,7 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
     if type(ifile) in [list, np.ndarray]:
         print('Reading an ENSEMBLE of input files..\n')
         if ifile[0][-4:] == '.grb' or ifile[0][-5:] == '.grib': engine = 'cfgrib'
-        pino = xr.load_mfdataset(ifile, use_cftime = True, engine = engine)
+        pino = xr.open_mfdataset(ifile, use_cftime = True, engine = engine)
     else:
         if ifile[-4:] == '.grb' or ifile[-5:] == '.grib': engine = 'cfgrib'
         pino = xr.load_dataset(ifile, use_cftime = True, engine = engine)

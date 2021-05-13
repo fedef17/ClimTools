@@ -970,9 +970,9 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
     lon = coords['lon']
     dates = coords['dates']
 
-    jli, jspeed = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+    jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile)
 
-    return jli, jspeed
+    return jli, jspeed, dates_season
 
 
 def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, remove_29feb = True):
@@ -1020,7 +1020,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     # pdf = ctl.calc_pdf(jli)
     # plt.plot(latsel, pdf(latsel))
 
-    return jli, jspeed
+    return jli, jspeed, dates_season
 
 
 #############################################################################
