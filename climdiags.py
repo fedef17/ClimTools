@@ -961,16 +961,41 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 #############################################################################
 ################ other for mid-lat flow #####################################
 
-def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None):
+def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, nchunks = 10, regrid_to_deg = 2.5):
     """
     Wrapper for jli.
     """
-    var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
-    lat = coords['lat']
-    lon = coords['lon']
-    dates = coords['dates']
+    if type(ifile) is str:
+        var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = regrid_to_deg)
+        lat = coords['lat']
+        lon = coords['lon']
+        dates = coords['dates']
 
-    jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+    elif type(ifile) is list:
+        jli = []
+        jspeed = []
+        dates_season = []
+        if compute_in_chunks:
+            npchu = len(ifile)//nchunks
+            for chu in range(nchunks):
+                fin = (chu+1)*npchu
+                if chu == nchunks-1:
+                    fin = None
+
+                var, coords, aux_info = ctl.read_xr(ifile[chu*npchu:fin], extract_level_hPa = 850., regrid_to_deg = regrid_to_deg)
+                lat = coords['lat']
+                lon = coords['lon']
+                dates = coords['dates']
+
+                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+            jli.append(jlich)
+            jspeed.append(jspeedch)
+            dates_season.append(dates_seasonch)
+
+        jli = np.concatenate(jli)
+        jspeed = np.concatenate(jspeed)
+        dates_season = np.concatenate(dates_season)
 
     return jli, jspeed, dates_season
 

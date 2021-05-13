@@ -1107,8 +1107,27 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
                     raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
 
     if regrid_to_reference is not None:
-        regridder = xe.Regridder(pino, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
-        pino = regridder(pino)
+        (nlat, nlon) = (len(datacoords['lat']), len(datacoords['lon']))
+        (nlat_ref, nlon_ref) = (len(regrid_to_reference['lat'].values), len(regrid_to_reference['lon'].values))
+
+        if nlat*nlon < nlat_ref*nlon_ref:
+            print('WARNING!! cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
+
+        if nlat == nlat_ref and nlon == nlon_ref:
+            lat_check = datacoords['lat'] == regrid_to_reference['lat'].values
+            lon_check = datacoords['lon'] == regrid_to_reference['lon'].values
+
+            if np.all(lat_check) and np.all(lon_check):
+                print('Grid check OK\n')
+            else:
+                print('Same nlat, nlon, but different grid. Regridding to reference..\n')
+                regridder = xe.Regridder(pino, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+                pino = regridder(pino)
+        else:
+            print('Different nlat, nlon. Regridding to reference..\n')
+            regridder = xe.Regridder(pino, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+            pino = regridder(pino)
+
         for std_nam in ['lat', 'lon']:
             datacoords[std_nam] = pino[std_nam].values
 
