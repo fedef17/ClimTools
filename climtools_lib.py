@@ -992,7 +992,7 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
         return all_vars
 
 
-def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_deg = None, regrid_to_reference_file = None, regrid_scheme = 'bilinear', convert_units_to = None, verbose = True, keep_only_maxdim_vars = True):
+def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_deg = None, regrid_to_reference_file = None, regrid_scheme = 'bilinear', convert_units_to = None, verbose = True, keep_only_maxdim_vars = True, year_range = None):
     """
     Read a netCDF file using xarray and optionally xesmf for regridding. Usual output.
 
@@ -1021,6 +1021,9 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
     else:
         if ifile[-4:] == '.grb' or ifile[-5:] == '.grib': engine = 'cfgrib'
         pino = xr.load_dataset(ifile, use_cftime = True, engine = engine)
+
+    if year_range is not None:
+        pino = pino.sel(time = slice('{}-01-01'.format(year_range[0]), '{}-12-31'.format(year_range[1])))
 
     var_names = [var for var in pino.data_vars]
     coord_names = [coor for coor in pino.coords]
@@ -2071,6 +2074,12 @@ def sel_area_translate(area):
         latS = 30.0
         lonW =-80.0
         lonE = 40.0
+    elif area=='NATL':
+        printarea='North-Atlantic'
+        latN = 75
+        latS = 15.0
+        lonW =-60.0
+        lonE = 0.0
     elif area=='PNA':
         printarea='Pacific North American'
         latN = 87.5
@@ -2886,22 +2895,26 @@ def bootstrap(var, dates, season, y = None, apply_func = None, func_args = None,
 
         bootstr.append(cos)
 
-    return np.array(bootstr)
+    return np.stack(bootstr)
 
 
 def range_years(year1, year2):
     # data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
     # data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
     data1 = datetime.strptime('{}0101'.format(year1), '%Y%m%d')
-    data2 = datetime.strptime('{}1231'.format(year2), '%Y%m%d')
+    data2 = datetime.strptime('{}0101'.format(year2+1), '%Y%m%d') # to include 31/12
     return data1, data2
 
 
-def sel_time_range(var, dates, dates_range, ignore_HHMM = True):
+def sel_time_range(var, dates, dates_range = None, year_range = None, ignore_HHMM = False):
     """
     Extracts a subset in time.
     < ignore_HHMM > : if True, considers only day, mon and year.
     """
+    if dates_range is None and year_range is not None:
+        dates_range = ctl.range_years(year_range)
+    elif dates_range is None and year_range is None:
+        raise ValueError('Specify either dates_range or year_range')
 
     if ignore_HHMM:
         okdates = np.array([(da.date() >= dates_range[0].date()) & (da.date() <= dates_range[1].date()) for da in dates])

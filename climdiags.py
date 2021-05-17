@@ -961,7 +961,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 #############################################################################
 ################ other for mid-lat flow #####################################
 
-def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, nchunks = 10):
+def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50):
     """
     Wrapper for jli.
     """
@@ -976,8 +976,8 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         jli = []
         jspeed = []
         dates_season = []
-        if compute_in_chunks:
-            npchu = len(ifile)//nchunks
+        if compute_in_chunks and len(ifile) > npchu:
+            nchunks = int(np.ceil(len(ifile)/npchu))
             for chu in range(nchunks):
                 fin = (chu+1)*npchu
                 if chu == nchunks-1:
@@ -1010,6 +1010,8 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     if orogfile is None:
         if os.uname()[1] == 'hobbes':
             orogfile = '/data-hobbes/reference/ERAInterim/geopot_vegcover_25.nc'
+        # elif os.uname()[1] == 'wilma':
+        #     orogfile = 'geopot_vegcover_25.nc'
 
     cose = np.arange(-2, 2.01, 0.01)
     lanczos = np.sinc(cose)*np.sinc(cose/2.)
@@ -1033,8 +1035,14 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
         #orogarea = orogarea[0]
         orogarea = orogarea.squeeze()
 
-    for co in range(wind_low.shape[0]):
-        wind_low[co][orogarea] = np.nan
+        # orogarea = np.zeros(var_area[0].shape)
+        # lat_green = [62.5, 62.5, 65. , 65. , 65. , 67.5, 67.5, 67.5, 67.5, 67.5, 67.5, 70. , 70. , 70. , 70. , 70. , 70. , 70. , 70. ]
+        # lon_green = [312.5, 315. , 312.5, 315. , 317.5, 312.5, 315. , 317.5, 320. , 322.5, 325. , 312.5, 315. , 317.5, 320. , 322.5, 325. , 327.5, 330. ]
+        # for lo, la in zip(lon_green, lat_green):
+
+
+        for co in range(wind_low.shape[0]):
+            wind_low[co][orogarea] = np.nan
 
     wind_zon = np.nanmean(wind_low, axis = 2)
 
