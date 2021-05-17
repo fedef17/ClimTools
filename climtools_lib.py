@@ -3116,6 +3116,33 @@ def lowpass_lanczos(var, wnd, nan_extremes = True):
     return low_var
 
 
+def butter_filter(data, n_days, filtype = 'lowpass', axis = 0, order = 5):
+    """
+    Butterworth filter.
+    Type of filter defaults to lowpass. Other options are 'highpass','bandpass', 'bandstop'. If band, n_days is expected as a tuple/list/array (min, max).
+    Assumes the sampling frequency is 1.
+    """
+
+    if 'band' in filtype:
+        if type(n_days) in [tuple, list]:
+            n_days = np.array(n_days)
+    elif type(n_days) == np.ndarray:
+        pass
+    else:
+        raise ValueError('n_days should be a tuple with (day_min, day_max) for band_pass filter')
+
+    cutoff = 1./n_days
+
+    fs = 1 # data sample frequency
+    nyq = 0.5 * fs # Niquist frequency
+    normal_cutoff = cutoff / nyq
+    b, a = signal.butter(order, normal_cutoff, btype=filtype, analog=False)
+
+    y = signal.filtfilt(b, a, data, axis = axis) # this is signal.lfilter applied twice, preserves phase
+
+    return y
+
+
 def anomalies_daily_detrended(var, dates, climate_mean = None, dates_climate_mean = None, window_days = 5, window_years = 20, step_year = 5):
     """
     Calculates the daily anomalies wrt a trending climatology. climate_mean and dates_climate_mean are the output of trend_daily_climat().
