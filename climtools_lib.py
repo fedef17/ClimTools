@@ -2907,8 +2907,8 @@ def range_years(year1, year2 = None):
             raise ValueError('year2 not specified')
     # data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
     # data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
-    data1 = datetime.strptime('{}0101'.format(year1), '%Y%m%d')
-    data2 = datetime.strptime('{}0101'.format(year2+1), '%Y%m%d') # to include 31/12
+    data1 = datetime.strptime('{}0101-00:00'.format(year1), '%Y%m%d-%H:%M')
+    data2 = datetime.strptime('{}1231-23:59'.format(year2), '%Y%m%d-%H:%M')
     return data1, data2
 
 
