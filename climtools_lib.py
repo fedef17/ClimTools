@@ -2898,7 +2898,13 @@ def bootstrap(var, dates, season, y = None, apply_func = None, func_args = None,
     return np.stack(bootstr)
 
 
-def range_years(year1, year2):
+def range_years(year1, year2 = None):
+    if year2 is None:
+        if type(year1) in [list, tuple]:
+            year2 = year1[1]
+            year1 = year1[0]
+        else:
+            raise ValueError('year2 not specified')
     # data1 = pd.to_datetime('{}0101'.format(year1), format='%Y%m%d')
     # data2 = pd.to_datetime('{}1231'.format(year2), format='%Y%m%d')
     data1 = datetime.strptime('{}0101'.format(year1), '%Y%m%d')
