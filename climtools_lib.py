@@ -2912,7 +2912,7 @@ def sel_time_range(var, dates, dates_range = None, year_range = None, ignore_HHM
     < ignore_HHMM > : if True, considers only day, mon and year.
     """
     if dates_range is None and year_range is not None:
-        dates_range = ctl.range_years(year_range)
+        dates_range = range_years(year_range)
     elif dates_range is None and year_range is None:
         raise ValueError('Specify either dates_range or year_range')
 
