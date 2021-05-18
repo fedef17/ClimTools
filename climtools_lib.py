@@ -3126,10 +3126,10 @@ def butter_filter(data, n_days, filtype = 'lowpass', axis = 0, order = 5):
     if 'band' in filtype:
         if type(n_days) in [tuple, list]:
             n_days = np.array(n_days)
-    elif type(n_days) == np.ndarray:
-        pass
-    else:
-        raise ValueError('n_days should be a tuple with (day_min, day_max) for band_pass filter')
+        elif type(n_days) == np.ndarray:
+            pass
+        else:
+            raise ValueError('n_days should be a tuple with (day_min, day_max) for band_pass filter')
 
     cutoff = 1./n_days
 
