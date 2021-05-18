@@ -1023,8 +1023,8 @@ def plot_jli_w_speed(jli, jspeed, dates, title = None, filename = None, colors =
     vmin, vmax = (np.min(jspeed), np.max(jspeed))
     vsel = np.linspace(vmin, vmax, 100)
 
-    jliserie = ctl.bootstrap(jli, dates_season, None, apply_func = dopdf, func_args = [latsel, bnd_width], n_choice = 50, n_bootstrap = 1000)
-    jspedserie = ctl.bootstrap(jspeed, dates_season, None, apply_func = dopdf, func_args = [vsel, None], n_choice = 50, n_bootstrap = 1000)
+    jliserie = ctl.bootstrap(jli, dates, None, apply_func = dopdf, func_args = [latsel, bnd_width], n_choice = 50, n_bootstrap = 1000)
+    jspedserie = ctl.bootstrap(jspeed, dates, None, apply_func = dopdf, func_args = [vsel, None], n_choice = 50, n_bootstrap = 1000)
 
     pdf = ctl.calc_pdf(jli, bnd_width = bnd_width)
     pdfok = pdf(latsel)
