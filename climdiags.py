@@ -961,7 +961,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 #############################################################################
 ################ other for mid-lat flow #####################################
 
-def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50):
+def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50, filter = 'butter', remove_orog = False, plot_filename = None):
     """
     Wrapper for jli.
     """
@@ -971,7 +971,7 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         lon = coords['lon']
         dates = coords['dates']
 
-        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile, filter = filter, remove_orog = remove_orog)
     elif type(ifile) is list:
         jli = []
         jspeed = []
@@ -988,7 +988,7 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
                 lon = coords['lon']
                 dates = coords['dates']
 
-                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, orogfile)
+                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, orogfile, filter = filter, remove_orog = remove_orog)
             jli.append(jlich)
             jspeed.append(jspeedch)
             dates_season.append(dates_seasonch)
@@ -997,52 +997,118 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         jspeed = np.concatenate(jspeed)
         dates_season = np.concatenate(dates_season)
 
+        if plot_filename is not None:
+            plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
+
+
     return jli, jspeed, dates_season
 
 
-def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, remove_29feb = True):
+def plot_jli_w_speed(jli, jspeed, dates, title = None, filename = None, colors = None, bnd_width = 0.22):
+    """
+    Plot JLI and jet speed.
+    """
+
+    def dopdf(var, xi, bnd_width):
+        pdf = ctl.calc_pdf(var, bnd_width = bnd_width)
+        pdfok = pdf(xi)
+        pdfok /= np.sum(pdfok)
+        return pdfok
+
+    fig = plt.figure(figsize = (24,12))
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+
+    latsel = np.arange(20, 71, 0.5)
+    vmin, vmax = (np.min(jspeed), np.max(jspeed))
+    vsel = np.linspace(vmin, vmax, 100)
+
+    jliserie = ctl.bootstrap(jli, dates_season, None, apply_func = dopdf, func_args = [latsel, bnd_width], n_choice = 50, n_bootstrap = 1000)
+    jspedserie = ctl.bootstrap(jspeed, dates_season, None, apply_func = dopdf, func_args = [vsel, None], n_choice = 50, n_bootstrap = 1000)
+
+    pdf = ctl.calc_pdf(jli, bnd_width = bnd_width)
+    pdfok = pdf(latsel)
+    pdfok /= np.sum(pdfok)
+
+    jlimin = np.percentile(jliserie, 10, axis = 0)
+    jlimax = np.percentile(jliserie, 90, axis = 0)
+    ax1.fill_between(latsel, jlimin, jlimax, color = 'forestgreen', alpha = 0.3)
+    ax1.plot(latsel, pdfok, color = 'forestgreen', linewidth = 3)
+
+    pdf = ctl.calc_pdf(jspeed)
+    pdfok = pdf(vsel)
+    pdfok /= np.sum(pdfok)
+
+    jlimin = np.percentile(jspedserie, 10, axis = 0)
+    jlimax = np.percentile(jspedserie, 90, axis = 0)
+    ax2.fill_between(vsel, jlimin, jlimax, color = 'indianred', alpha = 0.3)
+    ax2.plot(vsel, pdfok, color = 'indianred', linewidth = 3)
+
+    ax1.grid()
+    ax2.grid()
+    ax1.set_xlabel('Latitude')
+    ax2.set_xlabel('u wind (m/s)')
+    ax1.set_title('Jet latitude index')
+    ax2.set_title('Jet speed')
+
+    if title is not None:
+        fig.suptitle(title)
+
+    if filename is not None:
+        fig.savefig(filename)
+
+    return fig
+
+
+def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJFM', remove_orog = False, orogfile = None, remove_29feb = True, filter = 'butter'):
     """
     Calculates jet speed and jet latitude index.
     """
 
     var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
 
-    if orogfile is None:
-        if os.uname()[1] == 'hobbes':
-            orogfile = '/data-hobbes/reference/ERAInterim/geopot_vegcover_25.nc'
-        # elif os.uname()[1] == 'wilma':
-        #     orogfile = 'geopot_vegcover_25.nc'
+    # cose = np.arange(-2, 2.01, 0.01)
+    # lanczos = np.sinc(cose)*np.sinc(cose/2.)
+    # lanc20 = lanczos[::20]
+    # lanc20 = lanc20/np.sum(lanc20)
+    #
+    # wind_low = np.zeros(var_area.shape)
+    # for ila, la in enumerate(lat_area):
+    #     for ilo, lo in enumerate(lon_area):
+    #         wind_low[:, ila, ilo] = np.convolve(lanc20, var_area[:, ila, ilo], mode = 'same')
+    #     #wind_low = ctl.running_mean(wind_area, 10)
 
-    cose = np.arange(-2, 2.01, 0.01)
-    lanczos = np.sinc(cose)*np.sinc(cose/2.)
-    lanc20 = lanczos[::20]
-    lanc20 = lanc20/np.sum(lanc20)
-
-    wind_low = np.zeros(var_area.shape)
-    for ila, la in enumerate(lat_area):
-        for ilo, lo in enumerate(lon_area):
-            wind_low[:, ila, ilo] = np.convolve(lanc20, var_area[:, ila, ilo], mode = 'same')
-        #wind_low = ctl.running_mean(wind_area, 10)
+    if filter == 'lanczos':
+        wind_low = ctl.lowpass_lanczos(var_area, 10, nan_extremes = False)
+    elif filter == 'butter':
+        wind_low = ctl.butter_filter(var_area, 10)
+    else:
+        raise ValueError('Only values accepted for filter: lanczos, butter')
 
     wind_low, dates_season = ctl.sel_season(wind_low, dates, season, cut = False, remove_29feb = remove_29feb)
 
-    if orogfile is not None:
-        # masking Greenland
-        orog, coords, aux_info = ctl.readxDncfield(orogfile, select_var = 'z')
-        orogmask = orog > 1300.0
-        orogarea, _, _ = ctl.sel_area(coords['lat'], coords['lon'], orogmask, area)
-        print(orogarea.shape)
-        #orogarea = orogarea[0]
-        orogarea = orogarea.squeeze()
+    if remove_orog:
+        if orogfile is None:
+            if os.uname()[1] == 'hobbes':
+                orogfile = '/data-hobbes/reference/ERAInterim/geopot_vegcover_25.nc'
+            # elif os.uname()[1] == 'wilma':
+            #     orogfile = 'geopot_vegcover_25.nc'
+        if orogfile is not None:
+            # masking Greenland
+            orog, coords, aux_info = ctl.readxDncfield(orogfile, select_var = 'z')
+            orogmask = orog > 1300.0
+            orogarea, _, _ = ctl.sel_area(coords['lat'], coords['lon'], orogmask, area)
+            print(orogarea.shape)
+            #orogarea = orogarea[0]
+            orogarea = orogarea.squeeze()
 
-        # orogarea = np.zeros(var_area[0].shape)
-        # lat_green = [62.5, 62.5, 65. , 65. , 65. , 67.5, 67.5, 67.5, 67.5, 67.5, 67.5, 70. , 70. , 70. , 70. , 70. , 70. , 70. , 70. ]
-        # lon_green = [312.5, 315. , 312.5, 315. , 317.5, 312.5, 315. , 317.5, 320. , 322.5, 325. , 312.5, 315. , 317.5, 320. , 322.5, 325. , 327.5, 330. ]
-        # for lo, la in zip(lon_green, lat_green):
+            # orogarea = np.zeros(var_area[0].shape)
+            # lat_green = [62.5, 62.5, 65. , 65. , 65. , 67.5, 67.5, 67.5, 67.5, 67.5, 67.5, 70. , 70. , 70. , 70. , 70. , 70. , 70. , 70. ]
+            # lon_green = [312.5, 315. , 312.5, 315. , 317.5, 312.5, 315. , 317.5, 320. , 322.5, 325. , 312.5, 315. , 317.5, 320. , 322.5, 325. , 327.5, 330. ]
+            # for lo, la in zip(lon_green, lat_green):
 
-
-        for co in range(wind_low.shape[0]):
-            wind_low[co][orogarea] = np.nan
+            for co in range(wind_low.shape[0]):
+                wind_low[co][orogarea] = np.nan
 
     wind_zon = np.nanmean(wind_low, axis = 2)
 
