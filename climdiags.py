@@ -592,7 +592,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False, remove_climate_mean = True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -643,14 +643,17 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         if not rebase_to_historical:
             climate_mean = None # need to recalculate climate_mean
 
-    if is_daily:
-        if climate_mean is None:
-            climate_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
-        var_anom = ctl.anomalies_daily(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
+    if remove_climate_mean:
+        if is_daily:
+            if climate_mean is None:
+                climate_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
+            var_anom = ctl.anomalies_daily(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
+        else:
+            if climate_mean is None:
+                climate_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
+            var_anom = ctl.anomalies_monthly(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
     else:
-        if climate_mean is None:
-            climate_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
-        var_anom = ctl.anomalies_monthly(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
+        var_anom = var_season
 
     if select_area_first:
         var_area = var_anom
@@ -2841,7 +2844,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
 
     figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
 
-    return
+    return figs
 
 
 def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False, plot_type = 'pcolormesh', cb_label = 'Geopotential height anomaly (m)'):
