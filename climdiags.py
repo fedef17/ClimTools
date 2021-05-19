@@ -592,7 +592,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False, remove_climate_mean = True):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = False, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False, remove_climate_mean = True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -792,7 +792,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     return results
 
 
-def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names = None, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'sklearn', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = True, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
+def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names = None, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'sklearn', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = False, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -2815,7 +2815,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     return
 
 
-def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour'):
+def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour', reg_freq = None):
     """
     Nice regime plot.
     """
@@ -2829,6 +2829,11 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     cmappa = colors.ListedColormap(colo)
     cmappa.set_over('#800026') #662506
     cmappa.set_under('#023858') #542788
+
+    if names is None:
+        names = ['Clus {}'.format(i) for i in range(len(patts))]
+    if reg_freq is not None:
+        names = [na + ' - {}%'.format(fre) for na, fre in zip(names, reg_freq)]
 
     if clatlo is None:
         clatlo = (70, -20)

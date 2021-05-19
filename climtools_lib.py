@@ -6267,6 +6267,9 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
         numens_ok = int(np.ceil(numens//num_figs))
         side1 = int(np.ceil(np.sqrt(numens_ok)))
         side2 = int(np.ceil(numens_ok/float(side1)))
+        coso = (side1, side2)
+        side1 = np.min(coso)
+        side2 = np.max(coso)
     else:
         (side1, side2) = fix_subplots_shape
         numens_ok = side1*side2
