@@ -3551,14 +3551,27 @@ def Rcorr(x, y, latitude = None):
         weights_u = abs(np.cos(np.deg2rad(latitude)))
         weights = np.tile(weights_u, (x.shape[1], 1)).T
         if not masked:
-            weights = weights.flatten()
-            corrcoef = np.cov(xok, yok, aweights = weights)/np.sqrt(np.cov(xok, xok, aweights = weights) * np.cov(yok, yok, aweights = weights))
+            nans = np.isnan(xok)
+            if np.any(nans):
+                weights = weights.flatten()[~nans]
+                xoknan = xok[~nans]
+                yoknan = yok[~nans]
+                corrcoef = np.cov(xoknan, yoknan, aweights = weights)/np.sqrt(np.cov(xoknan, xoknan, aweights = weights) * np.cov(yoknan, yoknan, aweights = weights))
+            else:
+                weights = weights.flatten()
+                corrcoef = np.cov(xok, yok, aweights = weights)/np.sqrt(np.cov(xok, xok, aweights = weights) * np.cov(yok, yok, aweights = weights))
         else:
             weights = np.ma.masked_array(weights, mask = x.mask).compressed()
             corrcoef = np.cov(xok, yok, aweights = weights)/np.sqrt(np.cov(xok, xok, aweights = weights) * np.cov(yok, yok, aweights = weights))
     else:
         if not masked:
-            corrcoef = np.corrcoef(xok, yok)
+            nans = np.isnan(xok)
+            if np.any(nans):
+                xoknan = xok[~nans]
+                yoknan = yok[~nans]
+                corrcoef = np.corrcoef(xoknan, yoknan)
+            else:
+                corrcoef = np.corrcoef(xok, yok)
         else:
             corrcoef = np.corrcoef(xok, yok)
 
@@ -3617,10 +3630,10 @@ def E_rms(x, y, latitude = None):
         sum_norm = 0.
         for i, w in enumerate(weights):
             if not masked:
-                sum_norm += w*np.sum((x[i,:]-y[i,:])**2)
+                sum_norm += w*np.nansum((x[i,:]-y[i,:])**2)
                 n_norm += n_lons*w
             else:
-                sum_norm += w*np.sum((x[i,:].compressed()-y[i,:].compressed())**2)
+                sum_norm += w*np.nansum((x[i,:].compressed()-y[i,:].compressed())**2)
                 n_norm += len(x[i,:].compressed())*w
                 #print(i, n_norm, sum_norm, np.mean(x[i,:].compressed()))
 
@@ -4347,9 +4360,11 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
+def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
     """
     Find the best possible match between two sets of PCs.
+
+    Also works with arbitrary set of patterns, takes latitude in input to correctly weight the latitudes.
 
     Given two sets of PCs, finds the combination of PCs that minimizes the mean total squared error. If the input PCs represent cluster centroids, the results then correspond to the best unique match between the two sets of cluster centroids.
 
@@ -4382,8 +4397,12 @@ def match_pc_sets(pcset_ref, pcset, verbose = False, bad_matching_rule = 'rms_me
     mean_patcor = []
     sign_patcor = []
     for p in perms:
-        all_rms = np.array([LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)])
-        all_patcor = np.array([Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)])
+        if latitude is not None:
+            all_rms = np.array([E_rms(pcset_ref[i], pcset[p[i]], latitude = latitude) for i in range(numclus)])
+            all_patcor = np.array([Rcorr(pcset_ref[i], pcset[p[i]], latitude = latitude) for i in range(numclus)])
+        else:
+            all_rms = np.array([LA.norm(pcset_ref[i] - pcset[p[i]]) for i in range(numclus)])
+            all_patcor = np.array([Rcorr(pcset_ref[i], pcset[p[i]]) for i in range(numclus)])
         if verbose:
             print('Permutation: ', p)
             print(all_rms)
