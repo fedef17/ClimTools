@@ -2833,7 +2833,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     if names is None:
         names = ['Clus {}'.format(i) for i in range(len(patts))]
     if reg_freq is not None:
-        names = [na + ' - {}%'.format(fre) for na, fre in zip(names, reg_freq)]
+        names = [na + ' - {:4.1f}%'.format(fre) for na, fre in zip(names, reg_freq)]
 
     if clatlo is None:
         clatlo = (70, -20)
