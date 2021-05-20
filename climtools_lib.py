@@ -4372,6 +4372,8 @@ def match_patterns(patts_ref, patts, latitude = None):
         for j in range(cost_mat.shape[1]):
             cost_mat[i, j] = E_rms(patts_ref[i], patts[j], latitude=latitude)
 
+    print(cost_mat)
+
     gigi = optimize.linear_sum_assignment(cost_mat)
     return gigi[1]
 
