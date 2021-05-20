@@ -4370,7 +4370,7 @@ def match_patterns(patts_ref, patts, latitude = None):
     cost_mat = np.zeros((len(patts_ref), len(patts)))
     for i in range(cost_mat.shape[0]):
         for j in range(cost_mat.shape[1]):
-            cost_mat[i, j] = E_rms(patts_ref[i], patts[j], latitude=lat)
+            cost_mat[i, j] = E_rms(patts_ref[i], patts[j], latitude=latitude)
 
     gigi = optimize.linear_sum_assignment(cost_mat)
     return gigi[1]
