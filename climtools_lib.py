@@ -4369,7 +4369,7 @@ def match_patterns(patts_ref, patts, latitude = None, ignore_global_sign = False
 
     cost_mat = np.zeros((len(patts_ref), len(patts)))
     if ignore_global_sign:
-        sign_mat = cost_mat
+        sign_mat = np.zeros((len(patts_ref), len(patts)))
 
     for i in range(cost_mat.shape[0]):
         for j in range(cost_mat.shape[1]):
