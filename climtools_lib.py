@@ -4389,11 +4389,11 @@ def match_patterns(patts_ref, patts, latitude = None, ignore_global_sign = False
     if ignore_global_sign:
         res = gigi[1]
         sign_res = []
-        for c0, c1 in zip(gigi):
+        for c0, c1 in zip(gigi[0], gigi[1]):
             sign_res.append(sign_mat[c0, c1])
 
         sign_res = np.array(sign_res)
-        
+
         return res, sign_res
     else:
         return gigi[1]
