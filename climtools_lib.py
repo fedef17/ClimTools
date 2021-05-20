@@ -4362,8 +4362,18 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
 
 def match_patterns(patts_ref, patts, latitude = None):
     """
-    Does
+    Does an approximate matching based on RMS.
+
+    patts_ref can be of smaller length than patts. (not the opposite!)
     """
+
+    cost_mat = np.zeros(len(patts_ref), len(patts))
+    for i in range(cost_mat.shape[0]):
+        for j in range(cost_mat.shape[1]):
+            cost_mat[i, j] = ctl.E_rms(patts_ref[i], patts[j], latitude=lat)
+
+    gigi = linear_sum_assignment(cost_mat)
+    return gigi[1]
 
 
 def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
@@ -4388,7 +4398,7 @@ def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matchi
 
     if len(pcset_ref) > 5:
         print('WARNING!! this is the explicit solution to the matching problem and explodes for sets longer than 5 (?). Falling back to the approximate solution')
-        
+
         return match_patterns(pcset_ref, pcset, latitude = latitude)
 
     pcset_ref = np.array(pcset_ref)
