@@ -4360,7 +4360,7 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
-def match_patterns(patts_ref, patts, latitude = None):
+def match_patterns(patts_ref, patts, latitude = None, ignore_global_sign = False):
     """
     Does an approximate matching based on RMS.
 
@@ -4368,14 +4368,35 @@ def match_patterns(patts_ref, patts, latitude = None):
     """
 
     cost_mat = np.zeros((len(patts_ref), len(patts)))
+    if ignore_global_sign:
+        sign_mat = cost_mat
+
     for i in range(cost_mat.shape[0]):
         for j in range(cost_mat.shape[1]):
             cost_mat[i, j] = E_rms(patts_ref[i], patts[j], latitude=latitude)
+            if ignore_global_sign:
+                cos = E_rms(patts_ref[i], -1*patts[j], latitude=latitude)
+                if cos < cost_mat[i,j]:
+                    cost_mat[i,j] = cos
+                    sign_mat[i,j] = -1
+                else:
+                    sign_mat[i,j] = 1
 
     print(cost_mat)
 
     gigi = optimize.linear_sum_assignment(cost_mat)
-    return gigi[1]
+
+    if ignore_global_sign:
+        res = gigi[1]
+        sign_res = []
+        for c0, c1 in zip(gigi):
+            sign_res.append(sign_mat[c0, c1])
+
+        sign_res = np.array(sign_res)
+        
+        return res, sign_res
+    else:
+        return gigi[1]
 
 
 def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
