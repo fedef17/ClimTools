@@ -4360,6 +4360,12 @@ def clus_compare_patternsonly(centroids, labels, cluspattern_AREA, cluspattern_r
     return perm, centroids, labels, et, patcor
 
 
+def match_patterns(patts_ref, patts, latitude = None):
+    """
+    Does
+    """
+
+
 def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matching_rule = 'rms_mean_w_pos_patcor', matching_hierarchy = None):
     """
     Find the best possible match between two sets of PCs.
@@ -4379,6 +4385,12 @@ def match_pc_sets(pcset_ref, pcset, latitude = None, verbose = False, bad_matchi
     Output:
     - new_ord, the permutation of the second set that best matches the first.
     """
+
+    if len(pcset_ref) > 5:
+        print('WARNING!! this is the explicit solution to the matching problem and explodes for sets longer than 5 (?). Falling back to the approximate solution')
+        
+        return match_patterns(pcset_ref, pcset, latitude = latitude)
+
     pcset_ref = np.array(pcset_ref)
     pcset = np.array(pcset)
     if pcset_ref.shape != pcset.shape:
