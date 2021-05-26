@@ -2719,10 +2719,6 @@ def seasonal_climatology(var, dates = None, season = None, dates_range = None, c
         seas_p90 = np.stack(seas_p90)
         seas_p10 = np.stack(seas_p10)
 
-        gigi = xr.Dataset(data_vars=dict(mean = (('season', 'lat', 'lon'), seas_mean), std =
-    ...: (('season', 'lat', 'lon'), seas_std)), coords=dict(season = ['1','2','3','4'], lat =
-    ...: var.lat, lon = var.lon))
-
         dims = tuple(['season'] + list(var.dims)[1:])
         coords = dict([('season', allseasons)] + [(co, var[co]) for co in var.dims[1:]])
         seas_clim = xr.Dataset(data_vars=dict(mean = (dims, seas_mean), std = (dims, seas_std), p90 = (dims, seas_p90), p10 = (dims, seas_p10)), coords = coords)
