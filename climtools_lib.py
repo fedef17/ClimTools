@@ -2686,7 +2686,7 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     return filt_mean, dates_ok, filt_std
 
 
-def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
+def seasonal_climatology(var, dates = None, season = None, dates_range = None, cut = True, percentiles = False):
     """
     Performs a seasonal climatological mean of the dataset.
     Works both on monthly and daily datasets.
@@ -2696,16 +2696,53 @@ def seasonal_climatology(var, dates, season, dates_range = None, cut = True):
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
     """
 
-    if season != 'year':
-        all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
-        all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+    if isinstance(var, xr.DataArray):
+        vals = var.values
+        seas_mean = []
+        seas_std = []
+        seas_p10 = []
+        seas_p90 = []
+        allseasons = ['DJF', 'MAM', 'JJA', 'SON', 'year']
+        for season in allseasons:
+            if season == 'year':
+                all_seas = yearly_average(vals, var.time.values, dates_range = dates_range, cut = cut)[0]
+            else:
+                all_var_seas, _ = seasonal_set(vals, var.time.values, season, dates_range = dates_range, cut = cut)
+                all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+            seas_mean.append(np.mean(all_seas, axis = 0))
+            seas_std.append(np.std(all_seas, axis = 0))
+            seas_p10.append(np.percentile(all_seas, 10, axis = 0))
+            seas_p90.append(np.percentile(all_seas, 90, axis = 0))
+
+        seas_mean = np.stack(seas_mean)
+        seas_std = np.stack(seas_std)
+        seas_p90 = np.stack(seas_p90)
+        seas_p10 = np.stack(seas_p10)
+
+        gigi = xr.Dataset(data_vars=dict(mean = (('season', 'lat', 'lon'), seas_mean), std =
+    ...: (('season', 'lat', 'lon'), seas_std)), coords=dict(season = ['1','2','3','4'], lat =
+    ...: var.lat, lon = var.lon))
+
+        dims = tuple(['season'] + list(var.dims)[1:])
+        coords = dict([('season', allseasons)] + [(co, var[co]) for co in var.dims[1:]])
+        seas_clim = xr.Dataset(data_vars=dict(mean = (dims, seas_mean), std = (dims, seas_std), p90 = (dims, seas_p90), p10 = (dims, seas_p10)), coords = coords)
+        #ginkoarr = xr.DataArray(data=seas_mean, dims=["lat", "lon"], coords=[])
+        return seas_clim
     else:
-        all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
+        if season != 'year':
+            all_var_seas, _ = seasonal_set(var, dates, season, dates_range = dates_range, cut = cut)
+            all_seas = [np.mean(varse, axis = 0) for varse in all_var_seas]
+        else:
+            all_seas = yearly_average(var, dates, dates_range = dates_range, cut = cut)[0]
 
-    seas_mean = np.mean(all_seas, axis = 0)
-    seas_std = np.std(all_seas, axis = 0)
-
-    return seas_mean, seas_std
+        seas_mean = np.mean(all_seas, axis = 0)
+        seas_std = np.std(all_seas, axis = 0)
+        if percentiles:
+            seas_p10 = np.percentile(all_seas, 10, axis = 0)
+            seas_p90 = np.percentile(all_seas, 90, axis = 0)
+            return seas_mean, seas_std, seas_p10, seas_p90
+        else:
+            return seas_mean, seas_std
 
 
 def zonal_seas_climatology(var, dates, season, dates_range = None, cut = True):
@@ -5976,7 +6013,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     return fig, ax
 
 
-def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots a single map to a figure.
 
@@ -5993,11 +6030,19 @@ def plot_map_contour(data, lat, lon, filename = None, visualization = 'standard'
     < n_color_levels >: number of color levels.
     < draw_contour_lines >: draw lines in addition to the color levels?
     < n_lines >: number of lines to draw.
-
-
     """
     #if filename is None:
         #plt.ion()
+
+    if lat is None or lon is None:
+        if isinstance(data, xr.DataArray):
+            lat = data.lat.values
+            lon = data.lon.values
+            data = data.values
+        elif isinstance(data, xr.Dataset):
+            raise ValueError('Function works on DataArrays not on Datasets. Extract the right variable first')
+        else:
+            raise ValueError('lat/lon not specified')
 
     proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
@@ -6258,7 +6303,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None):
+def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6289,6 +6334,16 @@ def plot_multimap_contour(dataset, lat, lon, filename, max_ax_in_fig = 30, numbe
     < fix_subplots_shape > : Fixes the number of subplots in rows and columns.
 
     """
+
+    if lat is None or lon is None:
+        if isinstance(dataset[0], xr.DataArray):
+            lat = dataset[0].lat.values
+            lon = dataset[0].lon.values
+            data = [da.values for da in dataset]
+        elif isinstance(dataset, xr.Dataset) or isinstance(dataset[0], xr.Dataset):
+            raise ValueError('Not implemented! Function works on DataArrays not on Datasets. Extract the right variable first and concatenate them')
+        else:
+            raise ValueError('lat/lon not specified')
 
     proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
