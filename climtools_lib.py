@@ -2726,7 +2726,7 @@ def seasonal_climatology(var, dates = None, season = None, dates_range = None, c
 
         dims = tuple(['season'] + list(var.dims)[1:])
         coords = dict([('season', allseasons)] + [(co, var[co]) for co in var.dims[1:]])
-        seas_clim = xr.Dataset(data_vars=dict(mean = (dims, seas_mean), std = (dims, seas_std), p90 = (dims, seas_p90), p10 = (dims, seas_p10)), coords = coords)
+        seas_clim = xr.Dataset(data_vars=dict(seamean = (dims, seas_mean), seastd = (dims, seas_std), seap90 = (dims, seas_p90), seap10 = (dims, seas_p10)), coords = coords)
         #ginkoarr = xr.DataArray(data=seas_mean, dims=["lat", "lon"], coords=[])
         return seas_clim
     else:
@@ -5542,6 +5542,8 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     if verbose:
         print(clevels)
         print(np.min(data), np.max(data))
+
+    data, lat, lon = check_increasing_latlon(data, lat, lon)
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
