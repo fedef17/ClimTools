@@ -3478,34 +3478,46 @@ def variability_lowhi(lat, lon, var, dates, season, area = None, dates_range = N
     return mean_field, lowfr_variab, highfr_variab, stat_eddy
 
 
-def global_mean(field, latitude, mask = None, skip_nan = True):
+def global_mean(field, latitude = None, mask = None, skip_nan = True):
     """
     Calculates a global mean of field, weighting with the cosine of latitude.
 
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
-    weights_array = abs(np.cos(np.deg2rad(latitude)))
 
-    if mask is not None:
-        if field.ndim == 3 and mask.ndim == 2:
-            mask = np.tile(mask, (field.shape[0],1,1))
+    if isinstance(field, xr.DataArray):
+        coso = field.mean('lon')
+        glomean = np.average(coso, weights = abs(np.cos(np.deg2rad(coso.lat))), axis = -1)
 
-    zonal_field = zonal_mean(field, mask = mask, skip_nan = skip_nan)
-    #print(zonal_field.shape)
-    if np.any(np.isnan(zonal_field)):
-        if zonal_field.ndim == 2:
-            indexes = np.isnan(zonal_field)[0,:]
-        else:
-            indexes = np.isnan(zonal_field)
-        weights_array[indexes] = 0
-        zonal_field[np.isnan(zonal_field)] = 0.0
-    mea = np.average(zonal_field, weights = weights_array, axis = -1)
+        return glomean
+    elif isinstance(field, xr.Dataset):
+        raise ValueError('not implemented')
+    else:
+        if latitude is None:
+            raise ValueError('latitude is not set! call: global_mean(var, latitude)')
 
-    if np.any(np.isnan(mea)):
-        print('non dovrebbe essere NaN')
-        raise ValueError
+        weights_array = abs(np.cos(np.deg2rad(latitude)))
 
-    return mea
+        if mask is not None:
+            if field.ndim == 3 and mask.ndim == 2:
+                mask = np.tile(mask, (field.shape[0],1,1))
+
+        zonal_field = zonal_mean(field, mask = mask, skip_nan = skip_nan)
+        #print(zonal_field.shape)
+        if np.any(np.isnan(zonal_field)):
+            if zonal_field.ndim == 2:
+                indexes = np.isnan(zonal_field)[0,:]
+            else:
+                indexes = np.isnan(zonal_field)
+            weights_array[indexes] = 0
+            zonal_field[np.isnan(zonal_field)] = 0.0
+        mea = np.average(zonal_field, weights = weights_array, axis = -1)
+
+        if np.any(np.isnan(mea)):
+            print('non dovrebbe essere NaN')
+            raise ValueError
+
+        return mea
 
 
 def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
