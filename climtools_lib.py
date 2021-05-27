@@ -17,6 +17,11 @@ except Exception as exp:
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+
+if 'DISPLAY' not in os.environ.keys():
+    print('No DISPLAY variable set. Switching to agg backend')
+    plt.switch_backend('agg')
+
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
