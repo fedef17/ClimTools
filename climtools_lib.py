@@ -2691,7 +2691,7 @@ def monthly_climatology(var, dates, refyear = 2001, dates_range = None):
     return filt_mean, dates_ok, filt_std
 
 
-def seasonal_climatology(var, dates = None, season = None, dates_range = None, cut = True, percentiles = False):
+def seasonal_climatology(var, dates = None, season = None, dates_range = None, cut = True, percentiles = False, allseasons = ['DJF', 'MAM', 'JJA', 'SON', 'year']):
     """
     Performs a seasonal climatological mean of the dataset.
     Works both on monthly and daily datasets.
@@ -2707,7 +2707,6 @@ def seasonal_climatology(var, dates = None, season = None, dates_range = None, c
         seas_std = []
         seas_p10 = []
         seas_p90 = []
-        allseasons = ['DJF', 'MAM', 'JJA', 'SON', 'year']
         for season in allseasons:
             if season == 'year':
                 all_seas = yearly_average(vals, var.time.values, dates_range = dates_range, cut = cut)[0]

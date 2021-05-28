@@ -968,30 +968,25 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
     """
     Wrapper for jli.
     """
-    if type(ifile) is str:
-        var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
-        lat = coords['lat']
-        lon = coords['lon']
-        dates = coords['dates']
 
-        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
-    elif type(ifile) is list:
+    if type(ifile) is list and compute_in_chunks:
         jli = []
         jspeed = []
         dates_season = []
-        if compute_in_chunks and len(ifile) > npchu:
-            nchunks = int(np.ceil(len(ifile)/npchu))
-            for chu in range(nchunks):
-                fin = (chu+1)*npchu
-                if chu == nchunks-1:
-                    fin = None
+        #if compute_in_chunks and len(ifile) > npchu:
+        nchunks = int(np.ceil(len(ifile)/npchu))
+        for chu in range(nchunks):
+            fin = (chu+1)*npchu
+            if chu == nchunks-1:
+                fin = None
 
-                var, coords, aux_info = ctl.read_xr(ifile[chu*npchu:fin], extract_level_hPa = 850., regrid_to_deg = 2.5)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
+            var, coords, aux_info = ctl.read_xr(ifile[chu*npchu:fin], extract_level_hPa = 850., regrid_to_deg = 2.5)
+            lat = coords['lat']
+            lon = coords['lon']
+            dates = coords['dates']
 
-                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+            jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+
             jli.append(jlich)
             jspeed.append(jspeedch)
             dates_season.append(dates_seasonch)
@@ -999,9 +994,16 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         jli = np.concatenate(jli)
         jspeed = np.concatenate(jspeed)
         dates_season = np.concatenate(dates_season)
+    else:
+        var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
+        lat = coords['lat']
+        lon = coords['lon']
+        dates = coords['dates']
 
-        if plot_filename is not None:
-            plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
+        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+
+    if plot_filename is not None:
+        plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
 
 
     return jli, jspeed, dates_season
@@ -1069,6 +1071,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     """
 
     var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
+    print(var_area.shape)
 
     # cose = np.arange(-2, 2.01, 0.01)
     # lanczos = np.sinc(cose)*np.sinc(cose/2.)
@@ -1088,7 +1091,11 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     else:
         raise ValueError('Only values accepted for filter: lanczos, butter')
 
+    print(wind_low.shape)
+
     wind_low, dates_season = ctl.sel_season(wind_low, dates, season, cut = False, remove_29feb = remove_29feb)
+
+    print(wind_low.shape)
 
     if remove_orog:
         if orogfile is None:
@@ -1117,6 +1124,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
 
     jspeed = np.max(wind_zon, axis = 1)
     jli = lat_area[np.argmax(wind_zon, axis = 1)]
+    print(len(jli), len(jspeed))
 
     # plt.ion()
     # pdf = ctl.calc_pdf(jli)
