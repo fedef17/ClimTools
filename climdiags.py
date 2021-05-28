@@ -974,7 +974,7 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         lon = coords['lon']
         dates = coords['dates']
 
-        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, orogfile, filter = filter, remove_orog = remove_orog)
+        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
     elif type(ifile) is list:
         jli = []
         jspeed = []
@@ -991,7 +991,7 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
                 lon = coords['lon']
                 dates = coords['dates']
 
-                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, orogfile, filter = filter, remove_orog = remove_orog)
+                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
             jli.append(jlich)
             jspeed.append(jspeedch)
             dates_season.append(dates_seasonch)
