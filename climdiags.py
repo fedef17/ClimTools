@@ -964,14 +964,22 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 #############################################################################
 ################ other for mid-lat flow #####################################
 
-def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50, filter = 'butter', remove_orog = False, plot_filename = None):
+def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50, filter = 'butter', remove_orog = False, plot_filename = None, allareadict = None):
     """
     Wrapper for jli.
     """
 
     if type(ifile) is list and compute_in_chunks:
-        jli = []
-        jspeed = []
+        if allareadict is not None:
+            jli = dict()
+            jspeed = dict()
+            for area in allareadict.keys():
+                jli[area] = []
+                jspeed[area] = []
+        else:
+            jli = []
+            jspeed = []
+
         dates_season = []
         #if compute_in_chunks and len(ifile) > npchu:
         nchunks = int(np.ceil(len(ifile)/npchu))
@@ -985,14 +993,27 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
             lon = coords['lon']
             dates = coords['dates']
 
-            jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+            if allareadict is not None:
+                for area in allareadict.keys():
+                    jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, allareadict[area], season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
 
-            jli.append(jlich)
-            jspeed.append(jspeedch)
+                    jli[area].append(jlich)
+                    jspeed[area].append(jspeedch)
+            else:
+                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+
+                jli.append(jlich)
+                jspeed.append(jspeedch)
+
             dates_season.append(dates_seasonch)
 
-        jli = np.concatenate(jli)
-        jspeed = np.concatenate(jspeed)
+        if allareadict is not None:
+            for area in allareadict.keys():
+                jli[area] = np.concatenate(jli[area])
+                jspeed[area] = np.concatenate(jspeed[area])
+        else:
+            jli = np.concatenate(jli)
+            jspeed = np.concatenate(jspeed)
         dates_season = np.concatenate(dates_season)
     else:
         var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
@@ -1000,10 +1021,19 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         lon = coords['lon']
         dates = coords['dates']
 
-        jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+        if allareadict is not None:
+            jli = dict()
+            jspeed = dict()
+            for area in allareadict.keys():
+                jli[area], jspeed[area], dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+        else:
+            jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
 
     if plot_filename is not None:
-        plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
+        if allareadict is not None:
+            print('WARNING: jli plot for multiple areas not implemented')
+        else:
+            plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
 
 
     return jli, jspeed, dates_season
