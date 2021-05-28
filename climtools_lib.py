@@ -2852,8 +2852,8 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
         jump = dates_diff > pd.Timedelta('40 days')
         maxjump = int(np.round(np.max([ju.days for ju in dates_diff])/30.))
         len_seas = 12 - maxjump + 1
-        if season is not None:
-            if len_seas != len(season): raise ValueError('BUG in calculation of season length: {} vs {}'.format(len_seas, len(season)))
+        # if season is not None:
+        #     if len_seas != len(season): raise ValueError('BUG in calculation of season length: {} vs {}'.format(len_seas, len(season)))
         n_seas = len(var_season)//len_seas
         all_dates_seas = [dates_season[len_seas*i:len_seas*(i+1)] for i in range(n_seas)]
         all_var_seas = [var_season[len_seas*i:len_seas*(i+1), ...] for i in range(n_seas)]
@@ -6317,7 +6317,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None):
+def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, use_different_cbars = False, use_different_cmaps = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6371,23 +6371,47 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
     # Determining color levels
     if isinstance(cmap, str):
         cmappa = cm.get_cmap(cmap)
+    elif isinstance(cmap, list):
+        if isinstance(cmap[0], str):
+            cmappa = []
+            for cma in cmap:
+                cmappa.append(cm.get_cmap(cma))
+        else:
+            cmappa = cmap
     else:
         cmappa = cmap
 
     if cbar_range is None:
-        mi = np.nanpercentile(dataset, color_percentiles[0])
-        ma = np.nanpercentile(dataset, color_percentiles[1])
-        if plot_anomalies:
-            # making a symmetrical color axis
-            oko = max(abs(mi), abs(ma))
-            spi = 2*oko/(n_color_levels-1)
-            spi_ok = np.ceil(spi*100)/100
-            oko2 = spi_ok*(n_color_levels-1)/2
-            oko1 = -oko2
+        if use_different_cbars:
+            cbar_range = []
+            for da in dataset:
+                mi = np.nanpercentile(dataset, color_percentiles[0])
+                ma = np.nanpercentile(dataset, color_percentiles[1])
+                if plot_anomalies:
+                    # making a symmetrical color axis
+                    oko = max(abs(mi), abs(ma))
+                    spi = 2*oko/(n_color_levels-1)
+                    spi_ok = np.ceil(spi*100)/100
+                    oko2 = spi_ok*(n_color_levels-1)/2
+                    oko1 = -oko2
+                else:
+                    oko1 = mi
+                    oko2 = ma
+                cbar_range.append((oko1, oko2))
         else:
-            oko1 = mi
-            oko2 = ma
-        cbar_range = (oko1, oko2)
+            mi = np.nanpercentile(dataset, color_percentiles[0])
+            ma = np.nanpercentile(dataset, color_percentiles[1])
+            if plot_anomalies:
+                # making a symmetrical color axis
+                oko = max(abs(mi), abs(ma))
+                spi = 2*oko/(n_color_levels-1)
+                spi_ok = np.ceil(spi*100)/100
+                oko2 = spi_ok*(n_color_levels-1)/2
+                oko1 = -oko2
+            else:
+                oko1 = mi
+                oko2 = ma
+            cbar_range = (oko1, oko2)
 
     if clevels is None:
         clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
@@ -6435,7 +6459,17 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
             nens_rel = nens - numens_ok*i
             ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step)
+            if use_different_cmaps:
+                cma = cmappa[nens]
+            else:
+                cma = cmappa
+
+            if use_different_cbars:
+                cba = cbar_range[nens]
+            else:
+                cba = cbar_range
+
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cma, cba, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step)
 
             if number_subplots:
                 subtit = nens
@@ -6461,14 +6495,20 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
                         rect.set_linewidth(6.0)
                         ax.add_artist(rect)
 
-        #rect = [left, bottom, width, height]
-        cax = plt.axes([0.1, 0.08, 0.8, 0.03])
-        #cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+            if use_different_cbars or use_different_cmaps:
+                cb = plt.colorbar(map_plot, orientation = 'vertical')
+                cb.ax.tick_params(labelsize=12)
+                cb.set_label(cb_label, fontsize=14)
 
-        # cb = plt.colorbar(map_plot, ax = axs[0, :2], shrink=0.6, location='bottom')
-        cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
-        cb.ax.tick_params(labelsize=18)
-        cb.set_label(cb_label, fontsize=20)
+        if not (use_different_cbars or use_different_cmaps):
+            #rect = [left, bottom, width, height]
+            cax = plt.axes([0.1, 0.08, 0.8, 0.03])
+            #cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+
+            # cb = plt.colorbar(map_plot, ax = axs[0, :2], shrink=0.6, location='bottom')
+            cb = plt.colorbar(map_plot,cax=cax, orientation='horizontal')
+            cb.ax.tick_params(labelsize=18)
+            cb.set_label(cb_label, fontsize=20)
 
         plt.suptitle(title, fontsize=35, fontweight='bold')
 
