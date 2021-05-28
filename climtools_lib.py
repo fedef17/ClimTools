@@ -5575,6 +5575,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     xi,yi = np.meshgrid(lon,lat)
 
+    #print(cbar_range, clevels, cmappa)
     if plot_type == 'filled_contour':
         map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, transform = ccrs.PlateCarree(), extend = extend_opt, corner_mask = False, colors = colors, alpha = alphamap)
         nskip = (len(clevels)-1)//n_lines
@@ -6350,10 +6351,11 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
     """
 
     if lat is None or lon is None:
+        #print(type(dataset[0]))
         if isinstance(dataset[0], xr.DataArray):
             lat = dataset[0].lat.values
             lon = dataset[0].lon.values
-            data = [da.values for da in dataset]
+            dataset = [da.values for da in dataset]
         elif isinstance(dataset, xr.Dataset) or isinstance(dataset[0], xr.Dataset):
             raise ValueError('Not implemented! Function works on DataArrays not on Datasets. Extract the right variable first and concatenate them')
         else:
@@ -6383,38 +6385,21 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
 
     if cbar_range is None:
         if use_different_cbars:
+            if not isinstance(plot_anomalies, list):
+                plot_anomalies = len(dataset) * [plot_anomalies]
             cbar_range = []
-            for da in dataset:
-                mi = np.nanpercentile(dataset, color_percentiles[0])
-                ma = np.nanpercentile(dataset, color_percentiles[1])
-                if plot_anomalies:
-                    # making a symmetrical color axis
-                    oko = max(abs(mi), abs(ma))
-                    spi = 2*oko/(n_color_levels-1)
-                    spi_ok = np.ceil(spi*100)/100
-                    oko2 = spi_ok*(n_color_levels-1)/2
-                    oko1 = -oko2
-                else:
-                    oko1 = mi
-                    oko2 = ma
-                cbar_range.append((oko1, oko2))
+            for da, plan in zip(dataset, plot_anomalies):
+                cbar_range.append(get_cbar_range(da, plan, color_percentiles))
         else:
-            mi = np.nanpercentile(dataset, color_percentiles[0])
-            ma = np.nanpercentile(dataset, color_percentiles[1])
-            if plot_anomalies:
-                # making a symmetrical color axis
-                oko = max(abs(mi), abs(ma))
-                spi = 2*oko/(n_color_levels-1)
-                spi_ok = np.ceil(spi*100)/100
-                oko2 = spi_ok*(n_color_levels-1)/2
-                oko1 = -oko2
-            else:
-                oko1 = mi
-                oko2 = ma
-            cbar_range = (oko1, oko2)
+            cbar_range = get_cbar_range(dataset, plot_anomalies, color_percentiles)
 
     if clevels is None:
-        clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+        if use_different_cbars:
+            clevels = []
+            for cba in cbar_range:
+                clevels.append(np.linspace(cba[0], cba[1], n_color_levels))
+        else:
+            clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     # Begin plotting
     numens = len(dataset)
@@ -6466,10 +6451,13 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
 
             if use_different_cbars:
                 cba = cbar_range[nens]
+                clev = clevels[nens]
             else:
                 cba = cbar_range
+                clev = clevels
 
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cma, cba, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clevels, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step)
+            #print(cma, cba, type(dataset[nens]))
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cma, cba, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clev, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step)
 
             if number_subplots:
                 subtit = nens

@@ -1035,7 +1035,6 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
         else:
             plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
 
-
     return jli, jspeed, dates_season
 
 
