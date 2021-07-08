@@ -2369,6 +2369,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
                 start = np.argmax(start_cond)
             else:
                 start = 0
+            print('cutting: {} {} -> {}'.format(years[0], indxs[0], start))
 
             #print(start)
 
