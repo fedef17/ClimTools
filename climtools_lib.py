@@ -2348,8 +2348,12 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
 
     var_season = var[mask, ...]
     dates_season = dates[mask]
-    #dates_season_pdh = pd.to_datetime(dates_season)
 
+    # !!!! IMPORTANT FOR CUT !!!
+    years = years[mask]
+    months = months[mask]
+    days = days[mask]
+    #dates_season_pdh = pd.to_datetime(dates_season)
     #print(var_season.shape)
 
     if np.sum(mask) == 1:
@@ -2366,7 +2370,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
             #REMOVING THE FIRST MONTHS (for the first year) because there is no previuos december
             start_cond = (years == years[0]) & (months == indxs[0])
             if np.sum(start_cond):
-                start = np.argmax(start_cond)
+                start = np.argmax(start_cond) # argmax takes the first occurrence here
             else:
                 start = 0
             print('cutting: {} {} -> {}'.format(years[0], indxs[0], start))
