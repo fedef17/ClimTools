@@ -2810,7 +2810,7 @@ def find_point(data, lat, lon, lat_ok, lon_ok):
     return data[..., indla, indlo]
 
 
-def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_average = False, verbose = False):
+def seasonal_set(var, dates = None, season = None, dates_range = None, cut = True, seasonal_average = False, verbose = False):
     """
     Cuts var and dates, creating a list of variables relative to each season and a list of dates.
     Works both on monthly and daily datasets.
@@ -2818,6 +2818,20 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
     < seasonal_average > : if True, outputs a single average field for each season.
     """
+    if season is None:
+        raise ValueError('season not specified')
+
+    to_xr = False
+    if isinstance(var, xr.DataArray):
+        to_xr = True
+        dims = list(var.dims)[1:]
+        coords = [(co, var[co]) for co in var.dims[1:]]
+
+        dates = var['time'].values
+        var = var.values
+
+    if dates is None:
+        raise ValueError('dates not specified')
 
     if dates_range is not None:
         var, dates = sel_time_range(var, dates, dates_range)
@@ -2879,7 +2893,16 @@ def seasonal_set(var, dates, season, dates_range = None, cut = True, seasonal_av
     #print(np.shape(all_vars))
 
     if seasonal_average:
-        return np.stack([np.mean(va, axis = 0) for va in all_vars]), [dat[0] for dat in all_dates]
+        if to_xr:
+            nuvar = np.stack([np.mean(va, axis = 0) for va in all_vars])
+            allye = np.array([da[0].year for da in all_dates])
+            dims = tuple(['year'] + dims)
+            coords = dict([('year', allye)] + coords)
+
+            pio = xr.DataArray(nuvar, dims = dims, coords = coords, name = 'seamean')
+            return pio
+        else:
+            return np.stack([np.mean(va, axis = 0) for va in all_vars]), [dat[0] for dat in all_dates]
 
     return all_vars, all_dates
 
@@ -3089,7 +3112,7 @@ def extract_common_dates(dates1, dates2, arr1, arr2, ignore_HHMM = True):
     return arr1_ok, arr2_ok, dates_common
 
 
-def running_mean(var, wnd, remove_nans = False):
+def running_mean(var, wnd, remove_nans = False, cyclic = False):
     """
     Performs a running mean (if multidim, the mean is done on the first axis).
 
@@ -3100,6 +3123,12 @@ def running_mean(var, wnd, remove_nans = False):
         rollpi_temp = tempser.rolling(wnd, center = True).mean()
         if remove_nans: rollpi_temp = rollpi_temp[~np.isnan(rollpi_temp)]
         rollpi_temp = np.array(rollpi_temp)
+        if cyclic:
+            rollcy = pd.Series(np.concatenate([var, var])).rolling(wnd, center = True).mean()
+            rollcy = np.array(rollcy)
+            rollpi_temp = rollcy[:len(var)]
+            rollpi_temp[:wnd] = rollcy[len(var):len(var)+wnd]
+            rollpi_temp[-wnd:] = rollcy[len(var)-wnd:len(var)]
     else:
         rollpi_temp = []
         for i in range(len(var)):
