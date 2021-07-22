@@ -2083,14 +2083,32 @@ def sel_area_translate(area):
         printarea='North-Atlantic'
         latN = 75
         latS = 15.0
-        lonW =-60.0
+        lonW = -60.0
         lonE = 0.0
+    elif area=='NPAC':
+        printarea='North-Pacific'
+        latN = 75
+        latS = 15.0
+        lonW = 135.0
+        lonE = 235.0
+    elif area=='NEPAC':
+        printarea='Eastern North-Pacific'
+        latN = 75
+        latS = 15.0
+        lonW = 180.0
+        lonE = 235.0
     elif area=='PNA':
         printarea='Pacific North American'
         latN = 87.5
         latS = 30.0
         lonW = 140.0
         lonE = 280.0
+    elif area=='SH':
+        printarea='Southern Hemisphere'
+        latN = 0.0
+        latS = -90.0
+        lonW = -180.
+        lonE = 180.
     elif area=='NH':
         printarea='Northern Hemisphere'
         latN = 90.0
