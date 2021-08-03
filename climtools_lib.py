@@ -2933,7 +2933,7 @@ def seasonal_set(var, dates = None, season = None, dates_range = None, cut = Tru
             dims = tuple(['year'] + dims)
             coords = dict([('year', allye)] + coords)
 
-            pio = xr.DataArray(nuvar, dims = dims, coords = coords, name = statname)
+            pio = xr.DataArray(nuvar, dims = dims, coords = coords, name = statnam)
             return pio
         else:
             return nuvar, [dat[0] for dat in all_dates]
