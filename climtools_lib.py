@@ -2540,7 +2540,7 @@ def remove_global_polytrend(lat, lon, var, dates, season, deg = 3, area = 'globa
     Returns var detrended and selected for the season (not for area).
     """
 
-    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
+    var_set, dates_set = seasonal_set(var, dates, season)
     try:
         var_set_avg = np.nanmean(var_set, axis = 1)
     except Exception as czz:
@@ -2582,7 +2582,7 @@ def remove_local_lineartrend(lat, lon, var, dates, season, print_trend = True):
 
     trendmat, errtrendmat, cmat, errcmat = local_lineartrend_climate(lat, lon, var, dates, season, print_trend = print_trend)
 
-    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = False)
+    var_set, dates_set = seasonal_set(var, dates, season)
     try:
         var_set_avg = np.nanmean(var_set, axis = 1)
     except Exception as czz:
@@ -2618,7 +2618,7 @@ def local_lineartrend_climate(lat, lon, var, dates, season, print_trend = True, 
     if remove_global_trend:
         var, coeffs, var_regional, dates = remove_global_polytrend(lat, lon, var, dates, season, deg = global_deg, area = global_area)
 
-    var_set, dates_set = seasonal_set(var, dates, season, seasonal_average = True)
+    var_set, dates_set = seasonal_set(var, dates, season, seasonal_stat = 'mean')
     years = np.array([da.year for da in dates_set])
 
     trendmat = np.empty_like(var_set[0])
@@ -2828,13 +2828,13 @@ def find_point(data, lat, lon, lat_ok, lon_ok):
     return data[..., indla, indlo]
 
 
-def seasonal_set(var, dates = None, season = None, dates_range = None, cut = True, seasonal_average = False, verbose = False):
+def seasonal_set(var, dates = None, season = None, dates_range = None, cut = True, seasonal_stat = None, verbose = False):
     """
     Cuts var and dates, creating a list of variables relative to each season and a list of dates.
     Works both on monthly and daily datasets.
 
     < dates_range > : list, tuple. first and last dates to be considered in datetime format. If years, use range_years() function.
-    < seasonal_average > : if True, outputs a single average field for each season.
+    < seasonal_stat > : computes one of the following stats: mean, sum, percXX, max, min. If perc, write the requested percentile, e.g. perc10, perc90, ..
     """
     if season is None:
         raise ValueError('season not specified')
@@ -2910,17 +2910,33 @@ def seasonal_set(var, dates = None, season = None, dates_range = None, cut = Tru
 
     #print(np.shape(all_vars))
 
-    if seasonal_average:
-        if to_xr:
+    if seasonal_stat is not None:
+        if seasonal_stat == 'average' or seasonal_stat == 'mean':
             nuvar = np.stack([np.mean(va, axis = 0) for va in all_vars])
+            statnam = 'sea_mean'
+        elif seasonal_stat == 'sum':
+            nuvar = np.stack([np.sum(va, axis = 0) for va in all_vars])
+            statnam = 'sea_sum'
+        elif 'perc' in seasonal_stat:
+            percQ = int(seasonal_stat[-2:])
+            nuvar = np.stack([np.percentile(va, percQ, axis = 0) for va in all_vars])
+            statnam = 'sea_{}'.format(seasonal_stat)
+        elif seasonal_stat == 'max':
+            nuvar = np.stack([np.max(va, axis = 0) for va in all_vars])
+            statnam = 'sea_max'
+        elif seasonal_stat == 'min':
+            nuvar = np.stack([np.min(va, axis = 0) for va in all_vars])
+            statnam = 'sea_min'
+
+        if to_xr:
             allye = np.array([da[0].year for da in all_dates])
             dims = tuple(['year'] + dims)
             coords = dict([('year', allye)] + coords)
 
-            pio = xr.DataArray(nuvar, dims = dims, coords = coords, name = 'seamean')
+            pio = xr.DataArray(nuvar, dims = dims, coords = coords, name = statname)
             return pio
         else:
-            return np.stack([np.mean(va, axis = 0) for va in all_vars]), [dat[0] for dat in all_dates]
+            return nuvar, [dat[0] for dat in all_dates]
 
     return all_vars, all_dates
 
