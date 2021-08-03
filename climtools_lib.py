@@ -6081,6 +6081,48 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
     return
 
 
+def violinplot_on_ax(ax, alldists, names = None, colors = None, edge_colors = None, positions = None, wi = 0.4, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsdist = None, obs_color = 'black', obs_name = 'ERA', plot_mean = False, plot_minmax = False):
+    """
+    As above but produces a violinplot.
+    """
+
+    if positions is None:
+        positions = list(np.arange(len(alldists)-1)*0.7)
+        if obsdist is not None:
+            positions.append(positions[-1]+0.3+0.7)
+
+    if colors is None:
+        colors = ctl.color_set(len(alldists))
+
+    if edge_colors is None:
+        edge_colors = colors
+
+    if obsdist is not None:
+        alldists = list(alldists) + [obsdist]
+        colors += obs_color
+        edge_colors += obs_color
+
+    parts = ax.violinplot(alldists, positions = positions, widths = wi, showmeans = plot_mean, showextrema = plot_minmax, showmedians = True)#, quantiles=[0.25, 0.75]
+
+    for pc, col, edcol in zip(parts['bodies'], colors, edge_colors):
+        pc.set_facecolor(col)
+        pc.set_edgecolor(edcol)
+        pc.set_alpha(0.5)
+
+    if names is not None:
+        ax.set_xticklabels(names)
+
+    # for pos, ssp in zip(positions[1:], allsims[1:]):
+    #     if ttests[('freq', area, reg, ssp)].pvalue < 0.05:
+    #         ax.scatter(pos, -10, color = 'black', marker = '*', s = 30)
+
+    if obsdist is not None:
+        ax.axvline(np.mean([positions[-1], positions[-2]]), color = 'lightslategray', linewidth = 0.2, linestyle = '--')
+    # xli = ax.get_xlim()
+
+    return ax
+
+
 def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1):
     """
     Creates a figure with a cartopy ax for plotting maps.
