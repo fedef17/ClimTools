@@ -5934,6 +5934,47 @@ def positions(names, w = 0.7, w2 = 0.4):
     return positions, posticks
 
 
+def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True):
+    """
+    Plots on a gregory plot and calculates ERF (using first nfirst points) and ECS (using last nlast points).
+    """
+
+    toa5 = []
+    tas5 = []
+    for i in range(0, len(tas), 5):
+        if len(tas) - i < 3: continue
+        toa5.append(np.mean(toa[i:i+5]))
+        tas5.append(np.mean(tas[i:i+5]))
+
+    toa5 = np.array(toa5)
+    tas5 = np.array(tas5)
+
+    # toa5 = ctl.running_mean(toa, 5, remove_nans = True)
+    # tas5 = ctl.running_mean(tas, 5, remove_nans = True)
+
+    #ax.scatter(tas5, toa5, color = col, marker = mar, label = exp)
+    ax.scatter(tas5[1:-1], toa5[1:-1], color = color, marker = marker, label = label)
+    ax.scatter(tas5[0], toa5[0], color = color, marker = '>')
+    ax.scatter(tas5[-1], toa5[-1], color = color, marker = '<')
+    ax.plot(tas5, toa5, color = color, linewidth = 0.5)
+
+    if calc_ERF:
+        ax.scatter(tas[:nfirst], toa[:nfirst], s = 2, color = color)
+        m, c, err_m, err_c = ctl.linear_regre_witherr(tas[:nfirst], toa[:nfirst])
+        xino = np.array([0]+list(tas[:nfirst]))
+        ax.plot(xino, c+m*xino, color = color, linestyle = '--', linewidth = 0.5)
+        print('ERF: {} -> {:6.3f} +/- {:6.3f} W/m2'.format(label, c/2., err_c/2.))
+
+    if calc_ECS:
+        ax.scatter(tas[-nlast:], toa[-nlast:], s = 2, color = color)
+        m, c, err_m, err_c = ctl.linear_regre_witherr(tas[-nlast:], toa[-nlast:])
+        xino = np.array(list(tas[-nlast:])+[-c/m])
+        ax.plot(xino, c+m*xino, color = color, linestyle = '--', linewidth = 0.5)
+        print('ECS: {} -> {:6.3f} +/- {:6.3f} K'.format(label, -0.5*c/m, 0.5*(np.abs(err_c/c)+np.abs(err_m/m))*(-c/m)))
+
+    return
+
+
 def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers, ens_names, ens_colors, wi = 0.6, plot_mean = True):
     i = 0
 
