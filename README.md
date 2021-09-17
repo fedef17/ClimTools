@@ -44,7 +44,16 @@ Each time you want to use ClimTools, remember to activate the environment first:
 conda activate ctl4
 ```
 
-#### 2. Compile the Fortran routines
+#### 2. Add permanently the path to ClimTools to your PYTHONPATH
+Open a terminal inside the ClimTools folder and activate the ctl4 environment (*conda activate ctl4*).
+
+Then do:
+```
+conda-develop .
+```
+This commands adds the path to the ClimTools folder to the *ctl4* environment system paths.
+
+#### 3 (Optional). Compile the Fortran routines
 When the conda environment is correctly installed, you can proceed with the following.
 Some functions inside climtools_lib.py require the use of Fortran routines which can be found inside the cluster_fortran/ folder. To make them work, open a terminal from your ClimTools folder and do:
 ```
@@ -56,14 +65,8 @@ chmod +x compile_py3.sh
 In alternative, you might just open the file compile_py3.sh and copy and run each command in shell.
 This operation will create two binary libraries *ctool.so* and *ctp.so* in your ClimTools folder.
 
-#### 3. Add permanently the path to ClimTools to your PYTHONPATH
-Open a terminal inside the ClimTools folder and activate the ctl4 environment (*conda activate ctl4*).
+These libraries only are needed by the function ctl.clusters_sig() and by ctl.Kmeans_clustering() when set to algorithm 'molteni' (which is not the default). If you are not using this functions, you might avoid compiling the fortran code.
 
-Then do:
-```
-conda-develop .
-```
-This commands adds the path to the ClimTools folder to the *ctl4* environment system paths.
 
 ### Usage
 

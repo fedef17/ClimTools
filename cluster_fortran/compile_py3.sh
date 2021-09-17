@@ -1,5 +1,5 @@
 #!/bin/bash
-conda activate ctl3
+conda activate ctl4
 rm ctool.*.so
 rm ctp.*.so
 f2py3 --fcompiler=gfortran --f90flags="-fopenmp" -lgomp -c -m ctp cluster_toolkit_parallel.f90 only: clus_sig_p clus_sig_p_ncl

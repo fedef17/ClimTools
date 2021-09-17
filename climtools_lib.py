@@ -5585,7 +5585,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '..'], hatch_levels = [0.2, 0.8], colors = None, line_color = 'k', clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots field contours on the axis of a figure.
 
@@ -5649,13 +5649,15 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
         if draw_contour_lines:
-            map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+            map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = line_color, transform = ccrs.PlateCarree(), linewidths = lw_contour)
     elif plot_type == 'pcolormesh':
         map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree(), vmin = clevels[0], vmax = clevels[-1])
     elif plot_type == 'contour':
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
-        map_plot = ax.contour(xi, yi, data, clevels[::nskip], colors = 'k', transform = ccrs.PlateCarree(), linewidths = lw_contour)
+        map_plot = ax.contour(xi, yi, data, clevels[::nskip], colors = line_color, transform = ccrs.PlateCarree(), linewidths = lw_contour)
+    elif plot_type == 'binary_contour': # for data that assume only 0 or 1
+        map_plot = ax.contour(xi, yi, data, [0.5], colors = line_color, transform = ccrs.PlateCarree(), linewidths = lw_contour)
     else:
         raise ValueError('plot_type <{}> not recognised. Only available: filled_contour, pcolormesh, contour'.format(plot_type))
 
@@ -6138,7 +6140,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     return fig, ax
 
 
-def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both'):
     """
     Plots a single map to a figure.
 
@@ -6195,23 +6197,24 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
 
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, extend_opt = extend_opt)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, extend_opt = extend_opt, line_color = line_color)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
 
-    cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
-    cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
-    cb.ax.tick_params(labelsize=14)
-    cb.set_label(cb_label, fontsize=16)
+    if plot_type not in ['contour', 'binary_contour']:
+        cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+        cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
+        cb.ax.tick_params(labelsize=14)
+        cb.set_label(cb_label, fontsize=16)
 
-    top    = 0.88  # the top of the subplots
-    bottom = 0.20    # the bottom of the subplots
-    left   = 0.02    # the left side
-    right  = 0.98  # the right side
-    hspace = 0.20   # height reserved for white space
-    wspace = 0.05    # width reserved for blank space
-    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+        top    = 0.88  # the top of the subplots
+        bottom = 0.20    # the bottom of the subplots
+        left   = 0.02    # the left side
+        right  = 0.98  # the right side
+        hspace = 0.20   # height reserved for white space
+        wspace = 0.05    # width reserved for blank space
+        plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 
     # save the figure or show it
     if filename is not None:
