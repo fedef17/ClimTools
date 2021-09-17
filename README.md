@@ -54,8 +54,10 @@ conda-develop .
 This commands adds the path to the ClimTools folder to the *ctl4* environment system paths.
 
 #### 3 (Optional). Compile the Fortran routines
-When the conda environment is correctly installed, you can proceed with the following.
-Some functions inside climtools_lib.py require the use of Fortran routines which can be found inside the cluster_fortran/ folder. To make them work, open a terminal from your ClimTools folder and do:
+
+NOTE: These libraries only are needed by the function ctl.clusters_sig() and by ctl.Kmeans_clustering() when set to algorithm 'molteni' (which is not the default). If you are not using these features, you might skip this step.
+
+When the conda environment is correctly installed, you can proceed with the following. Some functions inside climtools_lib.py require the use of Fortran routines which can be found inside the cluster_fortran/ folder. To make them work, open a terminal from your ClimTools folder and do:
 ```
 cd cluster_fortran
 chmod +x compile_py3.sh
@@ -64,8 +66,6 @@ chmod +x compile_py3.sh
 
 In alternative, you might just open the file compile_py3.sh and copy and run each command in shell.
 This operation will create two binary libraries *ctool.so* and *ctp.so* in your ClimTools folder.
-
-These libraries only are needed by the function ctl.clusters_sig() and by ctl.Kmeans_clustering() when set to algorithm 'molteni' (which is not the default). If you are not using this functions, you might avoid compiling the fortran code.
 
 
 ### Usage
