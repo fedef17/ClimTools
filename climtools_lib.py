@@ -6188,7 +6188,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     return fig, ax
 
 
-def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['///', '', ''], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both', color_norm = None):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['///', '', ''], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, extend_opt = 'both', color_norm = None, clevels = None):
     """
     Plots a single map to a figure.
 
@@ -6243,9 +6243,12 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
             oko2 = ma
         cbar_range = (oko1, oko2)
 
-    clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    if clevels is None:
+        clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    else:
+        print('clevels specified directly, ignoring info on cbar_range and color_percentiles')
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, extend_opt = extend_opt, line_color = line_color, color_norm = color_norm)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, extend_opt = extend_opt, line_color = line_color, color_norm = color_norm, clevels = clevels)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
@@ -6561,6 +6564,8 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
                 clevels.append(np.linspace(cba[0], cba[1], n_color_levels))
         else:
             clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
+    else:
+        print('clevels specified directly, ignoring info on cbar_range and color_percentiles')
 
     # Begin plotting
     numens = len(dataset)
