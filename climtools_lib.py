@@ -5865,7 +5865,7 @@ def def_projection(visualization, central_lat_lon, bounding_lat = None):
         clat = 70.
 
     if visualization == 'standard' or visualization == 'Standard':
-        proj = ccrs.PlateCarree()
+        proj = ccrs.PlateCarree(central_longitude = clon)
     elif visualization == 'polar' or visualization == 'Npolar' or visualization == 'npolar':
         proj = ccrs.Orthographic(central_longitude = clon, central_latitude = 90)
     elif visualization == 'Spolar' or visualization == 'spolar':
