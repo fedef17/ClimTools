@@ -2858,8 +2858,8 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     """
     from matplotlib import colors
 
-    colo = '#d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4'
-    #colo = '#a50026 #d73027 #f46d43 #fdae61 #fee090 #e0f3f8 #abd9e9 #74add1 #4575b4 #313695'
+    #colo = '#d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4'
+    colo = '#a50026 #d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4 #313695'
     colo = colo.split()
     colo = colo[::-1]
     # sns.palplot(colo)
@@ -2876,7 +2876,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
         clatlo = (70, -20)
 
     if cbar_range is None:
-        cbar_range = (-135., 135.)
+        cbar_range = (-110., 110.)#(-135., 135.)
     clevels = np.arange(cbar_range[0], cbar_range[1]+1, (cbar_range[1]-cbar_range[0])/9.)
 
     plt.rcParams['lines.dashed_pattern'] = [5, 5]
@@ -2884,7 +2884,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 10, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 11, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
 
     return figs
 

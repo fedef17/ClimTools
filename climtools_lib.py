@@ -2309,7 +2309,7 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
         lon_new = lon[lonidx]
     else: # it does :/
         lonidx1 = (lon >= lonW) & (lon < lon_border)
-        lonidx2 = (lon > lon_border - 360.) & (lon <= lonE)
+        lonidx2 = (lon >= lon_border - 360.) & (lon <= lonE)
 
         var_area_1 = var[..., latidx, :][..., lonidx1] # the double slicing is necessary here
         var_area_2 = var[..., latidx, :][..., lonidx2] # the double slicing is necessary here
@@ -5617,7 +5617,9 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         print(clevels)
         print(np.min(data), np.max(data))
 
-    data, lat, lon = check_increasing_latlon(data, lat, lon)
+    # print(lon)
+    # data, lat, lon = check_increasing_latlon(data, lat, lon)
+    # print(lon)
 
     ax.set_global()
     ax.coastlines(linewidth = 2)
@@ -5630,6 +5632,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     cyclic = False
 
     grid_step = np.unique(np.diff(lon))
+    print(grid_step)
     if len(grid_step) == 1 and (lon[0]-lon[-1]) % 360 == grid_step[0]: # lon grid equally spaced and global longitudes
         if verbose: print('Adding cyclic point\n')
         cyclic = True
@@ -5658,7 +5661,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         if draw_contour_lines:
             map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors = line_color, transform = ccrs.PlateCarree(), linewidths = lw_contour)
     elif plot_type == 'pcolormesh':
-        map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree(), vmin = clevels[0], vmax = clevels[-1], norm = color_norm)
+        map_plot = ax.pcolormesh(xi, yi, data, cmap = cmappa, transform = ccrs.PlateCarree(), norm = color_norm, vmin = clevels[0], vmax = clevels[-1])
     elif plot_type == 'contour':
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0: nskip = 1
