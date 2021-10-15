@@ -5666,7 +5666,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     cyclic = False
 
     grid_step = np.unique(np.diff(lon))
-    print(grid_step)
+    #print(grid_step)
     if len(grid_step) == 1 and (lon[0]-lon[-1]) % 360 == grid_step[0]: # lon grid equally spaced and global longitudes
         if verbose: print('Adding cyclic point\n')
         cyclic = True
