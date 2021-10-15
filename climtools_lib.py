@@ -997,6 +997,27 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
         return all_vars
 
 
+def regrid_dataset(dataset, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear'):
+    """
+    Regrids xarray dataset as a reference dataset (regrid_to_reference) or with custom degrees spacing.
+    """
+    if regrid_to_reference is not None:
+        pass
+        # print('Loading reference cube for regridding..')
+        # regrid_to_reference = xr.load_dataset(regrid_to_reference_file)
+    elif regrid_to_deg is not None:
+        regrid_to_reference = xr.Dataset({'lat': (['lat'], np.arange(-90, 90.1, regrid_to_deg)), 'lon': (['lon'], np.arange(0, 360, regrid_to_deg)), })
+
+    print('Regridding...')
+    uno = datetime.now()
+    regridder = xe.Regridder(dataset, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+    pino = regridder(dataset)
+    due = datetime.now()
+    print('Regridding completed in {}'.format(due-uno))
+
+    return pino
+
+
 def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_deg = None, regrid_to_reference_file = None, regrid_scheme = 'bilinear', convert_units_to = None, verbose = True, keep_only_maxdim_vars = True, year_range = None):
     """
     Read a netCDF file using xarray and optionally xesmf for regridding. Usual output.
@@ -3222,6 +3243,19 @@ def lowpass_lanczos(var, wnd, nan_extremes = True):
 
 
 def butter_filter(data, n_days, filtype = 'lowpass', axis = 0, order = 5):
+    """
+    N-dimensional butterworth filter
+    """
+    low_var = apply_recursive_1D(data, butter_filter_1D, n_days, filtype = filtype, axis = axis, order = order)
+
+    return low_var
+
+
+def lowpass_butter(*args, **kwargs):
+    return butter_filter(*args, **kwargs)
+
+
+def butter_filter_1D(data, n_days, filtype = 'lowpass', axis = 0, order = 5):
     """
     Butterworth filter.
     Type of filter defaults to lowpass. Other options are 'highpass','bandpass', 'bandstop'. If band, n_days is expected as a tuple/list/array (min, max).
