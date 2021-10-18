@@ -7469,6 +7469,17 @@ def custom_alphagradient_cmap(color):
     return cmap
 
 
+def cmap_temp():
+    ### New colormap for temperature
+    col = cm.RdBu_r(np.linspace(0.,1,256))
+    col2 = cm.PuRd_r(np.linspace(0.25,0.75,128))
+    col3 = cm.bone_r(np.linspace(0.25,0.75,128))
+    colors = np.concatenate([col3, col, col2])
+    heatmap = mpl.colors.LinearSegmentedColormap.from_list('heat_strong', colors)
+
+    return heatmap
+
+
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):
 def plot_multimodel_regime_pdfs(results, model_names = None, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], plot_centroids = True, figsize = (16,12), reference = None, eof_axis_lim = None, nolegend = False, check_for_eofs = False, fix_subplots_shape = None, fac = 1.5):
     """
