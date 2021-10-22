@@ -26,7 +26,7 @@ import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
-from matplotlib.animation import ImageMagickFileWriter
+from matplotlib.animation import ImageMagickFileWriter, PillowWriter
 import seaborn as sns
 
 from shapely.geometry.polygon import LinearRing
@@ -6210,7 +6210,7 @@ def violinplot_on_ax(ax, alldists, names = None, colors = None, edge_colors = No
     return ax
 
 
-def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1):
+def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None):
     """
     Creates a figure with a cartopy ax for plotting maps.
     """
@@ -6221,6 +6221,10 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
 
     ax.set_global()
     ax.coastlines(linewidth = coast_lw)
+
+    if isinstance(proj, ccrs.PlateCarree):
+        if plot_margins is not None:
+            map_set_extent(ax, proj, bnd_box = plot_margins)
 
     return fig, ax
 
@@ -6886,22 +6890,22 @@ def plot_animation_map(maps, lat, lon, labels = None, fps_anim = 5, title = None
     cb.ax.tick_params(labelsize=14)
     cb.set_label(cb_label, fontsize=16)
 
-    if filename is not None:
-        metadata = dict(title=title, artist='climtools_lib')
-        writer = ImageMagickFileWriter(fps = fps_anim, metadata = metadata)#, frame_size = (1200, 900))
-        with writer.saving(fig, filename, 100):
-            for i, lab in enumerate(labels):
-                print(lab)
-                update_lines(i)
-                writer.grab_frame()
+    # if filename is not None:
+    #     metadata = dict(title=title, artist='climtools_lib')
+    #     writer = ImageMagickFileWriter(fps = fps_anim, metadata = metadata)#, frame_size = (1200, 900))
+    #     with writer.saving(fig, filename, 100):
+    #         for i, lab in enumerate(labels):
+    #             print(lab)
+    #             update_lines(i)
+    #             writer.grab_frame()
+    #
+    #     return writer
+    # else:
+    line_ani = animation.FuncAnimation(fig, update_lines, frames = len(maps), interval=100, blit=False)
+    writer = PillowWriter(fps = fps_anim)
+    line_ani.save(filename, writer = writer)
 
-        return writer
-    else:
-        print('vai?')
-        print(len(maps))
-        line_ani = animation.FuncAnimation(fig, update_lines, len(maps), interval = 100./fps_anim, blit=False)
-
-        return line_ani
+    return line_ani
 
 
 def Taylor_plot_EnsClus(models, observation, filename, title = None, label_bias_axis = None, label_ERMS_axis = None, show_numbers = True, only_numbers = False, colors_all = None, cluster_labels = None, cluster_colors = None, repr_cluster = None, verbose = True):
