@@ -5672,7 +5672,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         cyclic = True
         #lon = np.append(lon, 360)
         #data = np.c_[data,data[:,0]]
-        lon_o = lon
+        lon_o = lon.copy()
         data, lon = cutil.add_cyclic_point(data, coord = lon)
 
         if add_contour_field is not None:
@@ -5684,6 +5684,12 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
         if add_hatching is not None:
             add_hatching, lon = cutil.add_cyclic_point(add_hatching, coord = lon_o)
+    elif len(grid_step) > 1:
+        ### either the longitude is split or it has a discontinuity at zero which cartopy can't handle..
+        lon_o = lon.copy()
+        pi = np.where(np.diff(lon) < 0)[0][0]
+        lon_o[pi + 1 :] += 360.
+        lon = lon_o
 
     xi,yi = np.meshgrid(lon,lat)
 
