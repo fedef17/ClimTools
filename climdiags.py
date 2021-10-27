@@ -2852,20 +2852,21 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     return
 
 
-def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour', reg_freq = None):
+def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour', reg_freq = None, draw_contour_lines = True, cmappa = None, n_color_levels = 11):
     """
     Nice regime plot.
     """
     from matplotlib import colors
 
     #colo = '#d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4'
-    colo = '#a50026 #d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4 #313695'
-    colo = colo.split()
-    colo = colo[::-1]
-    # sns.palplot(colo)
-    cmappa = colors.ListedColormap(colo)
-    cmappa.set_over('#800026') #662506
-    cmappa.set_under('#023858') #542788
+    if cmappa is None:
+        colo = '#a50026 #d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4 #313695'
+        colo = colo.split()
+        colo = colo[::-1]
+        # sns.palplot(colo)
+        cmappa = colors.ListedColormap(colo)
+        cmappa.set_over('#800026') #662506
+        cmappa.set_under('#023858') #542788
 
     if names is None:
         names = ['Clus {}'.format(i) for i in range(len(patts))]
@@ -2877,14 +2878,18 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
 
     if cbar_range is None:
         cbar_range = (-110., 110.)#(-135., 135.)
-    clevels = np.arange(cbar_range[0], cbar_range[1]+1, (cbar_range[1]-cbar_range[0])/9.)
+
+    if n_color_levels == 11:
+        clevels = np.arange(cbar_range[0], cbar_range[1]+1, (cbar_range[1]-cbar_range[0])/9.)
+    else:
+        clevels = None
 
     plt.rcParams['lines.dashed_pattern'] = [5, 5]
 
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = 11, draw_contour_lines = True, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
 
     return figs
 

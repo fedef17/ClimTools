@@ -6529,7 +6529,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['///', '', ''], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None):
+def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['///', '', ''], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None, use_different_grids = False):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6571,6 +6571,10 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
             raise ValueError('Not implemented! Function works on DataArrays not on Datasets. Extract the right variable first and concatenate them')
         else:
             raise ValueError('lat/lon not specified')
+
+    if use_different_grids:
+        if len(dataset) != len(lat) or len(dataset) != len(lon):
+            raise ValueError('use_different_grids set, but lat/lon are not {}-elements lists'.format(len(dataset)))
 
     proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
@@ -6669,8 +6673,15 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
                 cba = cbar_range
                 clev = clevels
 
+            if use_different_grids:
+                lat_ok = lat[nens]
+                lon_ok = lon[nens]
+            else:
+                lat_ok = lat
+                lon_ok = lon
+
             #print(cma, cba, type(dataset[nens]))
-            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat, lon, proj, cma, cba, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clev, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, color_norm = color_norm)
+            map_plot = plot_mapc_on_ax(ax, dataset[nens], lat_ok, lon_ok, proj, cma, cba, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, clevels = clev, lw_contour = lw_contour, add_contour_field = add_contour_field[nens], add_vector_field = add_vector_field[nens], quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching[nens], hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, color_norm = color_norm)
 
             if number_subplots:
                 subtit = nens
