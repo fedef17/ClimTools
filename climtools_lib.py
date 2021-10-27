@@ -5828,8 +5828,15 @@ def plot_only_somelevels(ax, map_plot, colors, lev_to_plot):
 
 
 def get_cbar_range(data, symmetrical = False, percentiles = (0,100), n_color_levels = None):
-    mi = np.nanpercentile(data, percentiles[0])
-    ma = np.nanpercentile(data, percentiles[1])
+    try:
+        mi = np.nanpercentile(data, percentiles[0])
+        ma = np.nanpercentile(data, percentiles[1])
+    except:
+        # data is a list of unequal elements
+        daflat = np.concatenate([cos.flatten() for cos in data])
+        mi = np.nanpercentile(daflat, percentiles[0])
+        ma = np.nanpercentile(daflat, percentiles[1])
+
     if symmetrical:
         oko = max(abs(mi), abs(ma))
         if n_color_levels is not None:
