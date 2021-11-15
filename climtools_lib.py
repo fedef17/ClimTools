@@ -6094,7 +6094,7 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
     return
 
 
-def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True, plot_minmax = False):
+def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True, plot_minmax = False, plot_all = True):
     """
     Plots a boxplot. allpercs is a dictionary with keys: mean, p10, p25, p50, p75, p90
 
@@ -6109,34 +6109,46 @@ def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, version
     if edge_colors is None: edge_colors = colors
 
     if positions is None:
-        positions = list(np.arange(len(model_names))*0.7)
-        if obsperc is not None:
-            positions.append(positions[-1]+0.35+0.7)
-        if plot_ensmeans:
+        if plot_all:
+            positions = list(np.arange(len(model_names))*0.7)
+            if obsperc is not None:
+                positions.append(positions[-1]+0.35+0.7)
+            if plot_ensmeans:
+                for cos in ens_names:
+                    positions.append(positions[-1]+0.7)
+        else:
+            positions = [0.]
             for cos in ens_names:
                 positions.append(positions[-1]+0.7)
 
-    for iii, (pos, mod, col, vv, mcol) in enumerate(zip(positions, model_names, colors, versions, edge_colors)):
-        boxlist = []
-        box = {'med': allpercs['p50'][iii], 'q1': allpercs['p25'][iii], 'q3': allpercs['p75'][iii], 'whislo': allpercs['p10'][iii], 'whishi': allpercs['p90'][iii], 'showfliers' : False}
-        boxlist.append(box)
+    if plot_all:
+        for iii, (pos, mod, col, vv, mcol) in enumerate(zip(positions, model_names, colors, versions, edge_colors)):
+            print(mod)
+            boxlist = []
+            box = {'med': allpercs['p50'][iii], 'q1': allpercs['p25'][iii], 'q3': allpercs['p75'][iii], 'whislo': allpercs['p10'][iii], 'whishi': allpercs['p90'][iii], 'showfliers' : False}
+            boxlist.append(box)
 
-        boxprops = {'edgecolor' : mcol, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
-        whiskerprops = {'color': mcol, 'linewidth': 2}
-        medianprops = {'color': mcol, 'linewidth': 4}
-        capprops = {'color': mcol, 'linewidth': 2}
-        bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
+            boxprops = {'edgecolor' : mcol, 'linewidth': 2, 'facecolor': col, 'alpha': 0.6}
+            whiskerprops = {'color': mcol, 'linewidth': 2}
+            medianprops = {'color': mcol, 'linewidth': 4}
+            capprops = {'color': mcol, 'linewidth': 2}
+            bxp_kwargs = {'boxprops': boxprops, 'whiskerprops': whiskerprops, 'capprops': capprops, 'medianprops': medianprops, 'patch_artist': True, 'showfliers': False}
 
-        boxplo = ax.bxp(boxlist, [pos], [wi], **bxp_kwargs)
-        if plot_mean: ax.scatter(pos, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
+            boxplo = ax.bxp(boxlist, [pos], [wi], **bxp_kwargs)
+            if plot_mean: ax.scatter(pos, allpercs['mean'][iii], color = mcol, marker = 'o', s = 20)
 
-        if plot_minmax:
-            ax.scatter(pos, allpercs['min'][iii], color = mcol, marker = 'v', s = 20)
-            ax.scatter(pos, allpercs['max'][iii], color = mcol, marker = '^', s = 20)
+            if plot_minmax:
+                ax.scatter(pos, allpercs['min'][iii], color = mcol, marker = 'v', s = 20)
+                ax.scatter(pos, allpercs['max'][iii], color = mcol, marker = '^', s = 20)
 
-    iii += 1
+        iii += 1
+    else:
+        iii = 0
+
+
     if obsperc is not None:
-        ax.axvline(positions[iii]-(positions[iii]-positions[iii-1])/2., color = 'grey', alpha = 0.6, zorder = -1)
+        if plot_all:
+            ax.axvline(positions[iii]-(positions[iii]-positions[iii-1])/2., color = 'grey', alpha = 0.6, zorder = -1)
         boxlist = []
         box = {'med': obsperc['p50'], 'q1': obsperc['p25'], 'q3': obsperc['p75'], 'whislo': obsperc['p10'], 'whishi': obsperc['p90'], 'showfliers' : False}
         boxlist.append(box)
@@ -6223,14 +6235,21 @@ def violinplot_on_ax(ax, alldists, names = None, colors = None, edge_colors = No
     return ax
 
 
-def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None):
+def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None, gridsp = None, fix_subplots_shape = None):
     """
     Creates a figure with a cartopy ax for plotting maps.
     """
     proj = def_projection(visualization, central_lat_lon, bounding_lat = bounding_lat)
 
+    #fig, axs = plt.subplots(fix_subplots_shape, projection =)
     fig = plt.figure(figsize = figsize)
-    ax = plt.subplot(projection = proj)
+    if fix_subplots_shape is not None:
+        axs = []
+        for i in range(fix_subplots_shape[0]*fix_subplots_shape[1]):
+            ax = plt.subplot(fix_subplots_shape[0], fix_subplots_shape[1], i+1, projection = proj)
+            axs.append(ax)
+    else:
+        ax = plt.subplot(projection = proj)
 
     ax.set_global()
     ax.coastlines(linewidth = coast_lw)
@@ -6536,7 +6555,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['///', '', ''], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None, use_different_grids = False):
+def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['///', '', ''], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None, use_different_grids = False, fig_external = None, axs_external = None):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6658,7 +6677,13 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
 
     all_figures = []
     for i in range(num_figs):
-        fig = plt.figure(figsize = figsize)#(24,14)
+        if fig_external is None:
+            fig = plt.figure(figsize = figsize)#(24,14)
+        else:
+            if i == 0:
+                fig = fig_external
+            else:
+                raise ValueError('NOT IMPLEMENTED')
         #fig, axs = plt.subplots(side1, side2, figsize = figsize)
         axes_for_colorbar = []
         for nens in range(numens_ok*i, numens_ok*(i+1)):
@@ -6666,7 +6691,10 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
                 print('no more panels here')
                 break
             nens_rel = nens - numens_ok*i
-            ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
+            if axs_external is None:
+                ax = plt.subplot(side1, side2, nens_rel+1, projection=proj)
+            else:
+                ax = axs_external[nens]
 
             if use_different_cmaps:
                 cma = cmappa[nens]
@@ -7497,15 +7525,24 @@ def custom_alphagradient_cmap(color):
     return cmap
 
 
-def cmap_temp():
+def heatmap(n_levs = None):
     ### New colormap for temperature
     col = cm.RdBu_r(np.linspace(0.,1,256))
     col2 = cm.PuRd_r(np.linspace(0.25,0.75,128))
     col3 = cm.bone_r(np.linspace(0.25,0.75,128))
     colors = np.concatenate([col3, col, col2])
-    heatmap = mpl.colors.LinearSegmentedColormap.from_list('heat_strong', colors)
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('heat_strong', colors)
 
-    return heatmap
+    if n_levs is not None:
+        print('entro')
+        lista = np.linspace(0., 1., n_levs)
+        nucols = []
+        for li in lista:
+            nucols.append(cmap(li))
+
+        cmap = mpl.colors.LinearSegmentedColormap.from_list('heat_strong_discrete', nucols)
+
+    return cmap
 
 
 #def plot_multimodel_regime_pdfs(model_names, labels_set, pcs_set, eof_proj = [(0,1), (0,2), (1,2)], n_grid_points = 100, filename = None, colors = None, levels = [0.1, 0.5], centroids_set = None):

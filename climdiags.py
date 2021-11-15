@@ -2889,7 +2889,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, cbar_range = cbar_range, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
 
     return figs
 

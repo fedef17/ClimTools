@@ -21,3 +21,4 @@ dependencies:
 - xclim>=0.24
 - iris
 - nc-time-axis
+- xesmf
