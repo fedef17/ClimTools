@@ -1137,14 +1137,21 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
 
     if regrid_to_reference is not None:
         (nlat, nlon) = (len(datacoords['lat']), len(datacoords['lon']))
-        (nlat_ref, nlon_ref) = (len(regrid_to_reference['lat'].values), len(regrid_to_reference['lon'].values))
+        try:
+            (nlat_ref, nlon_ref) = (len(regrid_to_reference['lat'].values), len(regrid_to_reference['lon'].values))
+            reflatname = 'lat'
+            reflonname = 'lon'
+        except:
+            (nlat_ref, nlon_ref) = (len(regrid_to_reference['latitude'].values), len(regrid_to_reference['longitude'].values))
+            reflatname = 'latitude'
+            reflonname = 'longitude'
 
         if nlat*nlon < nlat_ref*nlon_ref:
             print('WARNING!! cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
 
         if nlat == nlat_ref and nlon == nlon_ref:
-            lat_check = datacoords['lat'] == regrid_to_reference['lat'].values
-            lon_check = datacoords['lon'] == regrid_to_reference['lon'].values
+            lat_check = datacoords['lat'] == regrid_to_reference[reflatname].values
+            lon_check = datacoords['lon'] == regrid_to_reference[reflonname].values
 
             if np.all(lat_check) and np.all(lon_check):
                 print('Grid check OK\n')
@@ -5904,7 +5911,7 @@ def adjust_color_scale(color_maps):
 
     return
 
-def def_projection(visualization, central_lat_lon, bounding_lat = None):
+def def_projection(visualization, central_lat_lon = None, bounding_lat = None):
     """
     Defines projection for the map plot.
     """
@@ -6647,6 +6654,7 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
     # Begin plotting
     numens = len(dataset)
 
+    #print(len(dataset), numens, max_ax_in_fig)
     if fix_subplots_shape is None:
         num_figs = int(np.ceil(1.0*numens/max_ax_in_fig))
         numens_ok = int(np.ceil(numens//num_figs))
