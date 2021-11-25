@@ -2865,7 +2865,7 @@ def seasonal_set(var, dates = None, season = None, dates_range = None, cut = Tru
     < seasonal_stat > : computes one of the following stats: mean, sum, percXX, max, min. If perc, write the requested percentile, e.g. perc10, perc90, ..
     """
     if season is None:
-        raise ValueError('season not specified')
+        print('WARNING: season not specified. Assuming already selected')
 
     to_xr = False
     if isinstance(var, xr.DataArray):
