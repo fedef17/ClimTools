@@ -388,6 +388,51 @@ def read_from_txt(ifile, n_skip = 0, dtype = float, first_column_header = True, 
 
     return cose
 
+
+def read_globo_plotout(ifile, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None, debug = False):
+    """
+    Read data from a text file, return matrix.
+    """
+
+    with open(ifile, 'r') as ifi:
+        var_name = ifi.readline().strip()
+        print(var_name)
+        cose = ifi.readline().strip().split()
+        #print(cose)
+        nlon = int(cose[0])
+        nlat = int(cose[1])
+
+        endfile = False
+        allprofs = []
+        while not endfile:
+            # try:
+            prof = []
+            while len(prof) < nlon*nlat:
+                line = ifi.readline()
+                if line == '':
+                    endfile = True
+                    break
+                else:
+                    pass
+                    #print(line)
+                prof += list(map(float, line.rstrip().split()))
+
+            if endfile:
+                break
+            #print(len(prof))
+
+            allprofs.append(np.reshape(prof, (nlat, nlon))[:, 1:-1])
+            # except:
+            #     endfile = True
+
+        # lines = ifi.readlines()
+        # print(lines[:3])
+        # cose = readlines_to_matrix(lines, n_skip = n_skip, dtype = dtype, first_column_header = False, sep = sep, n_stop = n_stop, debug = debug)
+
+    #return var_name, nlon, nlat, cose
+    return var_name, nlon-2, nlat, np.stack(allprofs)
+
+
 def readlines_to_matrix(lines, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None, debug = True):
     """
     Given readlines output of a datafile, returns a matrix. Skip the lines to be avoided (i.e. file header). Very simple, won't work if the data lines are interrupted by comments or blank lines.
@@ -401,6 +446,7 @@ def readlines_to_matrix(lines, n_skip = 0, dtype = float, first_column_header = 
 
     if not first_column_header:
         data = np.array([list(map(dtype, lin.rstrip().split())) for lin in lines_ok])
+        data = np.array([map(dtype, lin.rstrip().split()) for lin in lines_ok])
         return data
     else:
         headers = np.array([lin.rstrip().split()[0] for lin in lines_ok])
@@ -5672,10 +5718,11 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     cyclic = False
 
-    grid_step = np.unique(np.diff(lon))
+    grid_step = np.unique(np.round(np.diff(lon), 4))
+
     #print(grid_step)
-    if len(grid_step) == 1 and (lon[0]-lon[-1]) % 360 == grid_step[0]: # lon grid equally spaced and global longitudes
-        if verbose: print('Adding cyclic point\n')
+    if len(grid_step) == 1 and np.round((lon[0]-lon[-1]) % 360, 4) == grid_step[0]: # lon grid equally spaced and global longitudes
+        print('Adding cyclic point\n')
         cyclic = True
         #lon = np.append(lon, 360)
         #data = np.c_[data,data[:,0]]
