@@ -3739,9 +3739,10 @@ def zonal_mean(field, mask = None, skip_nan = True, skip_inf = True):
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
 
-    # if skip_inf:
-    #     skip_nan = True
-    #     field[np.isinf(field)] = np.nan
+    if skip_inf:
+        if np.any(np.isinf(field)):
+            skip_nan = True
+            field[np.isinf(field)] = np.nan
 
     if mask is not None:
         zonal_mask = np.any(mask, axis = -1)
