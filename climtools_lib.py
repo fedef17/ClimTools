@@ -389,6 +389,35 @@ def read_from_txt(ifile, n_skip = 0, dtype = float, first_column_header = True, 
     return cose
 
 
+def read_globo_grid(ifile, nlon, nlat, dtype = float):
+    """
+    Read data from a text file, return matrix.
+    """
+
+    with open(ifile, 'r') as ifi:
+        endfile = False
+        allprofs = []
+        while not endfile:
+            # try:
+            prof = []
+            while len(prof) < nlon*nlat:
+                line = ifi.readline()
+                if line == '':
+                    endfile = True
+                    break
+                else:
+                    pass
+                    #print(line)
+                prof += list(map(float, line.rstrip().split()))
+
+            if endfile:
+                break
+
+            allprofs.append(np.reshape(prof, (nlat, nlon)))
+
+    return np.stack(allprofs)
+
+
 def read_globo_plotout(ifile, n_skip = 0, dtype = float, first_column_header = True, sep = ' ', n_stop = None, debug = False):
     """
     Read data from a text file, return matrix.
@@ -1043,7 +1072,23 @@ def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_r
         return all_vars
 
 
-def regrid_dataset(dataset, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear'):
+def create_xr_grid(lats, lons, gridname = 'grid'):
+    """
+    Creates an xarray dataset containing only the grid, for remapping.
+    """
+    #grid = xr.Dataset({'lat': (['lat'], lats), 'lon': (['lon'], lons), })
+
+    coords = dict([('lat', lats), ('lon', lons)])
+
+    mgri = np.meshgrid(lats, lons)
+    data_vars = dict([('{}.lat'.format(gridname), (('lon', 'lat'), mgri[0])), ('{}.lon'.format(gridname), (('lon', 'lat'), mgri[1]))])
+
+    grids = xr.Dataset(data_vars = data_vars, coords = coords)
+
+    return grids
+
+
+def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear'):
     """
     Regrids xarray dataset as a reference dataset (regrid_to_reference) or with custom degrees spacing.
     """
@@ -1051,6 +1096,8 @@ def regrid_dataset(dataset, regrid_to_reference = None, regrid_to_deg = 2.5, reg
         pass
         # print('Loading reference cube for regridding..')
         # regrid_to_reference = xr.load_dataset(regrid_to_reference_file)
+    elif lats is not None and lons is not None:
+        regrid_to_reference = create_xr_grid(lats, lons)
     elif regrid_to_deg is not None:
         regrid_to_reference = xr.Dataset({'lat': (['lat'], np.arange(-90, 90.1, regrid_to_deg)), 'lon': (['lon'], np.arange(0, 360, regrid_to_deg)), })
 
@@ -3158,13 +3205,13 @@ def complete_time_range(var_season, dates_season, dates_all = None):
     return var_all, dates_all
 
 
-def date_series(init_dat, end_dat, freq = 'day', calendar = 'proleptic_gregorian'):
+def date_series(init_dat, end_dat, freq = 'd', calendar = 'proleptic_gregorian'):
     """
     Creates a complete date_series between init_dat and end_dat.
 
     < freq > : 'day' or 'mon'
     """
-    dates = pd.date_range(init_dat, end_dat, freq = freq[0]).to_pydatetime()
+    dates = pd.date_range(init_dat, end_dat, freq = freq).to_pydatetime()
 
     return dates
 
@@ -3653,19 +3700,15 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
         weights_array = abs(np.cos(np.deg2rad(latitude)))
 
         if mask is not None:
-            if field.ndim == 3 and mask.ndim == 2:
-                mask = np.tile(mask, (field.shape[0],1,1))
-
-        zonal_field = zonal_mean(field, mask = mask, skip_nan = skip_nan)
-        #print(zonal_field.shape)
-        if np.any(np.isnan(zonal_field)):
-            if zonal_field.ndim == 2:
-                indexes = np.isnan(zonal_field)[0,:]
+            if field.ndim == 3:
+                zux = weights_array[np.newaxis, :, np.newaxis]
             else:
-                indexes = np.isnan(zonal_field)
-            weights_array[indexes] = 0
-            zonal_field[np.isnan(zonal_field)] = 0.0
-        mea = np.average(zonal_field, weights = weights_array, axis = -1)
+                zux = weights_array[:, np.newaxis]
+            mea = np.nanmean((field*zux)[..., mask])/np.mean((np.ones(field.shape)*zux)[..., mask])
+            # mea = np.average(zonal_field[..., zonal_mask], weights=weights_array[..., zonal_mask], axis = -1)
+        else:
+            zonal_field = zonal_mean(field, skip_nan = skip_nan)
+            mea = np.average(zonal_field, weights = weights_array, axis = -1)
 
         if np.any(np.isnan(mea)):
             print('non dovrebbe essere NaN')
@@ -3680,6 +3723,7 @@ def band_mean_from_zonal(zonal_field, latitude, latmin, latmax):
 
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
+
     okpo = (latitude >= latmin) & (latitude <= latmax)
     weights_array = abs(np.cos(np.deg2rad(latitude[okpo])))
 
@@ -3695,18 +3739,18 @@ def zonal_mean(field, mask = None, skip_nan = True, skip_inf = True):
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
 
-    if skip_inf:
-        skip_nan = True
-        field[np.isinf(field)] = np.nan
+    # if skip_inf:
+    #     skip_nan = True
+    #     field[np.isinf(field)] = np.nan
 
     if mask is not None:
         zonal_mask = np.any(mask, axis = -1)
         if np.all(zonal_mask):
             mea = np.average(field, axis = -1, weights = mask)
         else:
-            mask[~ zonal_mask, 0] = True
-            mea = np.average(field, axis = -1, weights = mask)
-            mea[~ zonal_mask] = np.nan
+            mea_ok = np.average(field[..., zonal_mask, :], axis = -1, weights = mask[zonal_mask, :])
+            mea = np.nan*np.zeros(field.shape[:-1])
+            mea[..., zonal_mask] = mea_ok
     elif skip_nan:
         mea = np.nanmean(field, axis = -1)
     else:
