@@ -1088,7 +1088,7 @@ def create_xr_grid(lats, lons, gridname = 'grid'):
     return grids
 
 
-def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear'):
+def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear', ignore_degenerate = True):
     """
     Regrids xarray dataset as a reference dataset (regrid_to_reference) or with custom degrees spacing.
     """
@@ -1103,7 +1103,7 @@ def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None
 
     print('Regridding...')
     uno = datetime.now()
-    regridder = xe.Regridder(dataset, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+    regridder = xe.Regridder(dataset, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d", ignore_degenerate = ignore_degenerate)
     pino = regridder(dataset)
     due = datetime.now()
     print('Regridding completed in {}'.format(due-uno))
