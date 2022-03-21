@@ -3029,7 +3029,7 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
 
 
 #################### EnsClus
-def EnsClus_light(var_anom, lat, flag_perc = False, numpcs = 4, perc = 80, numclus = 4):
+def EnsClus_light(var_anom, lat = None, flag_perc = False, numpcs = 4, perc = 80, numclus = 4):
     '''
     var_anom is a list of lat-lon objects.
 

@@ -4179,14 +4179,14 @@ def eof_computation_bkp(var, varunits, lat, lon):
     return solver, pcs_scal1, eofs_scal2, pcs_unscal0, eofs_unscal0, varfrac
 
 
-def eof_computation(var, latitude, weight = True):
+def eof_computation(var, latitude = None, weight = True):
     """
     Computes the EOFs of a given variable. In the first dimension there has to be different time or ensemble realizations of variable.
 
     If weigth is True, the data are weighted with respect to the cosine of latitude.
     """
     # The data array is dimensioned (ntime, nlat, nlon) and in order for the latitude weights to be broadcastable to this shape, an extra length-1 dimension is added to the end:
-    if weight:
+    if weight and latitude is not None:
         weights_array = np.sqrt(np.cos(np.deg2rad(latitude)))[:, np.newaxis]
     else:
         weights_array = None
