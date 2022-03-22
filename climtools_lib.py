@@ -59,6 +59,8 @@ import iris
 
 from cf_units import Unit
 
+from multiprocessing import Process, Queue
+
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
 plt.rcParams['axes.axisbelow'] = True
@@ -369,6 +371,30 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
 
     return size
+
+
+def run_parallel(funct, n_proc, args = None, kwargs = None):
+    """
+    To run a function in parallel mode. n_proc is number of processes. args and kwargs are lists of length n_proc. If the function is from the library, a wrapper is needed to add "coda" as last input argument and coda.put(output) at the end, instead of return output.
+    """
+    processi = []
+    coda = []
+    outputs = []
+
+    for i in range(n_proc):
+        coda.append(Queue())
+        processi.append(Process(target = funct, args = args[i] + [coda[i]], kwargs = kwargs[i]))
+        processi[i].start()
+
+    for i in range(n_proc):
+        outputs.append(coda[i].get())
+
+    for i in range(n_proc):
+        processi[i].join()
+
+    return np.concatenate(outputs, axis = 0)
+
+
 
 #######################################################
 #
