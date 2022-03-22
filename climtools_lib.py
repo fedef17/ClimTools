@@ -392,11 +392,11 @@ def run_parallel(funct, n_proc, args = None, kwargs = None):
         if args is None and kwargs is None:
             processi.append(Process(target = funct, args = [coda[i]]))
         elif kwargs is None:
-            processi.append(Process(target = funct, args = args[i] + [coda[i]]))
+            processi.append(Process(target = funct, args = list(args[i]) + [coda[i]]))
         elif args is None:
             processi.append(Process(target = funct, args = [coda[i]],  kwargs = kwargs[i]))
         else:
-            processi.append(Process(target = funct, args = args[i] + [coda[i]], kwargs = kwargs[i]))
+            processi.append(Process(target = funct, args = list(args[i]) + [coda[i]], kwargs = kwargs[i]))
 
         processi[i].start()
 
