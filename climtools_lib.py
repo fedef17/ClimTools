@@ -122,6 +122,12 @@ def find_file(cart, fil):
     lista_oks = glob.glob(cart+fil)
     return lista_oks
 
+def loadpic(ifile):
+    with open(ifile, 'rb') as ifi:
+        res = pickle.load(ifi)
+
+    return res
+
 def load_wrtool(ifile):
     """
     Loads wrtool output.
@@ -383,7 +389,15 @@ def run_parallel(funct, n_proc, args = None, kwargs = None):
 
     for i in range(n_proc):
         coda.append(Queue())
-        processi.append(Process(target = funct, args = args[i] + [coda[i]], kwargs = kwargs[i]))
+        if args is None and kwargs is None:
+            processi.append(Process(target = funct, args = [coda[i]]))
+        elif kwargs is None:
+            processi.append(Process(target = funct, args = args[i] + [coda[i]]))
+        elif args is None:
+            processi.append(Process(target = funct, args = [coda[i]],  kwargs = kwargs[i]))
+        else:
+            processi.append(Process(target = funct, args = args[i] + [coda[i]], kwargs = kwargs[i]))
+
         processi[i].start()
 
     for i in range(n_proc):
