@@ -6380,7 +6380,7 @@ def violinplot_on_ax(ax, alldists, names = None, colors = None, edge_colors = No
     return ax
 
 
-def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None, fix_subplots_shape = None, draw_grid = True):
+def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = 0, figsize = (16, 12), coast_lw = 1, plot_margins = None, fix_subplots_shape = None, draw_grid = True):
     """
     Creates a figure with a cartopy ax for plotting maps.
     """
