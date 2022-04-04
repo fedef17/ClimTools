@@ -5858,7 +5858,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none', extend = 'both')
 
     if add_vector_field is not None:
-        vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale) # quiver_scale è inversamente proporzionale alla lunghezza delle frecce
+        vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale, transform = ccrs.PlateCarree()) # quiver_scale è inversamente proporzionale alla lunghezza delle frecce
         vecfi._init()
         qk = ax.quiverkey(vecfi, 0.95, 0.95, 10, r'$10 \frac{m}{s}$', labelpos='E', coordinates='figure')
         print('quiverscale!', vecfi.scale)
@@ -6340,7 +6340,7 @@ def violinplot_on_ax(ax, alldists, names = None, colors = None, edge_colors = No
     return ax
 
 
-def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None, gridsp = None, fix_subplots_shape = None):
+def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bounding_lat = None, figsize = (16, 12), coast_lw = 1, plot_margins = None, fix_subplots_shape = None, draw_grid = True):
     """
     Creates a figure with a cartopy ax for plotting maps.
     """
@@ -6359,6 +6359,9 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     ax.set_global()
     ax.coastlines(linewidth = coast_lw)
 
+    if draw_grid:
+        gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
+
     if isinstance(proj, ccrs.PlateCarree):
         if plot_margins is not None:
             map_set_extent(ax, proj, bnd_box = plot_margins)
@@ -6366,7 +6369,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     return fig, ax
 
 
-def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False):
     """
     Plots a single map to a figure.
 
@@ -6450,7 +6453,10 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
         fig4.savefig(filename)
         # plt.close(fig4)
 
-    return fig4
+    if not return_ax:
+        return fig4
+    else:
+        return fig4, ax
 
 
 def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
