@@ -59,6 +59,8 @@ import iris
 
 from cf_units import Unit
 
+from multiprocessing import Process, Queue
+
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
 plt.rcParams['axes.axisbelow'] = True
@@ -119,6 +121,12 @@ def mkdir(cart):
 def find_file(cart, fil):
     lista_oks = glob.glob(cart+fil)
     return lista_oks
+
+def loadpic(ifile):
+    with open(ifile, 'rb') as ifi:
+        res = pickle.load(ifi)
+
+    return res
 
 def load_wrtool(ifile):
     """
@@ -369,6 +377,38 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
 
     return size
+
+
+def run_parallel(funct, n_proc, args = None, kwargs = None):
+    """
+    To run a function in parallel mode. n_proc is number of processes. args and kwargs are lists of length n_proc. If the function is from the library, a wrapper is needed to add "coda" as last input argument and coda.put(output) at the end, instead of return output.
+    """
+    processi = []
+    coda = []
+    outputs = []
+
+    for i in range(n_proc):
+        coda.append(Queue())
+        if args is None and kwargs is None:
+            processi.append(Process(target = funct, args = [coda[i]]))
+        elif kwargs is None:
+            processi.append(Process(target = funct, args = [args[i], coda[i]]))
+        elif args is None:
+            processi.append(Process(target = funct, args = [coda[i]],  kwargs = kwargs[i]))
+        else:
+            processi.append(Process(target = funct, args = [args[i], coda[i]], kwargs = kwargs[i]))
+
+        processi[i].start()
+
+    for i in range(n_proc):
+        outputs.append(coda[i].get())
+
+    for i in range(n_proc):
+        processi[i].join()
+
+    return np.concatenate(outputs, axis = 0)
+
+
 
 #######################################################
 #
@@ -1088,7 +1128,7 @@ def create_xr_grid(lats, lons, gridname = 'grid'):
     return grids
 
 
-def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear'):
+def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None, regrid_to_deg = 2.5, regrid_scheme = 'bilinear', ignore_degenerate = True):
     """
     Regrids xarray dataset as a reference dataset (regrid_to_reference) or with custom degrees spacing.
     """
@@ -1103,7 +1143,7 @@ def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None
 
     print('Regridding...')
     uno = datetime.now()
-    regridder = xe.Regridder(dataset, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d")
+    regridder = xe.Regridder(dataset, regrid_to_reference, method = regrid_scheme, extrap_method = "nearest_s2d", ignore_degenerate = ignore_degenerate)
     pino = regridder(dataset)
     due = datetime.now()
     print('Regridding completed in {}'.format(due-uno))
