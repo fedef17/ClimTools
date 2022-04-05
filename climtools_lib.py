@@ -6049,7 +6049,7 @@ def adjust_color_scale(color_maps):
 
     return
 
-def def_projection(visualization, central_lat_lon = None, bounding_lat = None):
+def def_projection(visualization, central_lat_lon = None, bounding_lat = 0):
     """
     Defines projection for the map plot.
     """
