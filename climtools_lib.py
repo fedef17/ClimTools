@@ -3514,7 +3514,7 @@ def anomalies_daily(var, dates, climate_mean = None, dates_climate_mean = None, 
 
     for el, dat in zip(climate_mean, dates_climate_mean):
         mask = (months == dat.month) & (days == dat.day)
-        var_anom[mask, ...] = var[mask, ...] - el
+        var_anom[mask, ...] = var[mask, ...] - el[np.newaxis, ...]
 
     mask = (months == 2) & (days == 29)
     okel = (cmmonths == 2) & (cmdays == 28)
