@@ -383,6 +383,9 @@ def run_parallel(funct, n_proc, args = None, kwargs = None):
     """
     To run a function in parallel mode. n_proc is number of processes. args and kwargs are lists of length n_proc. If the function is from the library, a wrapper is needed to add "coda" as last input argument and coda.put(output) at the end, instead of return output.
     """
+    from multiprocessing import set_start_method
+    set_start_method("spawn")
+
     processi = []
     coda = []
     outputs = []
