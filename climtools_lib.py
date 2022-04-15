@@ -59,7 +59,9 @@ import iris
 
 from cf_units import Unit
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue # Pool
+from multiprocessing import set_start_method
+set_start_method("spawn")
 
 mpl.rcParams['hatch.linewidth'] = 0.1
 plt.rcParams['lines.dashed_pattern'] = [5, 5]
@@ -383,8 +385,6 @@ def run_parallel(funct, n_proc, args = None, kwargs = None):
     """
     To run a function in parallel mode. n_proc is number of processes. args and kwargs are lists of length n_proc. If the function is from the library, a wrapper is needed to add "coda" as last input argument and coda.put(output) at the end, instead of return output.
     """
-    from multiprocessing import set_start_method
-    set_start_method("spawn")
 
     processi = []
     coda = []
