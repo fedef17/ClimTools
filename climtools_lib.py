@@ -383,22 +383,22 @@ def run_parallel(funct, n_proc, args = None, kwargs = None):
     """
     To run a function in parallel mode. n_proc is number of processes. args and kwargs are lists of length n_proc. If the function is from the library, a wrapper is needed to add "coda" as last input argument and coda.put(output) at the end, instead of return output.
     """
-    ctx = mp.get_context("spawn")
+    #ctx = mp.get_context("spawn")
 
     processi = []
     coda = []
     outputs = []
 
     for i in range(n_proc):
-        coda.append(ctx.Queue())
+        coda.append(mp.Queue())
         if args is None and kwargs is None:
-            processi.append(ctx.Process(target = funct, args = [coda[i]]))
+            processi.append(mp.Process(target = funct, args = [coda[i]]))
         elif kwargs is None:
-            processi.append(ctx.Process(target = funct, args = [args[i], coda[i]]))
+            processi.append(mp.Process(target = funct, args = [args[i], coda[i]]))
         elif args is None:
-            processi.append(ctx.Process(target = funct, args = [coda[i]],  kwargs = kwargs[i]))
+            processi.append(mp.Process(target = funct, args = [coda[i]],  kwargs = kwargs[i]))
         else:
-            processi.append(ctx.Process(target = funct, args = [args[i], coda[i]], kwargs = kwargs[i]))
+            processi.append(mp.Process(target = funct, args = [args[i], coda[i]], kwargs = kwargs[i]))
 
         processi[i].start()
 
