@@ -6072,7 +6072,9 @@ def def_projection(visualization, central_lat_lon = None, bounding_lat = 0):
     elif visualization == 'Robinson' or visualization == 'robinson':
         proj = ccrs.Robinson(central_longitude = clon)
     elif visualization == 'nearside':
-        sat_height = Rearth + max(0, Rearth/np.cos(np.deg2rad(abs(clat - bounding_lat))))
+        #sat_height = Rearth + max(0, Rearth/np.cos(np.deg2rad(abs(clat - bounding_lat))))
+        sat_height = max(100, Rearth/np.cos(np.deg2rad(abs(clat - bounding_lat))) - Rearth)
+        print(sat_height)
         proj = ccrs.NearsidePerspective(central_longitude = clon, central_latitude = clat, satellite_height = sat_height)
     else:
         raise ValueError('visualization {} not recognised. Only standard, Npolar (or polar), Spolar, Nstereo (or stereo), Sstereo accepted'.format(visualization))
@@ -6951,7 +6953,7 @@ def plot_pdfpages(filename, figs, save_single_figs = False, fig_names = None):
     return
 
 
-def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False, return_ax = False):
+def plot_lat_crosssection(data, lat, levels, filename = None, ax = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False, return_ax = False, ylim = None):
     """
     Plots a latitudinal cross section map.
 
@@ -6990,12 +6992,15 @@ def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', t
     clevels = np.linspace(cbar_range[0], cbar_range[1], n_color_levels)
 
     # Plotting figure
-    fig = plt.figure(figsize = figsize)
-    ax = fig.add_subplot(111)
+    if ax is None:
+        fig = plt.figure(figsize = figsize)
+        ax = fig.add_subplot(111)
+    else:
+        fig = None
 
     xi,yi = np.meshgrid(lat, levels)
     if pressure_levels == True:
-        plt.gca().invert_yaxis()
+        ax.invert_yaxis()
         if set_logscale_levels:
             ax.set_yscale('log')
 
@@ -7003,30 +7008,43 @@ def plot_lat_crosssection(data, lat, levels, filename = None, cmap = 'RdBu_r', t
     if draw_contour_lines:
         map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', linewidth = 0.5)
 
-    plt.grid()
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
-    title_obj = plt.title(title, fontsize=20, fontweight='bold')
-    title_obj.set_position([.5, 1.05])
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
 
-    cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
-    cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
-    cb.ax.tick_params(labelsize=14)
-    cb.set_label(cb_label, fontsize=16)
+    ax.grid()
 
-    top    = 0.88  # the top of the subplots
-    bottom = 0.20    # the bottom of the subplots
-    left   = 0.1    # the left side
-    right  = 0.98  # the right side
-    hspace = 0.20   # height reserved for white space
-    wspace = 0.05    # width reserved for blank space
-    plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
+    if fig is not None:
+        title_obj = plt.title(title, fontsize=20, fontweight='bold')
+        title_obj.set_position([.5, 1.05])
+
+        cb = plt.colorbar(map_plot, orientation='horizontal', fraction = 0.1)
+
+        # cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
+        # cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')#, labelsize=18)
+        cb.ax.tick_params(labelsize=14)
+        cb.set_label(cb_label, fontsize=16)
+
+    # top    = 0.88  # the top of the subplots
+    # bottom = 0.20    # the bottom of the subplots
+    # left   = 0.1    # the left side
+    # right  = 0.98  # the right side
+    # hspace = 0.20   # height reserved for white space
+    # wspace = 0.05    # width reserved for blank space
+    # plt.subplots_adjust(left=left, bottom=bottom, right=right, top=top, wspace=wspace, hspace=hspace)
 
     # save the figure or show it
     if filename is not None:
         fig.savefig(filename)
         plt.close(fig)
 
-    if return_ax:
+    if fig is None:
+        return map_plot
+    elif return_ax:
         return fig, ax
     else:
         return fig
