@@ -5796,7 +5796,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     # print(lon)
 
     ax.set_global()
-    ax.coastlines(linewidth = 2)
+    ax.coastlines(linewidth = 1)
     if draw_grid:
         gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
 
