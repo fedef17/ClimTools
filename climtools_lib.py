@@ -3800,10 +3800,10 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
         if mask is not None:
             if field.ndim == 3:
                 zux = weights_array[np.newaxis, :, np.newaxis]
-                mea = np.nanmean((field*zux)[..., mask], axis = (1,2))/np.mean((np.ones(field.shape)*zux)[..., mask], axis = (1,2))
             else:
                 zux = weights_array[:, np.newaxis]
-                mea = np.nanmean((field*zux)[..., mask])/np.mean((np.ones(field.shape)*zux)[..., mask])
+
+            mea = np.nanmean((field*zux)[..., mask], axis = -1)/np.mean((np.ones(field.shape)*zux)[..., mask], axis = -1)
             # mea = np.average(zonal_field[..., zonal_mask], weights=weights_array[..., zonal_mask], axis = -1)
         else:
             zonal_field = zonal_mean(field, skip_nan = skip_nan)
