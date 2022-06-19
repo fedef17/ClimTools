@@ -2436,6 +2436,31 @@ def convert_lon_std(lon, lon_type = '0-360'):
     return lon
 
 
+def sel_area_xr(var, area):
+    """
+    Works on a DataArray.
+    """
+    if not isinstance(var, xr.DataArray):
+        raise ValueError('var is {}, should be a xr.DataArray'.format(type(var)))
+
+    var_nu, lat_nu, lon_nu = sel_area(var.lat, var.lon, var, area)
+
+    dims = var.dims
+
+    coords = dict()
+    for coo in var.dims:
+        if coo == 'lat':
+            coords[coo] = lat_nu
+        elif coo == 'lon':
+            coords[coo] = lon_nu
+        else:
+            coords[coo] = var[coo]
+
+    pio = xr.DataArray(var_nu, dims = dims, coords = coords, name = var.name)
+
+    return pio
+
+
 def sel_area(lat, lon, var, area, lon_type = '0-360'):
     '''
     GOAL
@@ -3334,6 +3359,37 @@ def running_mean(var, wnd, remove_nans = False, cyclic = False):
                 rollpi_temp.append(np.nan*np.ones(var[0].shape))
             else:
                 rollpi_temp.append(np.mean(var[i-wnd//2:i+wnd//2+1, ...], axis = 0))
+
+        rollpi_temp = np.stack(rollpi_temp)
+
+    return rollpi_temp
+
+
+def running_std(var, wnd, remove_nans = False, cyclic = False):
+    """
+    Performs a running standard dev (if multidim, the mean is done on the first axis).
+
+    < wnd > : is the window length.
+    """
+    if var.ndim == 1:
+        tempser = pd.Series(var)
+        rollpi_temp = tempser.rolling(wnd, center = True).std()
+        if remove_nans: rollpi_temp = rollpi_temp[~np.isnan(rollpi_temp)]
+        rollpi_temp = np.array(rollpi_temp)
+        if cyclic:
+            rollcy = pd.Series(np.concatenate([var, var])).rolling(wnd, center = True).std()
+            rollcy = np.array(rollcy)
+            rollpi_temp = rollcy[:len(var)]
+            rollpi_temp[:wnd] = rollcy[len(var):len(var)+wnd]
+            rollpi_temp[-wnd:] = rollcy[len(var)-wnd:len(var)]
+    else:
+        rollpi_temp = []
+        for i in range(len(var)):
+            if i-wnd//2 < 0 or i + wnd//2 > len(var)-1:
+                if remove_nans: continue
+                rollpi_temp.append(np.nan*np.ones(var[0].shape))
+            else:
+                rollpi_temp.append(np.std(var[i-wnd//2:i+wnd//2+1, ...], axis = 0))
 
         rollpi_temp = np.stack(rollpi_temp)
 
@@ -5766,7 +5822,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, line_color = 'k', clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, line_color = 'k', clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
     """
     Plots field contours on the axis of a figure.
 
@@ -5900,10 +5956,20 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         hatch = ax.contourf(xi, yi, add_hatching, levels = hatch_levels, transform = ccrs.PlateCarree(), hatches = hatch_styles, colors = 'none', extend = 'both')
 
     if add_vector_field is not None:
-        vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], add_vector_field_0[::vec_every, ::vec_every], add_vector_field_1[::vec_every, ::vec_every], linewidth = 0.5, scale = quiver_scale, transform = ccrs.PlateCarree()) # quiver_scale è inversamente proporzionale alla lunghezza delle frecce
-        vecfi._init()
-        qk = ax.quiverkey(vecfi, 0.95, 0.95, 10, r'$10 \frac{m}{s}$', labelpos='E', coordinates='figure')
-        print('quiverscale!', vecfi.scale)
+        u_ok = add_vector_field_0/np.cos(np.deg2rad(lat[:, np.newaxis]))
+        v_ok = add_vector_field_1
+        M = np.sqrt(add_vector_field_0**2 + add_vector_field_1**2)/np.sqrt(u_ok**2 + v_ok**2)
+
+        u_ok = u_ok * M
+        v_ok = v_ok * M
+        if vector_plot == 'streamline':
+
+            vecfi = ax.streamplot(xi, yi, u_ok, v_ok, transform = ccrs.PlateCarree(), density = 3, linewidth = 0.5)
+        elif vector_plot == 'quiver':
+            vecfi = ax.quiver(xi[::vec_every, ::vec_every], yi[::vec_every, ::vec_every], u_ok[::vec_every, ::vec_every], v_ok[::vec_every, ::vec_every], angles = 'xy', linewidth = 0.5, scale = quiver_scale, transform = ccrs.PlateCarree(), regrid_shape = add_contour_regrid_shape) # quiver_scale è inversamente proporzionale alla lunghezza delle frecce
+            vecfi._init()
+            qk = ax.quiverkey(vecfi, 0.95, 0.95, 10, r'$10 \frac{m}{s}$', labelpos='E', coordinates='figure')
+            print('quiverscale!', vecfi.scale)
 
     if isinstance(proj, ccrs.PlateCarree):
         if plot_margins is not None:
@@ -5925,14 +5991,16 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     return map_plot
 
-    # if add_vector_field and add_contour_field:
-    #     return map_plot, map_plot_lines, vecfi
-    # elif add_vector_field:
-    #     return map_plot, vecfi
-    # elif add_contour_field:
-    #     return map_plot, map_plot_lines
-    # else:
-    #     return map_plot
+
+def add_box_cartopy(ax, coords, color = 'black', fill_color = 'none', fill_alpha = None):
+    """
+    Draws a box on the map. coords are in sel_area format (lonW, lonE, latS, latN).
+    """
+
+    ring = makeRectangle(coords)
+    ax.add_geometries([ring], ccrs.PlateCarree(), facecolor=fill_color, edgecolor=color, linewidth = 1.0, alpha = fill_alpha)
+
+    return
 
 
 def extract_polys_contour(map_plot):
@@ -6142,40 +6210,114 @@ def positions(names, w = 0.7, w2 = 0.4):
     return positions, posticks
 
 
-def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True):
+def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True, mean5yr = True, check_diff = True):
     """
     Plots on a gregory plot and calculates ERF (using first nfirst points) and ECS (using last nlast points).
     """
 
-    toa5 = []
-    tas5 = []
-    for i in range(0, len(tas), 5):
-        if len(tas) - i < 3: continue
-        toa5.append(np.mean(toa[i:i+5]))
-        tas5.append(np.mean(tas[i:i+5]))
-
-    toa5 = np.array(toa5)
-    tas5 = np.array(tas5)
+    ### OLD WAY: THIS is wrong since averaging among years mixes up quite different gtas/net_toa, ending up in removing randomly some variability (actually this gives larger feedbacks where the forced response is much stronger than the internal variability, and spuriously smaller feedbacks at low forcing)
 
     # toa5 = ctl.running_mean(toa, 5, remove_nans = True)
     # tas5 = ctl.running_mean(tas, 5, remove_nans = True)
 
+    # VERY IMPORTANT! reordering for tas before averaging
+    gino = np.argsort(tas)
+    try:
+        tas5 = np.mean(np.split(tas[gino], int(len(tas)/5)), axis = 1)
+        toa5 = np.mean(np.split(toa[gino], int(len(toa)/5)), axis = 1)
+    except Exception as exp:
+        print(exp)
+        toa5 = []
+        tas5 = []
+        for i in range(0, len(tas), 5):
+            if len(tas) - i < 3: continue
+            toa5.append(np.mean(toa[gino][i:i+5]))
+            tas5.append(np.mean(tas[gino][i:i+5]))
+
+        toa5 = np.array(toa5)
+        tas5 = np.array(tas5)
+
+    if check_diff:
+        try:
+            tas5_time = np.mean(np.split(tas, int(len(tas)/5)), axis = 1)
+            toa5_time = np.mean(np.split(toa, int(len(toa)/5)), axis = 1)
+        except Exception as exp:
+            print(exp)
+            toa5_time = []
+            tas5_time = []
+            for i in range(0, len(tas), 5):
+                if len(tas) - i < 3: continue
+                toa5_time.append(np.mean(toa[i:i+5]))
+                tas5_time.append(np.mean(tas[i:i+5]))
+
+            toa5_time = np.array(toa5_time)
+            tas5_time = np.array(tas5_time)
+
+        try:
+            tas10_time = np.mean(np.split(tas, int(len(tas)/10)), axis = 1)
+            toa10_time = np.mean(np.split(toa, int(len(toa)/10)), axis = 1)
+        except Exception as exp:
+            print(exp)
+            toa10_time = []
+            tas10_time = []
+            for i in range(0, len(tas), 10):
+                if len(tas) - i < 5: continue
+                toa10_time.append(np.mean(toa[i:i+10]))
+                tas10_time.append(np.mean(tas[i:i+10]))
+
+            toa10_time = np.array(toa10_time)
+            tas10_time = np.array(tas10_time)
+
+        try:
+            tas20_time = np.mean(np.split(tas, int(len(tas)/20)), axis = 1)
+            toa20_time = np.mean(np.split(toa, int(len(toa)/20)), axis = 1)
+        except Exception as exp:
+            print(exp)
+            toa20_time = []
+            tas20_time = []
+            for i in range(0, len(tas), 20):
+                if len(tas) - i < 5: continue
+                toa20_time.append(np.mean(toa[i:i+20]))
+                tas20_time.append(np.mean(tas[i:i+20]))
+
+            toa20_time = np.array(toa20_time)
+            tas20_time = np.array(tas20_time)
+
     #ax.scatter(tas5, toa5, color = col, marker = mar, label = exp)
-    ax.scatter(tas5[1:-1], toa5[1:-1], color = color, marker = marker, label = label)
-    ax.scatter(tas5[0], toa5[0], color = color, marker = '>')
-    ax.scatter(tas5[-1], toa5[-1], color = color, marker = '<')
-    ax.plot(tas5, toa5, color = color, linewidth = 0.5)
+    if mean5yr:
+        ax.scatter(tas5[1:-1], toa5[1:-1], color = color, marker = marker, label = label, s = 5)
+        ax.scatter(tas5[0], toa5[0], color = color, marker = '>', s = 5)
+        ax.scatter(tas5[-1], toa5[-1], color = color, marker = '<', s = 5)
+    else:
+        ax.scatter(tas[1:-1], toa[1:-1], color = color, marker = marker, label = label, s = 1)
+        ax.scatter(tas[0], toa[0], color = color, marker = '>', s = 1)
+        ax.scatter(tas[-1], toa[-1], color = color, marker = '<', s = 1)
+
+    if check_diff:
+        print('bau')
+        ax.scatter(tas5_time, toa5_time, color = color, label = label, s = 20, marker = '*')
+        ax.scatter(tas5, toa5, facecolor = 'none', edgecolor = color, label = label, s = 20, marker = 'o')
+
+        for ta, to, ls in zip([tas, tas5_time, tas10_time, tas20_time], [toa, toa5_time, toa10_time, toa20_time], ['-','--',':', '-.']):
+            m, c, err_m, err_c = linear_regre_witherr(ta, to)
+            xino = np.array(list(ta)+[-c/m])
+            ax.plot(xino, c+m*xino, color = color, linestyle = ls, linewidth = 2)
+
+
+    #ax.plot(tas5, toa5, color = color, linewidth = 0.5)
 
     if calc_ERF:
-        ax.scatter(tas[:nfirst], toa[:nfirst], s = 2, color = color)
-        m, c, err_m, err_c = ctl.linear_regre_witherr(tas[:nfirst], toa[:nfirst])
+        if mean5yr and not check_diff:
+            ax.scatter(tas[:nfirst], toa[:nfirst], s = 1, color = color)
+        m, c, err_m, err_c = linear_regre_witherr(tas[:nfirst], toa[:nfirst])
         xino = np.array([0]+list(tas[:nfirst]))
         ax.plot(xino, c+m*xino, color = color, linestyle = '--', linewidth = 0.5)
         print('ERF: {} -> {:6.3f} +/- {:6.3f} W/m2'.format(label, c/2., err_c/2.))
 
     if calc_ECS:
-        ax.scatter(tas[-nlast:], toa[-nlast:], s = 2, color = color)
-        m, c, err_m, err_c = ctl.linear_regre_witherr(tas[-nlast:], toa[-nlast:])
+        if mean5yr and not check_diff:
+            ax.scatter(tas[-nlast:], toa[-nlast:], s = 2, color = color)
+        m, c, err_m, err_c = linear_regre_witherr(tas[-nlast:], toa[-nlast:])
         xino = np.array(list(tas[-nlast:])+[-c/m])
         ax.plot(xino, c+m*xino, color = color, linestyle = '--', linewidth = 0.5)
         print('ECS: {} -> {:6.3f} +/- {:6.3f} K'.format(label, -0.5*c/m, 0.5*(np.abs(err_c/c)+np.abs(err_m/m))*(-c/m)))
@@ -6413,7 +6555,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
     return fig, ax
 
 
-def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
     """
     Plots a single map to a figure.
 
@@ -6473,7 +6615,7 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
     else:
         print('clevels specified directly, ignoring info on cbar_range and color_percentiles')
 
-    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, add_contour_range = add_contour_range, extend_opt = extend_opt, line_color = line_color, color_norm = color_norm, clevels = clevels)
+    map_plot = plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, n_lines = n_lines, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = add_rectangles, draw_grid = draw_grid, plot_type = plot_type, verbose = verbose, lw_contour = lw_contour, add_contour_field = add_contour_field, add_vector_field = add_vector_field, quiver_scale = quiver_scale, vec_every = vec_every, add_hatching = add_hatching, hatch_styles = hatch_styles, add_contour_same_levels = add_contour_same_levels, add_contour_plot_anomalies = add_contour_plot_anomalies, add_contour_lines_step = add_contour_lines_step, add_contour_range = add_contour_range, extend_opt = extend_opt, line_color = line_color, color_norm = color_norm, clevels = clevels, add_contour_regrid_shape = add_contour_regrid_shape, vector_plot = vector_plot)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
     title_obj.set_position([.5, 1.05])
