@@ -3784,14 +3784,23 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
 
-    if isinstance(field, xr.DataArray):
+    if isinstance(field, xr.DataArray) and mask is None:
         coso = field.mean('lon')
-        glomean = np.average(coso, weights = abs(np.cos(np.deg2rad(coso.lat))), axis = -1)
+        weights = abs(np.cos(np.deg2rad(coso.lat.values)))
 
+        glomean = np.average(coso, weights = weights, axis = -1)
         return glomean
+        # else:
+        #     weights = np.stack(len(coso.lon)*[weights]).T
+        #     weights[~mask] = 0.
+        #     glomean = np.average(coso, weights = weights, axis = (-2, -1))
     elif isinstance(field, xr.Dataset):
         raise ValueError('not implemented')
     else:
+        if isinstance(field, xr.DataArray):
+            latitude = field.lat.values
+            field = field.values
+
         if latitude is None:
             raise ValueError('latitude is not set! call: global_mean(var, latitude)')
 
