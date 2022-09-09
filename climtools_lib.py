@@ -6588,8 +6588,12 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
 
     if lat is None or lon is None:
         if isinstance(data, xr.DataArray):
-            lat = data.lat.values
-            lon = data.lon.values
+            if 'lat' in data.coords:
+                lat = data.lat.values
+                lon = data.lon.values
+            else:
+                lat = data.latitude.values
+                lon = data.longitude.values
             data = data.values
         elif isinstance(data, xr.Dataset):
             raise ValueError('Function works on DataArrays not on Datasets. Extract the right variable first')
@@ -6897,8 +6901,12 @@ def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_
     if lat is None or lon is None:
         #print(type(dataset[0]))
         if isinstance(dataset[0], xr.DataArray):
-            lat = dataset[0].lat.values
-            lon = dataset[0].lon.values
+            if 'lat' in dataset[0].coords:
+                lat = dataset[0].lat.values
+                lon = dataset[0].lon.values
+            else:
+                lat = dataset[0].latitude.values
+                lon = dataset[0].longitude.values
             dataset = [da.values for da in dataset]
         elif isinstance(dataset, xr.Dataset) or isinstance(dataset[0], xr.Dataset):
             raise ValueError('Not implemented! Function works on DataArrays not on Datasets. Extract the right variable first and concatenate them')
@@ -7865,6 +7873,61 @@ def heatmap(n_levs = None):
             nucols.append(cmap(li))
 
         cmap = mpl.colors.LinearSegmentedColormap.from_list('heat_strong_discrete', nucols)
+
+    return cmap
+
+def heatmap_mono(n_levs = None, badcol = 'gainsboro'):
+    ### New colormap for temperature
+    col = cm.YlOrRd(np.linspace(0.,1,256))
+    col2 = cm.PuRd_r(np.linspace(0.12,0.87,192))
+    #col3 = cm.bone_r(np.linspace(0.25,0.75,128))
+    colors = np.concatenate([col, col2])
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('heat_mono', colors)
+
+    if n_levs is not None:
+        print('entro')
+        lista = np.linspace(0., 1., n_levs)
+        nucols = []
+        for li in lista:
+            nucols.append(cmap(li))
+
+        cmap = mpl.colors.LinearSegmentedColormap.from_list('heat_mono_discrete', nucols)
+
+    cmap.set_bad(badcol)
+    cmap.set_under(badcol)
+
+    return cmap
+
+
+def cmap_shading(colors, N = 256):
+    """
+    Returns a custom cmap, shading between 2 or more colors.
+    """
+
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('custom', colors, N = 256)
+
+    return cmap
+
+
+def wetmap(n_levs = None):
+    ### New colormap for temperature
+    col = cm.BrBG(np.linspace(0.,1,256))
+    pino = cmap_shading([col[-1], 'royalblue'], N = 128)
+    pino = pino(np.linspace(0,1,128))
+    piro = cmap_shading(['lightcoral', col[0]], N = 128)
+    piro = piro(np.linspace(0,1,128))
+
+    colors = np.concatenate([piro, col, pino])
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('wet_strong', colors)
+
+    if n_levs is not None:
+        print('entro')
+        lista = np.linspace(0., 1., n_levs)
+        nucols = []
+        for li in lista:
+            nucols.append(cmap(li))
+
+        cmap = mpl.colors.LinearSegmentedColormap.from_list('wet_strong_discrete', nucols)
 
     return cmap
 
