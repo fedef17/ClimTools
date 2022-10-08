@@ -6220,29 +6220,34 @@ def positions(names, w = 0.7, w2 = 0.4):
     return positions, posticks
 
 
-def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True, mean5yr = True, check_diff = True):
+def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True, mean_nyr = True, check_diff = False, ave_in_tasbins = False, nyea = 5, point_dim = 20):
     """
     Plots on a gregory plot and calculates ERF (using first nfirst points) and ECS (using last nlast points).
     """
 
     ### OLD WAY: THIS is wrong since averaging among years mixes up quite different gtas/net_toa, ending up in removing randomly some variability (actually this gives larger feedbacks where the forced response is much stronger than the internal variability, and spuriously smaller feedbacks at low forcing)
+    ### EDIT! This is not wrong. Averagin in years removes high req variability in net toa, while averagin in tas does not!! Better the old way. The other way makes sense if we have multiple members
 
-    # toa5 = ctl.running_mean(toa, 5, remove_nans = True)
-    # tas5 = ctl.running_mean(tas, 5, remove_nans = True)
+    # toa5 = running_mean(toa, nyea, remove_nans = True)
+    # tas5 = running_mean(tas, nyea, remove_nans = True)
+    if ave_in_tasbins:
+        # reordering for tas before averaging
+        # WARNING!! THIS SHOULD ONLY BE DONE IF MULTIPLE MEMBERS ARE PRESENT
+        gino = np.argsort(tas)
+        tas = tas[gino]
+        toa = toa[gino]
 
-    # VERY IMPORTANT! reordering for tas before averaging
-    gino = np.argsort(tas)
     try:
-        tas5 = np.mean(np.split(tas[gino], int(len(tas)/5)), axis = 1)
-        toa5 = np.mean(np.split(toa[gino], int(len(toa)/5)), axis = 1)
+        tas5 = np.mean(np.split(tas, int(len(tas)/nyea)), axis = 1)
+        toa5 = np.mean(np.split(toa, int(len(toa)/nyea)), axis = 1)
     except Exception as exp:
         print(exp)
         toa5 = []
         tas5 = []
-        for i in range(0, len(tas), 5):
+        for i in range(0, len(tas), nyea):
             if len(tas) - i < 3: continue
-            toa5.append(np.mean(toa[gino][i:i+5]))
-            tas5.append(np.mean(tas[gino][i:i+5]))
+            toa5.append(np.mean(toa[i:i+nyea]))
+            tas5.append(np.mean(tas[i:i+nyea]))
 
         toa5 = np.array(toa5)
         tas5 = np.array(tas5)
@@ -6294,10 +6299,10 @@ def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirs
             tas20_time = np.array(tas20_time)
 
     #ax.scatter(tas5, toa5, color = col, marker = mar, label = exp)
-    if mean5yr:
-        ax.scatter(tas5[1:-1], toa5[1:-1], color = color, marker = marker, label = label, s = 5)
-        ax.scatter(tas5[0], toa5[0], color = color, marker = '>', s = 5)
-        ax.scatter(tas5[-1], toa5[-1], color = color, marker = '<', s = 5)
+    if mean_nyr:
+        ax.scatter(tas5[1:-1], toa5[1:-1], color = color, marker = marker, label = label, s = point_dim)
+        ax.scatter(tas5[0], toa5[0], color = color, marker = '>', s = point_dim)
+        ax.scatter(tas5[-1], toa5[-1], color = color, marker = '<', s = point_dim)
     else:
         ax.scatter(tas[1:-1], toa[1:-1], color = color, marker = marker, label = label, s = 1)
         ax.scatter(tas[0], toa[0], color = color, marker = '>', s = 1)
@@ -6312,12 +6317,11 @@ def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirs
             m, c, err_m, err_c = linear_regre_witherr(ta, to)
             xino = np.array(list(ta)+[-c/m])
             ax.plot(xino, c+m*xino, color = color, linestyle = ls, linewidth = 2)
-
-
-    #ax.plot(tas5, toa5, color = color, linewidth = 0.5)
+    else:
+        ax.plot(tas5, toa5, color = color, linewidth = 0.5)
 
     if calc_ERF:
-        if mean5yr and not check_diff:
+        if mean_nyr and not check_diff:
             ax.scatter(tas[:nfirst], toa[:nfirst], s = 1, color = color)
         m, c, err_m, err_c = linear_regre_witherr(tas[:nfirst], toa[:nfirst])
         xino = np.array([0]+list(tas[:nfirst]))
@@ -6325,7 +6329,7 @@ def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirs
         print('ERF: {} -> {:6.3f} +/- {:6.3f} W/m2'.format(label, c/2., err_c/2.))
 
     if calc_ECS:
-        if mean5yr and not check_diff:
+        if mean_nyr and not check_diff:
             ax.scatter(tas[-nlast:], toa[-nlast:], s = 2, color = color)
         m, c, err_m, err_c = linear_regre_witherr(tas[-nlast:], toa[-nlast:])
         xino = np.array(list(tas[-nlast:])+[-c/m])
@@ -6393,6 +6397,28 @@ def primavera_boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors, vers
     #ax.grid(color = 'lightslategray', alpha = 0.5)
 
     return
+
+
+def boxplot(cose, names, colors, filename = None, **kwargs):
+    """
+    Simpler wrapper for boxplot_on_ax. Cose is a list of distributions.
+    """
+
+    fig, ax = plt.subplots(figsize = (12,8))
+
+    allpercs = dict()
+    for nu in [10, 25, 50, 75, 90]:
+        allpercs['p{}'.format(nu)] = [np.percentile(cos, nu) for cos in cose]
+    allpercs['mean'] = [np.mean(cos) for cos in cose]
+    allpercs['min'] = [np.min(cos) for cos in cose]
+    allpercs['max'] = [np.max(cos) for cos in cose]
+
+    boxplot_on_ax(ax, allpercs, names, colors, **kwargs)
+
+    if filename is not None:
+        fig.savefig(filename)
+
+    return fig, ax
 
 
 def boxplot_on_ax(ax, allpercs, model_names, colors, edge_colors = None, versions = None, positions = None, wi = 0.5, plot_ensmeans = True, ens_colors = ['indianred'], ens_names = ['CMIP6'], obsperc = None, obs_color = 'black', obs_name = 'ERA', plot_mean = True, plot_minmax = False, plot_all = True):
