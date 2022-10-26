@@ -6577,18 +6577,23 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
             axs.append(ax)
     else:
         ax = plt.subplot(projection = proj)
+        axs = [ax]
 
-    ax.set_global()
-    ax.coastlines(linewidth = coast_lw)
+    for ax in axs:
+        ax.set_global()
+        ax.coastlines(linewidth = coast_lw)
 
-    if draw_grid:
-        gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
+        if draw_grid:
+            gl = ax.gridlines(crs = ccrs.PlateCarree(), draw_labels = False, linewidth = 1, color = 'gray', alpha = 0.5, linestyle = ':')
 
-    if isinstance(proj, ccrs.PlateCarree):
-        if plot_margins is not None:
-            map_set_extent(ax, proj, bnd_box = plot_margins)
+        if isinstance(proj, ccrs.PlateCarree):
+            if plot_margins is not None:
+                map_set_extent(ax, proj, bnd_box = plot_margins)
 
-    return fig, ax
+    if fix_subplots_shape:
+        return fig, axs
+    else:
+        return fig, ax
 
 
 def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
