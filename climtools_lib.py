@@ -3784,11 +3784,19 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
     Accepts 3D (time, lat, lon) and 2D (lat, lon) input arrays.
     """
 
-    if isinstance(field, xr.DataArray) and mask is None:
-        coso = field.mean('lon')
-        weights = abs(np.cos(np.deg2rad(coso.lat.values)))
+    if isinstance(field, xr.DataArray):
+        # coso = field.mean('lon')
+        # weights = abs(np.cos(np.deg2rad(coso.lat.values)))
+        # glomean = np.average(coso, weights = weights, axis = -1)
 
-        glomean = np.average(coso, weights = weights, axis = -1)
+        if mask is None:
+            weights = np.cos(np.deg2rad(field.lat))
+            glomean = field.weighted(weights).mean(['lat', 'lon'])
+        else:
+            weights_mask = np.cos(np.deg2rad(np.array(field.lat)))[:, np.newaxis]*mask
+            we_da = xr.DataArray(weights_mask, coords = {'lat': field.lat, 'lon': field.lon})
+            glomean = field.weighted(we_da).mean(['lat', 'lon'])
+
         return glomean
         # else:
         #     weights = np.stack(len(coso.lon)*[weights]).T
@@ -3797,9 +3805,9 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
     elif isinstance(field, xr.Dataset):
         raise ValueError('not implemented')
     else:
-        if isinstance(field, xr.DataArray):
-            latitude = field.lat.values
-            field = field.values
+        # if isinstance(field, xr.DataArray):
+        #     latitude = field.lat.values
+        #     field = field.values
 
         if latitude is None:
             raise ValueError('latitude is not set! call: global_mean(var, latitude)')
