@@ -47,7 +47,7 @@ from sklearn.cluster import KMeans
 
 import xarray as xr
 import xesmf as xe
-import xclim
+#import xclim
 import cftime
 #import cfgrib
 
@@ -1225,6 +1225,8 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
                     pino = pino/9.80665
                     pino['units'] = 'm'
                 else:
+                    print('xclim not available!')
+                    raise ValueError('xclim not available!')
                     pino = xclim.units.convert_units_to(pino, convert_units_to)
             aux_info['var_units'] = pino.units
         else:
@@ -1252,6 +1254,8 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
                 if coor.units in ['Pa', 'mbar', 'bar'] and std_nam == 'level':
                     print('Converting units to hPa')
                     #print(pino.coords)
+                    print('xclim not available!')
+                    raise ValueError('xclim not available!')
                     plev2 = xclim.units.convert_units_to(pino[std_nam], 'hPa')
                     pino = pino.assign_coords(level = plev2) # or ({'level' : plev2})
                     datacoords[std_nam] = pino.coords[std_nam].values
@@ -5840,7 +5844,7 @@ def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = Fa
     return colors
 
 
-def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, line_color = 'k', clevels = None, add_rectangles = None, draw_grid = False, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
+def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels = 21, draw_contour_lines = False, n_lines = 8, bounding_lat = None, plot_margins = None, add_hatching = None, hatch_styles = ['', '', '...'], hatch_levels = [0.2, 0.8], colors = None, line_color = 'k', clevels = None, add_rectangles = None, draw_grid = True, alphamap = 1.0, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
     """
     Plots field contours on the axis of a figure.
 
@@ -6604,7 +6608,7 @@ def get_cartopy_fig_ax(visualization = 'standard', central_lat_lon = (0, 0), bou
         return fig, axs[0]
 
 
-def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
+def plot_map_contour(data, lat = None, lon = None, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, line_color = 'k', color_percentiles = (0,100), figsize = (8,6), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = True, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, add_hatching = None, hatch_styles = ['', '', '...'], vec_every = 2, add_contour_same_levels = False, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, extend_opt = 'both', color_norm = None, clevels = None, return_ax = False, add_contour_regrid_shape = 30, vector_plot = 'streamline'):
     """
     Plots a single map to a figure.
 
@@ -6698,7 +6702,7 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
         return fig4, ax
 
 
-def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
+def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = True, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6793,7 +6797,7 @@ def plot_double_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
+def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, stitle_1 = 'data1', stitle_2 = 'data2', cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), use_different_grids = False, bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = True, plot_type = 'filled_contour', verbose = False, lw_contour = 0.5):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -6905,7 +6909,7 @@ def plot_triple_sidebyside(data1, data2, lat, lon, filename = None, visualizatio
     return fig
 
 
-def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = False, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['', '', '...'], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None, use_different_grids = False, fig_external = None, axs_external = None, cbar_bottomspace = 0.08):
+def plot_multimap_contour(dataset, lat = None, lon = None, filename = None, max_ax_in_fig = 30, number_subplots = False, cluster_labels = None, cluster_colors = None, repr_cluster = None, visualization = 'standard', central_lat_lon = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, subtitles = None, color_percentiles = (0,100), fix_subplots_shape = None, figsize = (15,12), bounding_lat = 30, plot_margins = None, add_rectangles = None, draw_grid = True, reference_abs_field = None, plot_type = 'filled_contour', clevels = None, verbose = False, lw_contour = 0.5, add_contour_field = None, add_vector_field = None, quiver_scale = None, vec_every = 2, add_hatching = None, hatch_styles = ['', '', '...'], add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, use_different_cbars = False, use_different_cmaps = False, color_norm = None, use_different_grids = False, fig_external = None, axs_external = None, cbar_bottomspace = 0.08):
     """
     Plots multiple maps on a single figure (or more figures if needed).
 
@@ -7154,7 +7158,7 @@ def plot_pdfpages(filename, figs, save_single_figs = False, fig_names = None):
     return
 
 
-def plot_lat_crosssection(data, lat, levels, filename = None, ax = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False, return_ax = False, ylim = None):
+def plot_lat_crosssection(data, lat = None, levels = None, filename = None, ax = None, cmap = 'RdBu_r', title = None, xlabel = None, ylabel = None, cb_label = None, cbar_range = None, plot_anomalies = False, n_color_levels = 21, draw_contour_lines = False, n_lines = 5, color_percentiles = (0,100), figsize = (10,6), pressure_levels = True, set_logscale_levels = False, return_ax = False, ylim = None, add_contour_field = None, add_contour_same_levels = True, add_contour_plot_anomalies = False, add_contour_lines_step = None, add_contour_range = None, lw_contour = 0.5):
     """
     Plots a latitudinal cross section map.
 
@@ -7171,6 +7175,23 @@ def plot_lat_crosssection(data, lat, levels, filename = None, ax = None, cmap = 
     < n_lines >: number of lines to draw.
 
     """
+
+    if lat is None or levels is None:
+        if isinstance(data, xr.DataArray):
+            if 'lat' in data.coords:
+                lat = data.lat.values
+                levels = data.lev.values
+            elif 'rlat' in data.coords:
+                lat = data.rlat.values
+                levels = data.lev.values
+            else:
+                lat = data.latitude.values
+                levels = data.lev.values
+            data = data.values
+        elif isinstance(data, xr.Dataset):
+            raise ValueError('Function works on DataArrays not on Datasets. Extract the right variable first')
+        else:
+            raise ValueError('lat/levels not specified')
 
     # Determining color levels
     cmappa = cm.get_cmap(cmap)
@@ -7207,7 +7228,44 @@ def plot_lat_crosssection(data, lat, levels, filename = None, ax = None, cmap = 
 
     map_plot = ax.contourf(xi, yi, data, clevels, cmap = cmappa, extend = 'both', corner_mask = False)
     if draw_contour_lines:
-        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', linewidth = 0.5)
+        map_plot_lines = ax.contour(xi, yi, data, n_lines, colors = 'k', linewidth = lw_contour)
+
+    if add_contour_field is not None:
+        if add_contour_lines_step is not None:
+            add_contour_same_levels = False
+
+        if add_contour_same_levels:
+            nskip = (len(clevels)-1)//n_lines
+            if nskip == 0: nskip = 1
+            levs = clevels[::nskip]
+        else:
+            if add_contour_range is None:
+                mi = np.nanpercentile(add_contour_field, 0)
+                ma = np.nanpercentile(add_contour_field, 100)
+                if add_contour_plot_anomalies:
+                    # making a symmetrical color axis
+                    oko = max(abs(mi), abs(ma))
+                    spi = 2*oko/(n_color_levels-1)
+                    spi_ok = np.ceil(spi*100)/100
+                    oko2 = spi_ok*(n_color_levels-1)/2
+                    oko1 = -oko2
+                else:
+                    oko1 = mi
+                    oko2 = ma
+                cb2 = (oko1, oko2)
+            else:
+                cb2 = add_contour_range
+
+            if add_contour_lines_step is None:
+                levs = np.linspace(cb2[0], cb2[1], n_lines)
+            else:
+                if add_contour_plot_anomalies:
+                    levs = np.append(np.arange(0, cb2[0]-add_contour_lines_step/2, -add_contour_lines_step)[::-1], np.arange(0, cb2[1]+add_contour_lines_step/2, add_contour_lines_step)[1:])
+                else:
+                    levs = np.arange(cb2[0], cb2[1]+add_contour_lines_step/2, add_contour_lines_step)
+
+        map_plot_lines = ax.contour(xi, yi, add_contour_field, levs, colors = 'k', linewidths = lw_contour)
+    
 
     if ylim is not None:
         ax.set_ylim(ylim)
