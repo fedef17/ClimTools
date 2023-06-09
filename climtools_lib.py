@@ -2512,6 +2512,36 @@ def sel_area(lat, lon, var, area, lon_type = '0-360'):
     return var_area, lat_new, lon_new
 
 
+def sel_season_xr(dset, season, calc_average = False):
+    """
+    Thanks to: Emanuele Di Carlo (CNR-ISAC)
+
+    Season selection for xr datasets.
+
+    """
+
+    mesi_short = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    month_seq = 2*'JFMAMJJASOND'
+
+    if season in month_seq and len(season) > 1:
+        ind1 = month_seq.find(season)
+        ind2 = ind1 + len(season)
+        indxs = np.arange(ind1,ind2)
+        indxs = indxs % 12 + 1
+    elif season in mesi_short:
+        indxs = [mesi_short.index(season)+1]
+    else:
+        raise ValueError('season not understood, should be in DJF, JJA, ND,... format or the short 3 letters name of a month (Jan, Feb, ...)')
+
+    dset = dset.sel(time = dset.time.dt.month.isin(indxs))
+
+    if calc_average:
+        dset = dset.rolling(time = len(indxs)).mean('time')
+        dset = dset.sel(time = dset.time.dt.month == indxs[-1])
+
+    return dset
+
+
 def sel_season(var, dates, season, cut = True, remove_29feb = True):
     """
     Selects the desired seasons from the dataset.
@@ -2528,6 +2558,8 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
     :param cut: bool. If True eliminates partial seasons.
 
     """
+
+    # per xarray -> dset = dset.sel(time=dset.time.dt.month.isin(mon))
 
     #dates_pdh = pd.to_datetime(dates)
     # day = pd.Timedelta('1 days')
@@ -2558,6 +2590,7 @@ def sel_season(var, dates, season, cut = True, remove_29feb = True):
 
     var_season = var[mask, ...]
     dates_season = dates[mask]
+
 
     # !!!! IMPORTANT FOR CUT !!!
     years = years[mask]
@@ -5796,6 +5829,16 @@ def makeRectangle(area, npo = 40, lon_type = '0-360'):
 
     return ring
 
+
+def makePolygon(seq):
+    if isinstance(seq, list):
+        seq = np.stack(seq)
+
+    poly = mpatches.Polygon(seq, closed=True, ec='r', fill=False, lw=1, fc=None, transform=ccrs.PlateCarree())
+    
+    return poly
+
+
 def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False, use_seaborn = True, sns_palette = 'hls'):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
@@ -5909,6 +5952,10 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         pi = np.where(np.diff(lon) < 0)[0][0]
         lon_o[pi + 1 :] += 360.
         lon = lon_o
+    else:
+        ## regional domain
+        if plot_margins is None:
+            plot_margins = [lon[0], lon[-1], lat[0], lat[-1]]
 
     xi,yi = np.meshgrid(lon,lat)
 
@@ -6008,8 +6055,14 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
         if len(rectangle_list) == 1: colors = ['white']
         for rect, col in zip(rectangle_list, colors):
             # ax.add_patch(mpatches.Rectangle(xy = [rect[0], rect[2]], width = rect[1]-rect[0], height = rect[3]-rect[2], facecolor = 'none', edgecolor = col, alpha = 1.0, transform = proj, linewidth = 2.0, zorder = 20))
-            ring = makeRectangle(rect)
-            ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 1.0)
+
+            if len(rect) == 4:
+                ring = makeRectangle(rect)
+                ax.add_geometries([ring], ccrs.PlateCarree(), facecolor='none', edgecolor=col, linewidth = 1.0)
+            else:
+                ## This is a polygon
+                poly = makePolygon(rect)
+                ax.add_patch(poly)
 
     return map_plot
 
@@ -6695,6 +6748,10 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
     if filename is not None:
         fig4.savefig(filename)
         # plt.close(fig4)
+
+    if 'vscod' in os.environ['_']:
+        # matplotlib inline in jupyter
+        return ax
 
     if not return_ax:
         return fig4
