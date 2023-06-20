@@ -6749,7 +6749,7 @@ def plot_map_contour(data, lat = None, lon = None, filename = None, visualizatio
         fig4.savefig(filename)
         # plt.close(fig4)
 
-    if 'vscod' in os.environ['_']:
+    if 'vscod' in os.environ['browser']:
         # matplotlib inline in jupyter
         return ax
 
