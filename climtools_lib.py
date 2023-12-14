@@ -1152,6 +1152,9 @@ def regrid_dataset(dataset, lats = None, lons = None, regrid_to_reference = None
 
     return pino
 
+def roundlat(ds, ndec = 10):
+    ds = ds.assign_coords(lat = ds.lat.round(ndec))
+    return ds
 
 def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_deg = None, regrid_to_reference_file = None, regrid_scheme = 'bilinear', convert_units_to = None, verbose = True, keep_only_maxdim_vars = True, year_range = None):
     """
@@ -2444,6 +2447,9 @@ def sel_area_xr(var, area):
     """
     Works on a DataArray.
     """
+
+    # pinorot = pino.assign_coords(lon = (pino.lon + 180) % 360 - 180).roll(lon = len(pino.lon)//2, roll_coords=True)
+
     if not isinstance(var, xr.DataArray):
         raise ValueError('var is {}, should be a xr.DataArray'.format(type(var)))
 
@@ -6204,6 +6210,12 @@ def def_projection(visualization, central_lat_lon = None, bounding_lat = 0):
         clon = 0.
         clat = 70.
 
+    if bounding_lat == 0:
+        if clat > 80.:
+            bounding_lat = 50
+        elif clat < -80.:
+            bounding_lat = -50
+
     if visualization == 'standard' or visualization == 'Standard':
         proj = ccrs.PlateCarree(central_longitude = clon)
     elif visualization == 'polar' or visualization == 'Npolar' or visualization == 'npolar':
@@ -6285,7 +6297,7 @@ def positions(names, w = 0.7, w2 = 0.4):
     return positions, posticks
 
 
-def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True, mean_nyr = True, check_diff = False, ave_in_tasbins = False, nyea = 5, point_dim = 20):
+def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirst = 5, nlast = 50, calc_ERF = True, calc_ECS = True, mean_nyr = True, check_diff = False, ave_in_tasbins = False, nyea = 5, point_dim = 20, ylim = None, xlim = None, ls = '-'):
     """
     Plots on a gregory plot and calculates ERF (using first nfirst points) and ECS (using last nlast points).
     """
@@ -6383,7 +6395,7 @@ def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirs
             xino = np.array(list(ta)+[-c/m])
             ax.plot(xino, c+m*xino, color = color, linestyle = ls, linewidth = 2)
     else:
-        ax.plot(tas5, toa5, color = color, linewidth = 0.5)
+        ax.plot(tas5, toa5, color = color, linewidth = 0.5, ls = ls)
 
     if calc_ERF:
         if mean_nyr and not check_diff:
@@ -6400,6 +6412,11 @@ def gregplot_on_ax(ax, tas, toa, color = None, label = None, marker = 'D', nfirs
         xino = np.array(list(tas[-nlast:])+[-c/m])
         ax.plot(xino, c+m*xino, color = color, linestyle = '--', linewidth = 0.5)
         print('ECS: {} -> {:6.3f} +/- {:6.3f} K'.format(label, -0.5*c/m, 0.5*(np.abs(err_c/c)+np.abs(err_m/m))*(-c/m)))
+    
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
     return
 
