@@ -6,15 +6,6 @@ import sys
 import os
 import glob
 
-try:
-    import ctool, ctp
-except ModuleNotFoundError:
-    print('WARNING: ctool, ctp modules not found. Some functions may raise errors. Run the compiler in the cluster_fortran/ routine to avoid this.\n')
-except Exception as exp:
-    print(exp)
-    pass
-
-
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
@@ -27,7 +18,7 @@ import matplotlib.patches as mpatches
 import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter, PillowWriter
-import seaborn as sns
+#import seaborn as sns
 
 from shapely.geometry.polygon import LinearRing
 from shapely import geometry
@@ -35,7 +26,7 @@ from shapely import geometry
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy.util as cutil
-import pandas as pd
+#import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
@@ -55,9 +46,7 @@ from datetime import datetime
 import pickle
 from copy import deepcopy as dcopy
 
-import iris
-
-from cf_units import Unit
+#from cf_units import Unit
 
 import multiprocessing as mp
 
@@ -577,175 +566,6 @@ def check_increasing_latlon(var, lat, lon):
     return var, lat, lon
 
 
-def regrid_cube(cube, ref_cube, regrid_scheme = 'linear'):
-    """
-    Regrids cube according to ref_cube grid. Default scheme is linear (cdo remapbil). Other scheme available: nearest and conservative (cdo remapcon).
-    """
-    if regrid_scheme == 'linear':
-        schema = iris.analysis.Linear()
-    elif regrid_scheme == 'conservative':
-        schema = iris.analysis.AreaWeighted()
-    elif regrid_scheme == 'nearest':
-        schema = iris.analysis.Nearest()
-
-    (nlat, nlon) = (len(cube.coord('latitude').points), len(cube.coord('longitude').points))
-    (nlat_ref, nlon_ref) = (len(ref_cube.coord('latitude').points), len(ref_cube.coord('longitude').points))
-
-    if nlat*nlon < nlat_ref*nlon_ref:
-        #raise ValueError('cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
-        print('WARNING!! cube size {}x{} is smaller than the reference cube {}x{}!\n'.format(nlat, nlon, nlat_ref, nlon_ref))
-
-    if nlat == nlat_ref and nlon == nlon_ref:
-        lat_check = cube.coord('latitude').points == ref_cube.coord('latitude').points
-        lon_check = cube.coord('longitude').points == ref_cube.coord('longitude').points
-
-        if np.all(lat_check) and np.all(lon_check):
-            print('Grid check OK\n')
-        else:
-            print('Same nlat, nlon, but different grid. Regridding to reference..\n')
-            nucube = cube.regrid(ref_cube, schema)
-    else:
-        print('Different nlat, nlon. Regridding to reference..\n')
-        nucube = cube.regrid(ref_cube, schema)
-
-    return nucube
-
-
-def transform_iris_cube(cube, regrid_to_reference = None, convert_units_to = None, extract_level_hPa = None, regrid_scheme = 'linear', adjust_nonstd_dates = True, pressure_levels = False):
-    """
-    Transforms an iris cube in a variable and a set of coordinates.
-    Optionally selects a level (given in hPa).
-    TODO: cube regridding to a given lat/lon grid.
-
-    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
-    < force_level_units > : str. Sometimes level units are not set inside the netcdf file. Set units of levels to avoid errors in reading. To be used with caution, always check the level output to ensure that the units are correct.
-    """
-    #print('INIZIO')
-    ndim = cube.ndim
-    datacoords = dict()
-    aux_info = dict()
-    ax_coord = dict()
-
-    #print(datetime.now())
-
-    #print(datetime.now())
-    if convert_units_to:
-        if cube.units.name != convert_units_to:
-            print('Converting data from {} to {}\n'.format(cube.units.name, convert_units_to))
-            if cube.units.name == 'm**2 s**-2' and convert_units_to == 'm':
-                cu = cu/9.80665
-                cube.units = 'm'
-            else:
-                cube.convert_units(convert_units_to)
-
-    #print(datetime.now())
-    #print(datetime.now())
-    aux_info['var_units'] = cube.units.name
-
-    coord_names = [cord.name() for cord in cube.coords()]
-
-    allco = ['lat', 'lon', 'level']
-    allconames = dict()
-    allconames['lat'] = np.array(['latitude', 'lat'])
-    allconames['lon'] = np.array(['longitude', 'lon'])
-    allconames['level'] = np.array(['level', 'lev', 'pressure', 'plev', 'plev8', 'air_pressure'])
-
-    oknames = dict()
-
-    #print(datetime.now())
-
-    for i, nam in enumerate(coord_names):
-        found = False
-        if nam == 'time': continue
-        for std_nam in allconames:
-            if nam in allconames[std_nam]:
-                coor = cube.coord(nam)
-                oknames[std_nam] = nam
-                #print(coor)
-                #print(pressure_levels)
-                #print(std_nam)
-                if pressure_levels and std_nam == 'level':
-                    print('Converting units to hPa')
-                    coor.convert_units('hPa')
-                datacoords[std_nam] = coor.points
-                ax_coord[std_nam] = i
-                found = True
-        if not found:
-            print('# WARNING: coordinate {} in cube not recognized.\n'.format(nam))
-
-    #print(datetime.now())
-    squeeze = False
-    if 'level' in datacoords.keys():
-        if len(datacoords['level']) == 1:
-            #data = data.squeeze()
-            squeeze = True
-            print('File contains only level {}'.format(datacoords['level'][0]))
-        else:
-            if extract_level_hPa is not None:
-                okind = datacoords['level'] == extract_level_hPa
-
-                if np.any(okind):
-                    datacoords['level'] = datacoords['level'][okind]
-                    # data = data.take(first(okind), axis = ax_coord['level'])
-                    cub_lev = iris.Constraint(coord_values = {oknames['level'] : extract_level_hPa})
-                    cube = cube.extract(cub_lev)
-                else:
-                    mincos = np.min(np.abs(datacoords['level']-extract_level_hPa))
-                    if mincos < 1: # tolerance 1 hPa
-                        okind = np.argmin(np.abs(datacoords['level']-extract_level_hPa))
-                        datacoords['level'] = datacoords['level'][okind]
-
-                        cub_lev = iris.Constraint(coord_values = {oknames['level'] : datacoords['level'][okind]})
-                        cube = cube.extract(cub_lev)
-
-                        # data = data.take(okind, axis = ax_coord['level'])
-                    else:
-                        raise ValueError('Level {} hPa not found among: '.format(extract_level_hPa)+(len(datacoords['level'])*'{}, ').format(*datacoords['level']))
-            else:
-                raise ValueError('File contains more levels. select level to keep if in hPa or give a single level file as input')
-
-    if regrid_to_reference is not None:
-        cube = regrid_cube(cube, regrid_to_reference, regrid_scheme = regrid_scheme)
-        for std_nam in ['lat', 'lon']:
-            datacoords[std_nam] = cube.coord(oknames[std_nam]).points
-
-    data = cube.data
-    if squeeze: data = data.squeeze()
-
-    #print(datetime.now())
-    if 'time' in coord_names:
-        time = cube.coord('time').points
-        time_units = cube.coord('time').units
-        dates = time_units.num2date(time)#, only_use_cftime_datetimes = False) # this is a set of cftime._cftime.real_datetime objects
-        time_cal = time_units.calendar
-
-        # if adjust_nonstd_dates:
-        #     if dates[0].year < 1677 or dates[-1].year > 2256:
-        #         print('WARNING!!! Dates outside pandas range: 1677-2256\n')
-        #         # Remove 29 feb first
-        #         skipcose = np.array([(da.month!= 2 or da.day != 29) for da in dates])
-        #         data = data[skipcose]
-        #         dates = dates[skipcose]
-        #         dates = adjust_outofbound_dates(dates)
-        #
-        #     if time_cal == '365_day' or time_cal == 'noleap':
-        #         dates = adjust_noleap_dates(dates)
-        #     elif time_cal == '360_day':
-        #         dates = adjust_360day_dates(dates)
-
-        datacoords['dates'] = dates
-        aux_info['time_units'] = time_units.name
-        aux_info['time_calendar'] = time_cal
-
-    #print(datetime.now())
-    data, lat, lon = check_increasing_latlon(data, datacoords['lat'], datacoords['lon'])
-    datacoords['lat'] = lat
-    datacoords['lon'] = lon
-    #print('FINE')
-
-    return data, datacoords, aux_info
-
-
 def check_available_cmip6_data(varname, mip_table, experiment, base_cart_cmip6 = None, cmip_family_dirs = False, grid_dir = False, version_dir = False):
     """
     Checks all models/members available for the selected variable.
@@ -929,7 +749,7 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
                     listafil = listafil_ok
 
                 if len(listafil) > 0:
-                    var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
+                    var, coords, aux_info = read_xr(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
                     data[member] = (var, coords, aux_info)
 
         return data
@@ -974,144 +794,9 @@ def read_cmip6_data(varname, mip_table, experiment, model, sel_member = 'first',
                 listafil = listafil_ok
 
             if len(listafil) > 0:
-                var, coords, aux_info = read_ensemble_iris(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
+                var, coords, aux_info = read_xr(listafil, extract_level_hPa = extract_level_hPa, select_var = varname, regrid_to_reference_file = regrid_to_reference_file, adjust_nonstd_dates = True, verbose = verbose, netcdf4_read = netcdf4_read, sel_yr_range = sel_yr_range, select_area_first = select_area_first, select_season_first = select_season_first, area = area, season = season, remove_29feb = remove_29feb)
 
         return var, coords, aux_info
-
-
-def read_ensemble_iris(ifilez, extract_level_hPa = None, select_var = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = True, netcdf4_read = False, sel_yr_range = None, select_area_first = False, select_season_first = False, area = None, season = None, remove_29feb = True):
-    """
-    Read a list of netCDF files using the iris library.
-    """
-
-    ref_cube = None
-    if regrid_to_reference_file is not None:
-        if not netcdf4_read:
-            print('Loading reference cube for regridding..')
-            ref_cube = iris.load(regrid_to_reference_file)[0]
-        else:
-            print('WARNING! Cannot regrid with netcdf4_read, setting netcdf4_read to False')
-            netcdf4_read = False
-
-    print('Concatenating {} input files..\n'.format(len(ifilez)))
-    var_sel = []
-    var_full = []
-    dates_sel = []
-    dates_full = []
-    for fil in ifilez:
-        if fil[-3:] == '.nc':
-            if netcdf4_read:
-                var, coords, aux_info = readxDncfield(fil, extract_level = extract_level_hPa)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
-            else:
-                var, coords, aux_info = read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = ref_cube, pressure_levels = pressure_levels)
-                lat = coords['lat']
-                lon = coords['lon']
-                dates = coords['dates']
-        elif fil[-4:] == '.grb' or fil[-5:] == '.grib':
-            if ref_cube is not None or extract_level_hPa is not None:
-                print('WARNING! Unable to perform regridding or extracting level with grib file')
-            var, coords, aux_info = read3D_grib(fil)
-            lat = coords['lat']
-            lon = coords['lon']
-            dates = coords['dates']
-
-        if sel_yr_range is not None:
-            var, dates = sel_time_range(var, dates, range_years(sel_yr_range[0], sel_yr_range[1]))
-
-        if select_area_first:
-            print('Selecting area first for saving memory')
-            var, lat, lon = sel_area(lat, lon, var, area)
-
-        if select_season_first:
-            var_season, dates_season = sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
-            var_sel.append(var_season)
-            dates_sel.append(dates_season)
-        else:
-            ### inefficient for memory: I just need 20 days at both ends to calculate climatology
-            dates_full.append(dates)
-            var_full.append(var)
-
-    if select_season_first:
-        var = np.concatenate(var_sel)
-        dates = np.concatenate(dates_sel)
-    else:
-        var = np.concatenate(var_full)
-        dates = np.concatenate(dates_full)
-
-    coords = dict()
-    coords['lat'] = lat
-    coords['lon'] = lon
-    coords['dates'] = dates
-
-    return var, coords, aux_info
-
-
-def read_iris_nc(ifile, extract_level_hPa = None, select_var = None, regrid_to_reference = None, regrid_to_reference_file = None, regrid_scheme = 'linear', convert_units_to = None, adjust_nonstd_dates = True, verbose = True, keep_only_maxdim_vars = True, pressure_levels = False):
-    """
-    Read a netCDF file using the iris library.
-
-    < extract_level_hPa > : float. If set, only the corresponding level is extracted. Level units are converted to hPa before the selection.
-    < select_var > : str or list. For a multi variable file, only variable names corresponding to those listed in select_var are read. Redundant definition are treated safely: variable is extracted only one time.
-
-    < keep_only_maxdim_vars > : keeps only variables with maximum size (excludes variables like time_bnds, lat_bnds, ..)
-    """
-
-    if regrid_to_reference_file is not None:
-        print('Loading reference cube for regridding..')
-        regrid_to_reference = iris.load(regrid_to_reference_file)[0]
-
-    print('Reading {}\n'.format(ifile))
-    is_ensemble = False
-    if type(ifile) in [list, np.ndarray]:
-        is_ensemble = True
-        print('WARNING!!!! Reading an ENSEMBLE of input files instead than a single file! Is this desired?\n')
-
-    fh = iris.load(ifile)
-
-    if len(fh) == 0:
-        raise ValueError('ERROR! Empty file: '+ifile)
-
-    cudimax = np.argmax([cu.ndim for cu in fh])
-    ndim = np.max([cu.ndim for cu in fh])
-
-    dimensions = [cord.name() for cord in fh[cudimax].coords()]
-
-    if verbose: print('Dimensions: {}\n'.format(dimensions))
-
-    if keep_only_maxdim_vars:
-        fh = [cu for cu in fh if cu.ndim == ndim]
-
-    variab_names = [cu.name() for cu in fh]
-    if verbose: print('Variables: {}\n'.format(variab_names))
-    nvars = len(variab_names)
-    print('Field as {} dimensions and {} vars. All vars: {}'.format(ndim, nvars, variab_names))
-
-    all_vars = dict()
-    if not is_ensemble:
-        for cu in fh:
-            all_vars[cu.name()] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates, pressure_levels = pressure_levels)
-        if select_var is not None:
-            print('Read variable: {}\n'.format(select_var))
-            return all_vars[select_var]
-    else:
-        ens_id = 0
-        if select_var is not None:
-            print('Read variable: {}\n'.format(select_var))
-        for cu in fh:
-            if select_var is not None:
-                if cu.name() != select_var: continue
-            all_vars[cu.name()+'_{}'.format(ens_id)] = transform_iris_cube(cu, regrid_to_reference = regrid_to_reference, convert_units_to = convert_units_to, extract_level_hPa = extract_level_hPa, regrid_scheme = regrid_scheme, adjust_nonstd_dates = adjust_nonstd_dates, pressure_levels = pressure_levels)
-            ens_id += 1
-
-    if len(all_vars.keys()) == 1:
-        print('Read variable: {}\n'.format(list(all_vars.keys())[0]))
-        return list(all_vars.values())[0]
-    else:
-        print('Read all variables: {}\n'.format(all_vars.keys()))
-        return all_vars
 
 
 def create_xr_grid(lats, lons, gridname = 'grid'):
@@ -1228,8 +913,9 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
                     pino = pino/9.80665
                     pino['units'] = 'm'
                 else:
-                    print('xclim not available!')
-                    raise ValueError('xclim not available!')
+                    if 'xclim' not in sys.modules:
+                        print('xclim not available! Cannot convert units to hPa!')
+                        raise ValueError('xclim not available!')
                     pino = xclim.units.convert_units_to(pino, convert_units_to)
             aux_info['var_units'] = pino.units
         else:
@@ -1257,8 +943,9 @@ def read_xr(ifile, extract_level_hPa = None, select_var = None, regrid_to_refere
                 if coor.units in ['Pa', 'mbar', 'bar'] and std_nam == 'level':
                     print('Converting units to hPa')
                     #print(pino.coords)
-                    print('xclim not available!')
-                    raise ValueError('xclim not available!')
+                    if 'xclim' not in sys.modules:
+                        print('xclim not available! Cannot convert units to hPa!')
+                        #raise ValueError('xclim not available!')
                     plev2 = xclim.units.convert_units_to(pino[std_nam], 'hPa')
                     pino = pino.assign_coords(level = plev2) # or ({'level' : plev2})
                     datacoords[std_nam] = pino.coords[std_nam].values
@@ -1918,174 +1605,6 @@ def read_N_2Dfields(ifile):
 
     return var, var_units, lat, lon
 
-
-def create_iris_cube(data, varname, varunits, iris_coords_list, long_name = None):
-    """
-    Creates an iris.cube.Cube instance.
-
-    < iris_coords_list > : list of iris.coords.DimCoord objects (use routine create_iris_coord_list for standard coordinates).
-    """
-    # class iris.cube.Cube(data, standard_name=None, long_name=None, var_name=None, units=None, attributes=None, cell_methods=None, dim_coords_and_dims=None, aux_coords_and_dims=None, aux_factories=None)
-
-    allcoords = []
-    if not isinstance(iris_coords_list[0], iris.coords.DimCoord):
-        raise ValueError('coords not in iris format')
-
-    allcoords = [(cor, i) for i, cor in enumerate(iris_coords_list)]
-
-    cube = iris.cube.Cube(data, standard_name = varname, units = varunits, dim_coords_and_dims = allcoords, long_name = long_name)
-
-    return cube
-
-
-def create_iris_coord_list(coords_points, coords_names, time_units = None, time_calendar = None, level_units = None):
-    """
-    Creates a list of coords in iris format for standard (lat, lon, time, level) coordinates.
-    """
-
-    coords_list = []
-    for i, (cordpo, nam) in enumerate(zip(coords_points, coords_names)):
-        cal = None
-        circ = False
-        if nam in ['latitude', 'longitude', 'lat', 'lon']:
-            units = 'degrees'
-            if 'lon' in nam: circ = True
-        if nam == 'time':
-            units = Unit(time_units, calendar = time_calendar)
-        if nam in ['lev', 'level', 'plev']:
-            units = level_units
-
-        cord = create_iris_coord(cordpo, std_name = nam, units = units, circular = circ)
-        coords_list.append(cord)
-
-    return coords_list
-
-
-def create_iris_coord(points, std_name, long_name = None, units = None, circular = False, calendar = None):
-    """
-    Creates an iris.coords.DimCoord instance.
-    """
-    # class iris.coords.DimCoord(points, standard_name=None, long_name=None, var_name=None, units='1', bounds=None, attributes=None, coord_system=None, circular=False)
-
-    if std_name == 'longitude' or std_name == 'lon':
-        circular = True
-    if std_name == 'time' and (calendar is None or units is None):
-        raise ValueError('No calendar/units given for time!')
-        units = Unit(units, calendar = calendar)
-
-    try:
-        coord = iris.coords.DimCoord(points, standard_name = std_name, long_name = long_name, units = units, circular = circular)
-    except Exception as stron:
-        print('Problem in creating DimCoord: {}\n'.format(stron))
-        print('Creating AuxCoord instead..')
-        coord = iris.coords.AuxCoord(points, standard_name = std_name, long_name = long_name, units = units)
-
-    return coord
-
-
-def save_iris_3Dfield(filename, var, lat, lon, dates = None, time_units = None, time_cal = None):
-    """
-    Saves 3D field (time, lat, lon) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
-    """
-
-    var_ok, lat_ok, lon_ok = check_increasing_latlon(var, lat, lon)
-
-    if dates is None:
-        index = create_iris_coord(np.arange(len(var)), None, long_name = 'index')
-    else:
-        if time_units is None or time_cal is None:
-            raise ValueError('Must specify both time_units and time_cal')
-        time = nc.date2num(dates, units = time_units, calendar = time_cal)
-        index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
-
-    colist = create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
-    colist = [index] + colist
-    cubo = create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
-
-    iris.save(cubo, filename)
-
-    return
-
-
-def save_iris_3Dfield(filename, var, lat, lon, dates = None, time_units = None, time_cal = None, std_name = None, long_name = '', units = '1'):
-    """
-    Saves 3D field (time, lat, lon) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
-    """
-
-    var_ok, lat_ok, lon_ok = check_increasing_latlon(var, lat, lon)
-
-    if dates is None:
-        index = create_iris_coord(np.arange(len(var)), None, long_name = 'index')
-    else:
-        if time_units is None or time_cal is None:
-            raise ValueError('Must specify both time_units and time_cal')
-        time = nc.date2num(dates, units = time_units, calendar = time_cal)
-        index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
-
-    colist = create_iris_coord_list([lat_ok, lon_ok], ['latitude', 'longitude'])
-    colist = [index] + colist
-    cubo = create_iris_cube(var_ok, std_name, units, colist, long_name = long_name)
-
-    iris.save(cubo, filename)
-
-    return
-
-
-def save_iris_timeseries(filename, var, dates = None, time_units = None, time_cal = None, std_name = None, long_name = '', units = '1'):
-    """
-    Saves a timeseries 1D (time, var) or 2D (time, index, var) in nc file using iris. If dates is None, creates a dummy 'index' coordinate.
-    """
-
-    if dates is None:
-        time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
-    else:
-        if time_units is None or time_cal is None:
-            raise ValueError('Must specify both time_units and time_cal')
-
-        time = nc.date2num(dates, units = time_units, calendar = time_cal)
-        try:
-            time_index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
-        except Exception as errrr:
-            print('!!!! Error in creating iris time coord, creating dummy time_index instead !!!!\n')
-            print(errrr)
-            time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
-
-    cubo = create_iris_cube(var, std_name, units, [time_index], long_name = long_name)
-    iris.save(cubo, filename)
-
-    return
-
-
-def save_iris_N_timeseries(filename, vars, dates = None, time_units = None, time_cal = None, long_names = None):
-    """
-    Saves a set of timeseries 1D (time, var) as multiple variables in nc file using iris. If dates is None, creates a dummy 'index' coordinate. Variable names are set by std_names (only if cmor) or long_names.
-    """
-
-    if dates is None:
-        time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
-    else:
-        if time_units is None or time_cal is None:
-            raise ValueError('Must specify both time_units and time_cal')
-        time = nc.date2num(dates, units = time_units, calendar = time_cal)
-        try:
-            time_index = create_iris_coord(time, 'time', units = time_units, calendar = time_cal)
-        except Exception as errrr:
-            print('!!!! Error in creating iris time coord, creating dummy time_index instead !!!!\n')
-            print(errrr)
-            time_index = create_iris_coord(np.arange(len(var)), None, long_name = 'time_index')
-
-    if long_names is None:
-        long_names = ['var{}'.format(i) for i in range(len(vars))]
-
-    cubolis = []
-    for var, longnam in zip(vars, long_names):
-        cubo = create_iris_cube(var, None, '1', [time_index], long_name = longnam)
-        cubolis.append(cubo)
-
-    cubolis = iris.cube.CubeList(cubolis)
-    iris.save(cubolis, filename)
-
-    return
 
 
 def save2Dncfield(lats,lons,variab,varname,ofile):
@@ -4433,7 +3952,7 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
     start = datetime.now()
 
     if algorithm == 'molteni' and 'ctool' not in sys.modules:
-        print('WARNING!!! ctool module not loaded, using algorithm <sklearn> instead of <molteni>. Try rerunning the compiler in the cluster_fortran/ directory.')
+        print('WARNING!!! ctool module not available, using algorithm <sklearn> instead of <molteni>.')
         algorithm = 'sklearn'
 
     if algorithm == 'sklearn':
@@ -4464,44 +3983,6 @@ def Kmeans_clustering(PCs, numclus, order_by_frequency = True, algorithm = 'skle
         centroids, labels = clus_order_by_frequency(centroids, labels)
 
     return centroids, labels
-
-
-def clusters_sig(pcs, centroids, labels, dates, nrsamp = 1000, npart_molt = 100):
-    """
-    H_0: There are no regimes ---> multi-normal distribution PDF
-    Synthetic datasets modelled on the PCs of the original data are computed (synthetic PCs have the same lag-1, mean and standard deviation of the original PCs)
-    SIGNIFICANCE = % of times that the optimal variance ratio found by clustering the real dataset exceeds the optimal ratio found by clustering the syntetic dataset (is our distribution more clustered than a multinormal distribution?)
-
-    < pcs > : the series of principal components. pcs.shape = (n_days, numpcs)
-    < dates > : the dates.
-    < nrsamp > : the number of synthetic datasets used to calculate the significance.
-    """
-    if 'ctp' not in sys.modules:
-        print('WARNING!!! ctp module not loaded, significance calculation can not be performed. Try rerunning the compiler in the cluster_fortran/ directory.')
-        return np.nan
-        #raise ValueError('ctp module not loaded. Run the compiler in the cluster_fortran/ directory')
-
-    #PCunscal = solver.pcs()[:,:numpcs]
-    pc_trans = np.transpose(pcs)
-
-    numclus = centroids.shape[0]
-    varopt = calc_varopt_molt(pcs, centroids, labels)
-
-    #dates = pd.to_datetime(dates)
-    deltas = dates[1:]-dates[:-1]
-    deltauno = dates[1]-dates[0]
-    ndis = np.sum(abs(deltas) > 2*deltauno) # Finds number of divisions in the dataset (n_seasons - 1)
-
-    print('check: number of seasons = {}\n'.format(ndis+1))
-
-    #=======parallel=======
-    start = datetime.now()
-    significance = ctp.cluster_toolkit_parallel.clus_sig_p_ncl(nrsamp, numclus, npart_molt, ndis, pc_trans, varopt)
-    end = datetime.now()
-    print('significance computation took me {:6.2f} seconds'.format((end-start).seconds))
-    print('significance for {} clusters = {:6.2f}'.format(numclus, significance))
-
-    return significance
 
 
 def calc_varopt_molt(pcs, centroids, labels):
@@ -5845,12 +5326,16 @@ def makePolygon(seq):
     return poly
 
 
-def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False, use_seaborn = True, sns_palette = 'hls'):
+def color_set(n, cmap = 'nipy_spectral', bright_thres = None, full_cb_range = False, only_darker_colors = False, use_seaborn = False, sns_palette = 'hls'):
     """
     Gives a set of n well chosen (hopefully) colors, darker than bright_thres. bright_thres ranges from 0 (darker) to 1 (brighter).
 
     < full_cb_range > : if True, takes all cb values. If false takes the portion 0.05/0.95.
     """
+
+    if 'seaborn' not in sys.modules and use_seaborn:
+        use_seaborn = False
+
     if not use_seaborn:
         if bright_thres is None:
             if only_darker_colors:
@@ -8016,6 +7501,10 @@ def plot_allregime_pdfs(labels, pcs, eof_proj = [(0,1), (0,2), (1,2)], all_regim
 def custom_alphagradient_cmap(color):
     # define custom colormap with fixed colour and alpha gradient
     # use simple linear interpolation in the entire scale
+
+    if 'seaborn' not in sys.modules:
+        print('Install seaborn to use this')
+        raise ModuleNotFoundError
 
     cmap = sns.light_palette(color, as_cmap = True)
     # if type(color) is str:
