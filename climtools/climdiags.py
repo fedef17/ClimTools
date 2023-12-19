@@ -13,7 +13,7 @@ import os
 
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
-import matplotlib.patheffects as PathEffects
+#import matplotlib.patheffects as PathEffects
 from matplotlib.colors import LogNorm
 
 import pandas as pd
@@ -26,20 +26,20 @@ import climtools.climtools_lib as ctl
 import glob
 
 
-
 ###############################################################################
-### constants
-cp = 1005.0 # specific enthalpy dry air - J kg-1 K-1
-cpw = 1840.0 # specific enthalpy water vapor - J kg-1 K-1
+# constants
+cp = 1005.0  # specific enthalpy dry air - J kg-1 K-1
+cpw = 1840.0  # specific enthalpy water vapor - J kg-1 K-1
 # per la moist air sarebbe cpm = cp + q*cpw, ma conta al massimo per un 3 %
-L = 2501000.0 # J kg-1
-Lsub = 2835000.0 # J kg-1
-g = 9.81 # m s-2
-Rearth = 6371.0e3 # mean radius
+L = 2501000.0  # J kg-1
+Lsub = 2835000.0  # J kg-1
+g = 9.81  # m s-2
+Rearth = 6371.0e3  # mean radius
 
 ###############################################################################
 
-def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_style = 'bil', grid = 'r144x73', gridtag = '25', merge = False, rechunk = False, verbose = False, remove_single_files = False, skip_existing = True, check_cmip6 = False, taglev = ''):
+
+def preprocess_cdo(cart_in, cart_out, sel_levels=None, regrid=True, interp_style='bil', grid='r144x73', gridtag='25', merge=False, rechunk=False, verbose=False, remove_single_files=False, skip_existing=True, check_cmip6=False, taglev=''):
     """
     Preselects levels, remaps to a different grid and optionally merges data in different files using cdo. Considers all nc files inside cart_in and outputs in cart_out.
 
@@ -53,7 +53,8 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
             taglev = '_' + str(int(sel_levels))
         sel_levels = [sel_levels]
     elif type(sel_levels) in [list, np.ndarray]:
-        if taglev == '': taglev = '_{}levs'.format(len(sel_levels))
+        if taglev == '':
+            taglev = '_{}levs'.format(len(sel_levels))
     else:
         taglev = ''
 
@@ -63,7 +64,8 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
         file_list = [fi for fi in file_list if len(fi.split('_')) == 7]
     file_list.sort()
     print('Processing {}...\n'.format(cart_in))
-    if verbose: print(file_list)
+    if verbose:
+        print(file_list)
 
     if len(file_list) == 0:
         print('\n\nEMPTY FOLDER\n\n')
@@ -91,11 +93,11 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
             return
         elif os.path.exists(cart_out):
             lista_done = os.listdir(cart_out)
-            #lista_ok = [fi for fi in lista_done if varname in fi]
+            # lista_ok = [fi for fi in lista_done if varname in fi]
             if len(lista_done) > 0:
                 listatempi = [os.stat(cart_out + fil).st_mtime for fil in lista_done]
                 tempi = np.argsort(listatempi)
-                fil_out_done = np.array(lista_done)[tempi][:-1] # excludes last file
+                fil_out_done = np.array(lista_done)[tempi][:-1]  # excludes last file
                 check_files = True
 
     if regrid:
@@ -104,42 +106,54 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
 
         file_out = cart_out + filenam[:indpo] + taglev + '_remap{}.nc'.format(gridtag)
 
-        if verbose: print('Processing {}\n'.format(file_in))
+        if verbose:
+            print('Processing {}\n'.format(file_in))
         if sel_levels is not None:
-            if verbose: print('Selecting levels..\n')
+            if verbose:
+                print('Selecting levels..\n')
             command = 'cdo -s sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
-            if verbose: print(command)
+            if verbose:
+                print(command)
             os.system(command)
             file_in = provname
-        if verbose: print('Calculating weights for interpolation....\n')
+        if verbose:
+            print('Calculating weights for interpolation....\n')
         command = 'cdo -s gen{},{} {} {}remapweights.nc'.format(interp_style, grid, file_in, cart_out)
-        if verbose: print(command)
+        if verbose:
+            print(command)
         os.system(command)
         command = 'cdo -s remap,{},{} {} {}'.format(grid, cart_out+'remapweights.nc', file_in, file_out)
-        if verbose: print(command)
+        if verbose:
+            print(command)
         os.system(command)
 
         if len(file_list) > 1:
             for filenam in file_list[1:]:
                 file_in = cart_in + filenam
                 indpo = filenam.index('.nc')
-                filepart = filenam[:indpo] + taglev +  '_remap{}.nc'.format(gridtag)
+                filepart = filenam[:indpo] + taglev + '_remap{}.nc'.format(gridtag)
                 file_out = cart_out + filepart
 
                 if check_files:
                     if filepart in fil_out_done:
-                        if verbose: print('Already processed {}'.format(file_in))
+                        if verbose:
+                            print('Already processed {}'.format(file_in))
                         continue
 
-                if verbose: print('Processing {}\n'.format(file_in))
+                if verbose:
+                    print('Processing {}\n'.format(file_in))
                 if sel_levels is not None:
-                    if verbose: print('Selecting levels..\n')
-                    command = 'cdo -s sellevel'+''.join([',{}'.format(lev) for lev in sel_levels])+' {} {}'.format(file_in, provname)
-                    if verbose: print(command)
+                    if verbose:
+                        print('Selecting levels..\n')
+                    command = 'cdo -s sellevel'+''.join([',{}'.format(lev)
+                                                        for lev in sel_levels])+' {} {}'.format(file_in, provname)
+                    if verbose:
+                        print(command)
                     os.system(command)
                     file_in = provname
                 command = 'cdo -s remap,{},{} {} {}'.format(grid, cart_out+'remapweights.nc', file_in, file_out)
-                if verbose: print(command)
+                if verbose:
+                    print(command)
                 os.system(command)
 
         os.remove(cart_out + 'remapweights.nc')
@@ -147,14 +161,17 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
 
     if merge:
         mergefilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '.nc'
-        #command = 'cdo -s cat {}*_remap*.nc {}'.format(cart_out, mergefilenam)
+        # command = 'cdo -s cat {}*_remap*.nc {}'.format(cart_out, mergefilenam)
         command = 'cdo -s mergetime {}*_remap*.nc {}'.format(cart_out, mergefilenam)
-        if verbose: print(command)
+        if verbose:
+            print(command)
         os.system(command)
         if rechunk:
             rcfilenam = cart_out + filenam_base + '_' + datestag + '_r' + gridtag + '_rc.nc'
-            command = 'nccopy -4 -c time/100,lat/{},lon/{} -d 1 -h 100000000 {} {}'.format(latchunks, lonchunks, mergefilenam, rcfilenam)
-            if verbose: print(command)
+            command = 'nccopy -4 -c time/100,lat/{},lon/{} -d 1 -h 100000000 {} {}'.format(
+                latchunks, lonchunks, mergefilenam, rcfilenam)
+            if verbose:
+                print(command)
             os.system(command)
             if remove_single_files:
                 os.remove(mergefilenam)
@@ -176,7 +193,7 @@ def preprocess_cdo(cart_in, cart_out, sel_levels = None, regrid = True, interp_s
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_yr_range = None, extract_level_hPa = None, netcdf4_read = False, iris_read = False, remove_29feb = False, thres_inf = 1.e9, pressure_levels = False, select_area_first = False, rebase_to_historical = False, climate_mean = None, dates_climate_mean = None, read_from_p = None, write_to_p = None, **kwargs):
+def WRtool_from_file(ifile, season, area, regrid_to_reference_cube=None, sel_yr_range=None, extract_level_hPa=None, netcdf4_read=False, iris_read=False, remove_29feb=False, thres_inf=1.e9, pressure_levels=False, select_area_first=False, rebase_to_historical=False, climate_mean=None, dates_climate_mean=None, read_from_p=None, write_to_p=None, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -219,7 +236,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         if select_area_first:
             print('Selecting area first for saving memory')
             var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
-        var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+        var_season, dates_season = ctl.sel_season(var, dates, season, cut=False, remove_29feb=remove_29feb)
         var_full.append(var)
         dates_full.append(dates)
         var_sel.append(var_season)
@@ -237,7 +254,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 print('Selecting area first for saving memory')
                 var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
 
-            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+            var_season, dates_season = ctl.sel_season(var, dates, season, cut=False, remove_29feb=remove_29feb)
             var_full.append(var)
             dates_full.append(dates)
             var_sel.append(var_season)
@@ -265,18 +282,20 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         if netcdf4_read:
             if regrid_to_reference_cube is not None:
                 print('WARNING! Unable to perform regridding with netcdf4_read. Set it to False to use read_xr instead')
-            #var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
-            var, coords, aux_info = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
+            var, coords, aux_info = ctl.readxDncfield(ifile, extract_level=extract_level_hPa)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
         elif iris_read:
-            var, coords, aux_info = ctl.read_iris_nc(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+            var, coords, aux_info = ctl.read_iris_nc(
+                ifile, extract_level_hPa=extract_level_hPa, regrid_to_reference=regrid_to_reference_cube, pressure_levels=pressure_levels)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
         else:
-            var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+            var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa=extract_level_hPa,
+                                                regrid_to_reference=regrid_to_reference_cube)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
@@ -284,8 +303,10 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         cond = np.abs(var) > thres_inf
         if np.any(cond):
             if np.sum(cond) > np.size(var)/100:
-                raise ValueError('Too many values larger than thres_inf = {:8.2e}. Check the threshold or the data file.'.format(thres_inf))
-            print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found {:5d} points.'.format(thres_inf, np.sum(cond)))
+                raise ValueError(
+                    'Too many values larger than thres_inf = {:8.2e}. Check the threshold or the data file.'.format(thres_inf))
+            print('WARNING!! Replacing values larger than {:8.2e} with NaN. Found {:5d} points.'.format(
+                thres_inf, np.sum(cond)))
             var[cond] = np.nan
 
         if write_to_p is not None:
@@ -300,10 +321,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
         if len(all_ye) > len(all_ye_data):
             missing_ye = []
             for ye in all_ye:
-                if ye not in all_ye_data: missing_ye.append(ye)
+                if ye not in all_ye_data:
+                    missing_ye.append(ye)
             print('WARNING! Missing years in model: {}'.format(missing_ye))
 
-        var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb = remove_29feb)
+        var_season, dates_season = ctl.sel_season(var, dates, season, remove_29feb=remove_29feb)
     else:
         is_ensemble = True
         print('Concatenating {} input files..\n'.format(len(ifile)))
@@ -316,18 +338,20 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
             if netcdf4_read:
                 if regrid_to_reference_cube is not None:
                     print('WARNING! Unable to perform regridding with netcdf4_read set to True')
-                var, coords, aux_info = ctl.readxDncfield(fil, extract_level = extract_level_hPa)
+                var, coords, aux_info = ctl.readxDncfield(fil, extract_level=extract_level_hPa)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
                 # var, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(ifile, extract_level = extract_level_hPa)
             elif iris_read:
-                var, coords, aux_info = ctl.read_iris_nc(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube, pressure_levels = pressure_levels)
+                var, coords, aux_info = ctl.read_iris_nc(
+                    fil, extract_level_hPa=extract_level_hPa, regrid_to_reference=regrid_to_reference_cube, pressure_levels=pressure_levels)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
             else:
-                var, coords, aux_info = ctl.read_xr(fil, extract_level_hPa = extract_level_hPa, regrid_to_reference = regrid_to_reference_cube)
+                var, coords, aux_info = ctl.read_xr(fil, extract_level_hPa=extract_level_hPa,
+                                                    regrid_to_reference=regrid_to_reference_cube)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
@@ -345,11 +369,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
                 print('Selecting area first for saving memory')
                 var, lat, lon = ctl.sel_area(lat, lon, var, area)
 
-            ### inefficient for memory: I just need 20 days at both ends to calculate climatology
+            # inefficient for memory: I just need 20 days at both ends to calculate climatology
             dates_full.append(dates)
             var_full.append(var)
 
-            var_season, dates_season = ctl.sel_season(var, dates, season, cut = False, remove_29feb = remove_29feb)
+            var_season, dates_season = ctl.sel_season(var, dates, season, cut=False, remove_29feb=remove_29feb)
             var_sel.append(var_season)
             dates_sel.append(dates_season)
 
@@ -363,11 +387,11 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
         del var_full, var_sel, dates_full, dates_sel
 
-    #HERE calculate climate_mean
+    # HERE calculate climate_mean
     if not rebase_to_historical:
         print('Calculating mean climatology\n')
         if ctl.check_daily(dates):
-            climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
+            climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window=kwargs['wnd_days'])
 
             # climate_mean_dtr, dates_climate_mean_dtr = None, None
             # if kwargs['detrended_eof_calculation']:
@@ -395,8 +419,9 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
     #     dates = dates[okdat]
     del var
 
-    #results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, climate_mean_dtr = climate_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
-    results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, select_area_first = select_area_first, rebase_to_historical = rebase_to_historical, **kwargs)
+    # results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, climate_mean_dtr = climate_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
+    results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean=climate_mean, dates_climate_mean=dates_climate_mean,
+                          select_area_first=select_area_first, rebase_to_historical=rebase_to_historical, **kwargs)
 
     results['dates_allyear'] = dates
     if read_from_p is not None:
@@ -407,7 +432,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube = None, sel_y
 
     var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season, kwargs['numclus'])
     results['freq_clus_monthly'] = var
-    #results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
+    # results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
     results['freq_clus_monthly_dates'] = datesmon
 
     # separare qui gli ensembles? no
@@ -462,7 +487,7 @@ def extract_ensemble_results(results, ens_names):
         for nam in ens_names[mod]:
             var, datesmon = ctl.calc_monthly_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
             nures[mod]['freq_clus_monthly'][nam] = var
-            #nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
+            # nures[mod]['freq_clus_monthly_dates'][nam] = pd.to_datetime(datesmon)
             nures[mod]['freq_clus_monthly_dates'][nam] = datesmon
 
             var, years = ctl.calc_seasonal_clus_freq(nures[mod]['labels'][nam], nures[mod]['dates'][nam], numclus)
@@ -495,7 +520,7 @@ def export_results_to_json(filename, results):
             if ke in ['solver', 'regime_transition_pcs', 'resid_times', 'var_area', 'var_glob']:
                 del nures[mod][ke]
 
-        if 'is_ensemble' not in results[mod].keys(): # backward Compatibility
+        if 'is_ensemble' not in results[mod].keys():  # backward Compatibility
             nures[mod]['is_ensemble'] = False
 
         if not nures[mod]['is_ensemble']:
@@ -514,7 +539,8 @@ def export_results_to_json(filename, results):
                         nures[mod][ke] = [cos.isoformat() for cos in nures[mod][ke]]
 
             for ke in alkeens:
-                if ke not in nures[mod]: continue
+                if ke not in nures[mod]:
+                    continue
                 # devo splittare ogni ens
                 for ens in nures[mod]['ens_names']:
                     coso = nures[mod][ke][ens]
@@ -525,7 +551,6 @@ def export_results_to_json(filename, results):
                     if type(coso) == list and (type(coso[0]) in [cftime.real_datetime, pd.Timestamp, datetime] or issubclass(type(coso[0]), cftime._cftime.datetime)):
                         nures[mod][ke][ens] = [cos.isoformat() for cos in coso]
 
-
     with open(filename, 'w') as fp:
         try:
             json.dump(nures, fp)
@@ -533,7 +558,7 @@ def export_results_to_json(filename, results):
             print(nures[list(nures.keys())[0]].keys())
             for mod in nures.keys():
                 print(mod)
-                #print(mod, results[mod])
+                # print(mod, results[mod])
                 if 'ens_names' in nures[mod]:
                     ens = nures[mod]['ens_names'][0]
                     print(nures[mod]['ens_names'])
@@ -589,7 +614,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_years = 30, numpcs = 4, perc = None, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'molteni', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = False, significance_calc_routine = 'BootStrap25', use_reference_eofs = False, use_reference_clusters = False, ref_clusters_centers = None, climate_mean = None, dates_climate_mean = None, bad_matching_rule = 'rms_mean', matching_hierarchy = None, area_dtr = 'global', detrend_only_global = False, calc_gradient = False, supervised_clustering = False, frac_super = 0.02, select_area_first = False, deg_dtr = 1, detrend_local_linear = False, rebase_to_historical = False, remove_climate_mean = True):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days=20, wnd_years=30, numpcs=4, perc=None, numclus=4, ref_solver=None, ref_patterns_area=None, clus_algorhitm='molteni', nrsamp_sig=5000, heavy_output=False, run_significance_calc=False, significance_calc_routine='BootStrap25', use_reference_eofs=False, use_reference_clusters=False, ref_clusters_centers=None, climate_mean=None, dates_climate_mean=None, bad_matching_rule='rms_mean', matching_hierarchy=None, area_dtr='global', detrend_only_global=False, calc_gradient=False, supervised_clustering=False, frac_super=0.02, select_area_first=False, deg_dtr=1, detrend_local_linear=False, rebase_to_historical=False, remove_climate_mean=True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -627,28 +652,31 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         if ref_solver is None:
             raise ValueError('reference solver is None!')
 
-    ## PRECOMPUTE
+    # PRECOMPUTE
     if detrend_only_global:
         print('Detrending polynomial global tendencies over area {}'.format(area_dtr))
-        var_season, coeffs_dtr, var_dtr, dates_season = ctl.remove_global_polytrend(lat, lon, var_season, dates_season, None, deg = deg_dtr, area = area_dtr)
+        var_season, coeffs_dtr, var_dtr, dates_season = ctl.remove_global_polytrend(
+            lat, lon, var_season, dates_season, None, deg=deg_dtr, area=area_dtr)
         if not rebase_to_historical:
-            climate_mean = None # need to recalculate climate_mean
+            climate_mean = None  # need to recalculate climate_mean
 
     if detrend_local_linear:
         print('Detrending local linear tendencies')
         var_season, local_trend, dates_season = ctl.remove_local_lineartrend(lat, lon, var_season, dates_season, None)
         if not rebase_to_historical:
-            climate_mean = None # need to recalculate climate_mean
+            climate_mean = None  # need to recalculate climate_mean
 
     if remove_climate_mean:
         if is_daily:
             if climate_mean is None:
                 climate_mean, dates_climate_mean, climat_std = ctl.daily_climatology(var_season, dates_season, wnd_days)
-            var_anom = ctl.anomalies_daily(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
+            var_anom = ctl.anomalies_daily(var_season, dates_season, climate_mean=climate_mean,
+                                           dates_climate_mean=dates_climate_mean)
         else:
             if climate_mean is None:
                 climate_mean, dates_climate_mean, climat_std = ctl.monthly_climatology(var_season, dates_season)
-            var_anom = ctl.anomalies_monthly(var_season, dates_season, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean)
+            var_anom = ctl.anomalies_monthly(var_season, dates_season, climate_mean=climate_mean,
+                                             dates_climate_mean=dates_climate_mean)
     else:
         var_anom = var_season
 
@@ -660,7 +688,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
         var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
     print('Running compute\n')
-    #### EOF COMPUTATION
+    # EOF COMPUTATION
     eof_solver = ctl.eof_computation(var_area, lat_area)
     if perc is not None:
         varfrac = eof_solver.varianceFraction()
@@ -676,18 +704,18 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     if not use_reference_clusters:
         if not supervised_clustering:
             print('Running clustering\n')
-            #### CLUSTERING
-            centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
+            # CLUSTERING
+            centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm=clus_algorhitm)
             dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
         else:
             print('Running clustering with supervised fraction = {:5.2e}\n'.format(frac_super))
             if frac_super == 0:
                 raise ValueError('fraction supervised is 0! cannot perform supervised clustering')
             n_rep = int(np.ceil(len(PCs)*frac_super))
-            gigi = np.concatenate(n_rep*[ref_clusters_centers], axis = 0)
-            pcs2 = np.concatenate([PCs, gigi], axis = 0)
+            gigi = np.concatenate(n_rep*[ref_clusters_centers], axis=0)
+            pcs2 = np.concatenate([PCs, gigi], axis=0)
 
-            centroids, labels = ctl.Kmeans_clustering(pcs2, numclus, algorithm = clus_algorhitm)
+            centroids, labels = ctl.Kmeans_clustering(pcs2, numclus, algorithm=clus_algorhitm)
             labels = labels[:len(PCs)]
             dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
     else:
@@ -721,14 +749,15 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
 
     if run_significance_calc:
         print('Running clus sig\n')
-        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
+        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp=nrsamp_sig)
         results['significance'] = significance
 
     results['var_ratio'] = ctl.calc_varopt_molt(PCs, centroids, labels)
 
     if ref_solver is not None and ref_patterns_area is not None:
         print('Running compare\n')
-        perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs, bad_matching_rule = bad_matching_rule, matching_hierarchy = matching_hierarchy)
+        perm, centroids, labels, et, patcor = ctl.clus_compare_projected(
+            centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs, bad_matching_rule=bad_matching_rule, matching_hierarchy=matching_hierarchy)
 
         print('Optimal permutation: {}\n'.format(perm))
         cluspattern = cluspattern[perm, ...]
@@ -761,9 +790,9 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     effcen = []
     for clus in range(numclus):
         oklabs = labels == clus
-        effcen.append(np.mean(PCs[oklabs], axis = 0))
+        effcen.append(np.mean(PCs[oklabs], axis=0))
 
-    results['eff_centroids'] = np.stack(effcen) # mean of the PCs for each cluster
+    results['eff_centroids'] = np.stack(effcen)  # mean of the PCs for each cluster
 
     if 'use_reference_eofs' and ref_solver is not None:
         results['eofs_ref_pcs'] = ref_solver.eofs()[:numpcs]
@@ -774,14 +803,15 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     results['model_eofs_eigenvalues'] = eof_solver.eigenvalues()[:numpcs]
     results['model_eofs_varfrac'] = eof_solver.varianceFraction()[:numpcs]
 
-    results['resid_times'] = ctl.calc_regime_residtimes(labels, dates = dates_season)[0]
+    results['resid_times'] = ctl.calc_regime_residtimes(labels, dates=dates_season)[0]
     results['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels, dates_season)
     results['dates'] = dates_season
 
-    if calc_gradient: results['maxgrad'] = ctl.calc_max_gradient_series(var_area, lat_area, lon_area)
+    if calc_gradient:
+        results['maxgrad'] = ctl.calc_max_gradient_series(var_area, lat_area, lon_area)
 
     if heavy_output:
-        results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs, filter_longer_than = 3)
+        results['regime_transition_pcs'] = ctl.find_transition_pcs(1, labels, dates_season, PCs, filter_longer_than=3)
         results['var_area'] = var_area
         results['var_glob'] = var_anom
         results['solver'] = eof_solver
@@ -789,7 +819,7 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days = 20, wnd_yea
     return results
 
 
-def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names = None, wnd = 5, numpcs = 4, numclus = 4, ref_solver = None, ref_patterns_area = None, clus_algorhitm = 'sklearn', nrsamp_sig = 5000, heavy_output = False, run_significance_calc = False, detrended_eof_calculation = False, detrended_anom_for_clustering = False):
+def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area, ens_names=None, wnd=5, numpcs=4, numclus=4, ref_solver=None, ref_patterns_area=None, clus_algorhitm='sklearn', nrsamp_sig=5000, heavy_output=False, run_significance_calc=False, detrended_eof_calculation=False, detrended_anom_for_clustering=False):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -808,7 +838,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
     < detrended_eof_calculation > : Calculates a 20-year running mean for the geopotential before calculating the eofs.
     < detrended_anom_for_clustering > : Calculates the anomalies for clustering using the same detrended running mean.
     """
-    ## PRECOMPUTE
+    # PRECOMPUTE
     if detrended_anom_for_clustering and not detrended_eof_calculation:
         detrended_eof_calculation = True
         print('Setting detrended_eof_calculation = True\n')
@@ -827,19 +857,21 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         for ens in range(n_ens):
             # Detrending
             print('Detrended eof calculation\n')
-            climate_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(var_season_set[ens], dates_season_set[ens], window_days = wnd)
+            climate_mean_dtr, dates_climat_dtr = ctl.trend_daily_climat(
+                var_season_set[ens], dates_season_set[ens], window_days=wnd)
             trace_ens.append(len(var_season_set[ens]))
             if heavy_output:
-                results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climate_mean_dtr), axis = 1)
+                results[ens_names[ens]]['climate_mean_dtr'] = np.mean(np.stack(climate_mean_dtr), axis=1)
                 results[ens_names[ens]]['climate_mean_dtr_dates'] = np.array([da.year for da in dates_climat_dtr])
-            var_anom_dtr.append(ctl.anomalies_daily_detrended(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean_dtr, dates_climate_mean = dates_climat_dtr))
+            var_anom_dtr.append(ctl.anomalies_daily_detrended(
+                var_season_set[ens], dates_season_set[ens], climate_mean=climate_mean_dtr, dates_climate_mean=dates_climat_dtr))
 
         var_anom_dtr = np.concatenate(var_anom_dtr)
 
         var_area_dtr, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom_dtr, area)
 
         print('Running compute\n')
-        #### EOF COMPUTATION
+        # EOF COMPUTATION
         eof_solver = ctl.eof_computation(var_area_dtr, lat_area)
 
         if detrended_anom_for_clustering:
@@ -851,9 +883,10 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
                 # Detrending
                 climate_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
                 if heavy_output:
-                    results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis = 1)
+                    results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis=1)
                     results[ens_names[ens]]['climate_mean_dates'] = dates_climat
-                var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean, dates_climate_mean = dates_climat))
+                var_anom.append(ctl.anomalies_daily(
+                    var_season_set[ens], dates_season_set[ens], climate_mean=climate_mean, dates_climate_mean=dates_climat))
 
             var_anom = np.concatenate(var_anom)
             var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
@@ -865,21 +898,22 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
             trace_ens.append(len(var_season_set[ens]))
             climate_mean, dates_climat, climat_std = ctl.daily_climatology(var_season_set[ens], dates_season_set[ens], wnd)
             if heavy_output:
-                results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis = 1)
+                results[ens_names[ens]]['climate_mean'] = np.mean(climate_mean, axis=1)
                 results[ens_names[ens]]['climate_mean_dates'] = dates_climat
-            var_anom.append(ctl.anomalies_daily(var_season_set[ens], dates_season_set[ens], climate_mean = climate_mean, dates_climate_mean = dates_climat))
+            var_anom.append(ctl.anomalies_daily(
+                var_season_set[ens], dates_season_set[ens], climate_mean=climate_mean, dates_climate_mean=dates_climat))
 
         var_anom = np.concatenate(var_anom)
         var_area, lat_area, lon_area = ctl.sel_area(lat, lon, var_anom, area)
 
         print('Running compute\n')
-        #### EOF COMPUTATION
+        # EOF COMPUTATION
         eof_solver = ctl.eof_computation(var_area, lat_area)
         PCs = eof_solver.pcs()[:, :numpcs]
 
     print('Running clustering\n')
-    #### CLUSTERING
-    centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm = clus_algorhitm)
+    # CLUSTERING
+    centroids, labels = ctl.Kmeans_clustering(PCs, numclus, algorithm=clus_algorhitm)
 
     dist_centroid = ctl.compute_centroid_distance(PCs, centroids, labels)
 
@@ -900,12 +934,13 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 
     if run_significance_calc:
         print('Running clus sig\n')
-        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp = nrsamp_sig)
+        significance = ctl.clusters_sig(PCs, centroids, labels, dates_season, nrsamp=nrsamp_sig)
         results['all']['significance'] = significance
 
     if ref_solver is not None and ref_patterns_area is not None:
         print('Running compare\n')
-        perm, centroids, labels, et, patcor = ctl.clus_compare_projected(centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs)
+        perm, centroids, labels, et, patcor = ctl.clus_compare_projected(
+            centroids, labels, cluspatt_area, ref_patterns_area, ref_solver, numpcs)
 
         print('Optimal permutation: {}\n'.format(perm))
         cluspattern = cluspattern[perm, ...]
@@ -940,7 +975,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
         results[ennam]['dates'] = dates_season_set[ens]
 
         results[ennam]['freq_clus'] = ctl.calc_clus_freq(labels[ind1:ind2], numclus)
-        results[ennam]['resid_times'] = ctl.calc_regime_residtimes(labels[ind1:ind2], dates = dates_season_set[ens])[0]
+        results[ennam]['resid_times'] = ctl.calc_regime_residtimes(labels[ind1:ind2], dates=dates_season_set[ens])[0]
         results[ennam]['trans_matrix'] = ctl.calc_regime_transmatrix(1, labels[ind1:ind2], dates_season_set[ens])
 
         if heavy_output:
@@ -951,9 +986,11 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
                 results[ennam]['var_area'] = var_area[ind1:ind2]
                 results[ennam]['var_glob'] = var_anom[ind1:ind2]
 
-    results['all']['trans_matrix'] = ctl.calc_regime_transmatrix(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set)
+    results['all']['trans_matrix'] = ctl.calc_regime_transmatrix(
+        n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set)
     if heavy_output:
-        results['all']['regime_transition_pcs'] = ctl.find_transition_pcs(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set, [results[ennam]['pcs'] for ennam in ens_names], filter_longer_than = 3)
+        results['all']['regime_transition_pcs'] = ctl.find_transition_pcs(n_ens, [results[ennam]['labels'] for ennam in ens_names], dates_season_set, [
+                                                                          results[ennam]['pcs'] for ennam in ens_names], filter_longer_than=3)
 
     return results
 
@@ -961,7 +998,7 @@ def WRtool_core_ensemble(n_ens, var_season_set, lat, lon, dates_season_set, area
 #############################################################################
 ################ other for mid-lat flow #####################################
 
-def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile = None, compute_in_chunks = True, npchu = 50, filter = 'butter', remove_orog = False, plot_filename = None, allareadict = None):
+def jli_from_files(ifile, area=[-60., 0., 20., 70.], season='DJFM', orogfile=None, compute_in_chunks=True, npchu=50, filter='butter', remove_orog=False, plot_filename=None, allareadict=None):
     """
     Wrapper for jli.
     """
@@ -978,26 +1015,28 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
             jspeed = []
 
         dates_season = []
-        #if compute_in_chunks and len(ifile) > npchu:
+        # if compute_in_chunks and len(ifile) > npchu:
         nchunks = int(np.ceil(len(ifile)/npchu))
         for chu in range(nchunks):
             fin = (chu+1)*npchu
             if chu == nchunks-1:
                 fin = None
 
-            var, coords, aux_info = ctl.read_xr(ifile[chu*npchu:fin], extract_level_hPa = 850., regrid_to_deg = 2.5)
+            var, coords, aux_info = ctl.read_xr(ifile[chu*npchu:fin], extract_level_hPa=850., regrid_to_deg=2.5)
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
 
             if allareadict is not None:
                 for area in allareadict.keys():
-                    jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, allareadict[area], season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+                    jlich, jspeedch, dates_seasonch = jetlatindex(
+                        var, lat, lon, dates, allareadict[area], season, filter=filter, remove_orog=remove_orog, orogfile=orogfile)
 
                     jli[area].append(jlich)
                     jspeed[area].append(jspeedch)
             else:
-                jlich, jspeedch, dates_seasonch = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+                jlich, jspeedch, dates_seasonch = jetlatindex(
+                    var, lat, lon, dates, area, season, filter=filter, remove_orog=remove_orog, orogfile=orogfile)
 
                 jli.append(jlich)
                 jspeed.append(jspeedch)
@@ -1013,7 +1052,7 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
             jspeed = np.concatenate(jspeed)
         dates_season = np.concatenate(dates_season)
     else:
-        var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa = 850., regrid_to_deg = 2.5)
+        var, coords, aux_info = ctl.read_xr(ifile, extract_level_hPa=850., regrid_to_deg=2.5)
         lat = coords['lat']
         lon = coords['lon']
         dates = coords['dates']
@@ -1022,31 +1061,33 @@ def jli_from_files(ifile, area = [-60., 0., 20., 70.], season = 'DJFM', orogfile
             jli = dict()
             jspeed = dict()
             for area in allareadict.keys():
-                jli[area], jspeed[area], dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+                jli[area], jspeed[area], dates_season = jetlatindex(
+                    var, lat, lon, dates, area, season, filter=filter, remove_orog=remove_orog, orogfile=orogfile)
         else:
-            jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season, filter = filter, remove_orog = remove_orog, orogfile = orogfile)
+            jli, jspeed, dates_season = jetlatindex(var, lat, lon, dates, area, season,
+                                                    filter=filter, remove_orog=remove_orog, orogfile=orogfile)
 
     if plot_filename is not None:
         if allareadict is not None:
             print('WARNING: jli plot for multiple areas not implemented')
         else:
-            plot_jli_w_speed(jli, jspeed, dates, filename = plot_filename)
+            plot_jli_w_speed(jli, jspeed, dates, filename=plot_filename)
 
     return jli, jspeed, dates_season
 
 
-def plot_jli_w_speed(jli, jspeed, dates, title = None, filename = None, colors = None, bnd_width = 0.22):
+def plot_jli_w_speed(jli, jspeed, dates, title=None, filename=None, colors=None, bnd_width=0.22):
     """
     Plot JLI and jet speed.
     """
 
     def dopdf(var, xi, bnd_width):
-        pdf = ctl.calc_pdf(var, bnd_width = bnd_width)
+        pdf = ctl.calc_pdf(var, bnd_width=bnd_width)
         pdfok = pdf(xi)
         pdfok /= np.sum(pdfok)
         return pdfok
 
-    fig = plt.figure(figsize = (24,12))
+    fig = plt.figure(figsize=(24, 12))
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
 
@@ -1054,26 +1095,26 @@ def plot_jli_w_speed(jli, jspeed, dates, title = None, filename = None, colors =
     vmin, vmax = (np.min(jspeed), np.max(jspeed))
     vsel = np.linspace(vmin, vmax, 100)
 
-    jliserie = ctl.bootstrap(jli, dates, None, apply_func = dopdf, func_args = [latsel, bnd_width], n_choice = 50, n_bootstrap = 1000)
-    jspedserie = ctl.bootstrap(jspeed, dates, None, apply_func = dopdf, func_args = [vsel, None], n_choice = 50, n_bootstrap = 1000)
+    jliserie = ctl.bootstrap(jli, dates, None, apply_func=dopdf, func_args=[latsel, bnd_width], n_choice=50, n_bootstrap=1000)
+    jspedserie = ctl.bootstrap(jspeed, dates, None, apply_func=dopdf, func_args=[vsel, None], n_choice=50, n_bootstrap=1000)
 
-    pdf = ctl.calc_pdf(jli, bnd_width = bnd_width)
+    pdf = ctl.calc_pdf(jli, bnd_width=bnd_width)
     pdfok = pdf(latsel)
     pdfok /= np.sum(pdfok)
 
-    jlimin = np.percentile(jliserie, 10, axis = 0)
-    jlimax = np.percentile(jliserie, 90, axis = 0)
-    ax1.fill_between(latsel, jlimin, jlimax, color = 'forestgreen', alpha = 0.3)
-    ax1.plot(latsel, pdfok, color = 'forestgreen', linewidth = 3)
+    jlimin = np.percentile(jliserie, 10, axis=0)
+    jlimax = np.percentile(jliserie, 90, axis=0)
+    ax1.fill_between(latsel, jlimin, jlimax, color='forestgreen', alpha=0.3)
+    ax1.plot(latsel, pdfok, color='forestgreen', linewidth=3)
 
     pdf = ctl.calc_pdf(jspeed)
     pdfok = pdf(vsel)
     pdfok /= np.sum(pdfok)
 
-    jlimin = np.percentile(jspedserie, 10, axis = 0)
-    jlimax = np.percentile(jspedserie, 90, axis = 0)
-    ax2.fill_between(vsel, jlimin, jlimax, color = 'indianred', alpha = 0.3)
-    ax2.plot(vsel, pdfok, color = 'indianred', linewidth = 3)
+    jlimin = np.percentile(jspedserie, 10, axis=0)
+    jlimax = np.percentile(jspedserie, 90, axis=0)
+    ax2.fill_between(vsel, jlimin, jlimax, color='indianred', alpha=0.3)
+    ax2.plot(vsel, pdfok, color='indianred', linewidth=3)
 
     ax1.grid()
     ax2.grid()
@@ -1091,7 +1132,7 @@ def plot_jli_w_speed(jli, jspeed, dates, title = None, filename = None, colors =
     return fig
 
 
-def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJFM', remove_orog = False, orogfile = None, remove_29feb = True, filter = 'butter'):
+def jetlatindex(var, lat, lon, dates, area=[-60., 0., 20., 70.], season='DJFM', remove_orog=False, orogfile=None, remove_29feb=True, filter='butter'):
     """
     Calculates jet speed and jet latitude index.
     """
@@ -1111,7 +1152,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
     #     #wind_low = ctl.running_mean(wind_area, 10)
 
     if filter == 'lanczos':
-        wind_low = ctl.lowpass_lanczos(var_area, 10, nan_extremes = False)
+        wind_low = ctl.lowpass_lanczos(var_area, 10, nan_extremes=False)
     elif filter == 'butter':
         wind_low = ctl.butter_filter(var_area, 10)
     else:
@@ -1119,7 +1160,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
 
     print(wind_low.shape)
 
-    wind_low, dates_season = ctl.sel_season(wind_low, dates, season, cut = False, remove_29feb = remove_29feb)
+    wind_low, dates_season = ctl.sel_season(wind_low, dates, season, cut=False, remove_29feb=remove_29feb)
 
     print(wind_low.shape)
 
@@ -1131,11 +1172,11 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
             #     orogfile = 'geopot_vegcover_25.nc'
         if orogfile is not None:
             # masking Greenland
-            orog, coords, aux_info = ctl.readxDncfield(orogfile, select_var = 'z')
+            orog, coords, aux_info = ctl.readxDncfield(orogfile, select_var='z')
             orogmask = orog > 1300.0
             orogarea, _, _ = ctl.sel_area(coords['lat'], coords['lon'], orogmask, area)
             print(orogarea.shape)
-            #orogarea = orogarea[0]
+            # orogarea = orogarea[0]
             orogarea = orogarea.squeeze()
 
             # orogarea = np.zeros(var_area[0].shape)
@@ -1146,10 +1187,10 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
             for co in range(wind_low.shape[0]):
                 wind_low[co][orogarea] = np.nan
 
-    wind_zon = np.nanmean(wind_low, axis = 2)
+    wind_zon = np.nanmean(wind_low, axis=2)
 
-    jspeed = np.max(wind_zon, axis = 1)
-    jli = lat_area[np.argmax(wind_zon, axis = 1)]
+    jspeed = np.max(wind_zon, axis=1)
+    jli = lat_area[np.argmax(wind_zon, axis=1)]
     print(len(jli), len(jspeed))
 
     # plt.ion()
@@ -1168,7 +1209,7 @@ def jetlatindex(var, lat, lon, dates, area = [-60., 0., 20., 70.], season = 'DJF
 #############################################################################
 
 
-def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = None, seasons = ['DJF', 'JJA']):
+def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity=None, seasons=['DJF', 'JJA']):
     """
     Calculates meridional fluxes of quantity quant.
 
@@ -1192,9 +1233,9 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
         raise ValueError('Level units are not in Pa?')
 
     press0 = dict()
-    press0['year'] = np.mean(ps, axis = 0)
+    press0['year'] = np.mean(ps, axis=0)
     for seas in seasons:
-        press0[seas] = np.mean(ctl.sel_season(ps, dates_ps, seas, cut = False)[0], axis = 0)
+        press0[seas] = np.mean(ctl.sel_season(ps, dates_ps, seas, cut=False)[0], axis=0)
 
     fluxes_levels = dict()
     fluxes_cross = dict()
@@ -1206,20 +1247,20 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
         del quantity
 
     for seas in seasons:
-        fluxes_levels[seas] = np.mean(ctl.sel_season(va, dates_6hrs, seas, cut = False)[0], axis = 0)
-    fluxes_levels['year'] = np.mean(va, axis = 0)
+        fluxes_levels[seas] = np.mean(ctl.sel_season(va, dates_6hrs, seas, cut=False)[0], axis=0)
+    fluxes_levels['year'] = np.mean(va, axis=0)
     del va
 
     zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
     for flun in fluxes_levels:
-        fluxes_cross[flun] = np.mean(fluxes_levels[flun], axis = -1)*zonal_factor
+        fluxes_cross[flun] = np.mean(fluxes_levels[flun], axis=-1)*zonal_factor
         fluxes_maps[flun] = np.zeros(fluxes_levels[flun].shape[1:])
 
     print('Starting vertical integration\n')
     for seas in press0:
         for ila in range(len(lat)):
             for ilo in range(len(lon)):
-                #print(lat[ila], lon[ilo])
+                # print(lat[ila], lon[ilo])
                 p0 = press0[seas][ila, ilo]
 
                 # Selecting pressure levels lower than surface pressure
@@ -1236,13 +1277,13 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
 
                 coso = fluxes_levels[seas][:, ila, ilo]
                 coso = np.append(coso[:lev0], np.interp(p0, levels, coso))
-                fluxes_maps[seas][ila, ilo] = np.trapz(coso, x = levels_ok)
+                fluxes_maps[seas][ila, ilo] = np.trapz(coso, x=levels_ok)
 
     print('done\n')
 
     zonal_factor = 2*np.pi*Rearth*np.cos(np.deg2rad(lat))
     for fu in fluxes_maps:
-        fluxes_zonal[fu] = np.mean(fluxes_maps[fu], axis = -1)*zonal_factor
+        fluxes_zonal[fu] = np.mean(fluxes_maps[fu], axis=-1)*zonal_factor
 
     results = dict()
     results['zonal'] = fluxes_zonal
@@ -1252,7 +1293,7 @@ def quant_flux_calc(va, lat, lon, levels, dates_6hrs, ps, dates_ps, quantity = N
     return results
 
 
-def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, zg_in_ERA_units = False, seasons = ['DJF', 'JJA'], netcdf_level_units = None):
+def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation=False, zg_in_ERA_units=False, seasons=['DJF', 'JJA'], netcdf_level_units=None):
     """
     Calculates meridional heat fluxes: SH (sensible), LH (latent) and PE (potential energy).
 
@@ -1285,7 +1326,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
     fluxes_maps = dict()
     fluxes_zonal = dict()
 
-    varnames = [['v','va'], ['t','ta'], ['z','zg'], ['q','hus']]
+    varnames = [['v', 'va'], ['t', 'ta'], ['z', 'zg'], ['q', 'hus']]
     fluxnames = ['SH', 'PE', 'LH']
     results = dict()
 
@@ -1294,7 +1335,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         # leggo v
         if type(file_list) is str:
             # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnames[0])
-            varuna, coords, aux_info = ctl.readxDncfield(ifile, select_var = varnames[0])
+            varuna, coords, aux_info = ctl.readxDncfield(ifile, select_var=varnames[0])
             lat = coords['lat']
             lon = coords['lon']
             dates = coords['dates']
@@ -1310,7 +1351,8 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         # Changing to standard names
         for varna in varuna:
             for varnamok in varnames:
-                if varna in varnamok: vars[varnamok[0]] = varuna.pop(varna)
+                if varna in varnamok:
+                    vars[varnamok[0]] = varuna.pop(varna)
 
         print(varuna.keys(), vars.keys())
 
@@ -1321,7 +1363,7 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
 
             if type(file_list) is str:
                 # varuna, level, lat, lon, dates, time_units, var_units, time_cal = ctl.readxDncfield(file_list, select_var = varnamok)
-                varuna, coords, aux_info = ctl.readxDncfield(file_list, select_var = varnamok)
+                varuna, coords, aux_info = ctl.readxDncfield(file_list, select_var=varnamok)
                 lat = coords['lat']
                 lon = coords['lon']
                 dates = coords['dates']
@@ -1343,7 +1385,8 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
                 fact = factors[flun]
 
             print('Calculating {}\n'.format(flun))
-            results[flun] = quant_flux_calc(vars['v'], lat, lon, level, dates, press0row, datespress, quantity = factors[flun]*vars[varname], seasons = seasons)
+            results[flun] = quant_flux_calc(vars['v'], lat, lon, level, dates, press0row,
+                                            datespress, quantity=factors[flun]*vars[varname], seasons=seasons)
             print('OK\n')
             del vars[varname]
 
@@ -1364,17 +1407,18 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
             varuna *= fact
 
             print('Calculating {}\n'.format(flun))
-            results[flun] = quant_flux_calc(varuna, lat, lon, level, dates, press0row, datespress, seasons = seasons)
+            results[flun] = quant_flux_calc(varuna, lat, lon, level, dates, press0row, datespress, seasons=seasons)
             print('OK\n')
             del varuna
 
-    if not os.path.exists(cart_out): os.mkdir(cart_out)
+    if not os.path.exists(cart_out):
+        os.mkdir(cart_out)
 
     for fu in results:
         filena = cart_out + '{}flux_map_{}_{}seasons.nc'.format(fu, tag, len(seasons))
         vals = [results[fu]['maps'][key] for key in seasons]
         vals.append(results[fu]['maps']['year'])
-        ctl.save_N_2Dfields(lat,lon,np.stack(vals), fu, 'W/m', filena)
+        ctl.save_N_2Dfields(lat, lon, np.stack(vals), fu, 'W/m', filena)
 
     # for fu in era_fluxes_zonal:
     #     #print(lat, era_lat, era_fluxes_zonal[fu])
@@ -1386,13 +1430,14 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
 
     for seas in seasons+['year']:
         for taw in ['zonal', 'maps', 'cross']:
-            total = np.sum([results[flun][taw][seas] for flun in fluxnames], axis = 0)
+            total = np.sum([results[flun][taw][seas] for flun in fluxnames], axis=0)
             results['tot'][taw][seas] = total
 
     margins = dict()
     for taw in ['zonal', 'maps', 'cross']:
         for flu in results:
-            margins[(flu, taw)] = (1.1*np.min([results[flu][taw][seas] for seas in seasons]), 1.1*np.max([results[flu][taw][seas] for seas in seasons]))
+            margins[(flu, taw)] = (1.1*np.min([results[flu][taw][seas] for seas in seasons]),
+                                   1.1*np.max([results[flu][taw][seas] for seas in seasons]))
 
     fluxnames = ['SH', 'PE', 'LH']
     # Single exps, single season figures:
@@ -1400,8 +1445,8 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         fig = plt.figure()
         plt.title('{} - Meridional heat fluxes - {}'.format(tag, seas))
         for flun in fluxnames:
-            plt.plot(lat, results[flun]['zonal'][seas], label = flun)
-        plt.plot(lat, results['tot']['zonal'][seas], label = 'Total')
+            plt.plot(lat, results[flun]['zonal'][seas], label=flun)
+        plt.plot(lat, results['tot']['zonal'][seas], label='Total')
         plt.legend()
         plt.grid()
         plt.ylim(margins[('tot', 'zonal')])
@@ -1410,19 +1455,21 @@ def heat_flux_calc(file_list, file_ps, cart_out, tag, full_calculation = False, 
         figures_exp.append(fig)
 
         for flun in fluxnames:
-            fig = ctl.plot_map_contour(results[flun]['maps'][seas], lat, lon, title = 'SH - {} - {}'.format(tag, seas), cbar_range = margins[(flun, 'maps')])
+            fig = ctl.plot_map_contour(results[flun]['maps'][seas], lat, lon,
+                                       title='SH - {} - {}'.format(tag, seas), cbar_range=margins[(flun, 'maps')])
             figures_exp_maps.append(fig)
 
-        fig = ctl.plot_map_contour(results['tot']['maps'][seas], lat, lon, title = 'Total meridional flux - {} - {}'.format(tag, seas), cbar_range = margins[('tot', 'maps')])
+        fig = ctl.plot_map_contour(results['tot']['maps'][seas], lat, lon,
+                                   title='Total meridional flux - {} - {}'.format(tag, seas), cbar_range=margins[('tot', 'maps')])
         figures_exp_maps.append(fig)
 
     for flun in fluxnames+['tot']:
         fig = plt.figure()
         plt.title('{} fluxes - {}'.format(flun, tag))
-        cset = ctl.color_set(len(seasons)+1, only_darker_colors = False)
+        cset = ctl.color_set(len(seasons)+1, only_darker_colors=False)
         for seas, col in zip(seasons+['year'], cset):
-            plt.plot(lat, results[flun]['zonal'][seas], label = seas, color = col, linewidth = 2.)
-            #plt.plot(lat, era_fluxes_zonal_itrp[(seas, flun)], label = 'ERA '+seas, color = col, linewidth = 0.7, linestyle = '--')
+            plt.plot(lat, results[flun]['zonal'][seas], label=seas, color=col, linewidth=2.)
+            # plt.plot(lat, era_fluxes_zonal_itrp[(seas, flun)], label = 'ERA '+seas, color = col, linewidth = 0.7, linestyle = '--')
         plt.legend()
         plt.grid()
         plt.ylim(margins[(flun, 'zonal')])
@@ -1455,11 +1502,7 @@ def calc_index_climatology(clim_psl, index_name):
     < index_name > : can be one among 'NAM', 'SAM', 'PDO', 'AMV'.
     """
 
-
-
-
     return
-
 
 
 #############################################################################
@@ -1470,7 +1513,7 @@ def calc_index_climatology(clim_psl, index_name):
 #############################################################################
 #############################################################################
 
-def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotential height anomaly at 500 hPa', var_std_name = 'geopotential_height_anomaly', var_units = 'm'):
+def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name='geopotential height anomaly at 500 hPa', var_std_name='geopotential_height_anomaly', var_units='m'):
     """
     Output in netcdf format.
     """
@@ -1503,7 +1546,8 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
 
             ctl.save_iris_3Dfield(outfil, var, lat, lon)
 
-        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
+        if inputs['use_reference_eofs'] and nam == 'model_eofs':
+            continue
 
         # for each model
         for mod in models:
@@ -1529,9 +1573,10 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
         dates_all = obs['dates_allyear']
         dates_season = obs['dates']
 
-        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all=dates_all)
 
-        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = obs['time_units'], time_cal = obs['time_cal'], std_name = std_name, units = units, long_name = long_name)
+        ctl.save_iris_timeseries(
+            outfil, var_all, dates=da, time_units=obs['time_units'], time_cal=obs['time_cal'], std_name=std_name, units=units, long_name=long_name)
 
     for mod in models:
         outfil = cart_out + 'regime_index_{}.nc'.format(mod)
@@ -1540,16 +1585,16 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
         dates_all = models[mod]['dates_allyear']
         dates_season = models[mod]['dates']
 
-        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all=dates_all)
 
-        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], std_name = std_name, units = units, long_name = long_name)
+        ctl.save_iris_timeseries(outfil, var_all, dates=da, time_units=models[mod]['time_units'],
+                                 time_cal=models[mod]['time_cal'], std_name=std_name, units=units, long_name=long_name)
 
         outfil2 = cart_out + 'regime_index_{}_compressed.npy'.format(mod)
         if type(var_all) is np.ma.core.MaskedArray:
             np.save(outfil2, var_all.compressed())
         else:
             np.save(outfil2, var_all)
-
 
     # monthly clus frequency
     std_name = None
@@ -1566,7 +1611,8 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
             var_all, datesall = ctl.complete_time_range(fre, datesmon)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=obs['time_units'], time_cal=obs['time_cal'], long_names=long_names)
 
     for mod in models:
         outfil = cart_out + 'clus_freq_monthly_{}.nc'.format(mod)
@@ -1579,17 +1625,19 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
             var_all, datesall = ctl.complete_time_range(fre, datesmon)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=models[mod]['time_units'], time_cal=models[mod]['time_cal'], long_names=long_names)
 
     for mod in models:
         outfil = cart_out + 'clus_freq_seasonal_{}.nc'.format(mod)
-        var, dates_yr = ctl.calc_seasonal_clus_freq(models[mod]['labels'], models[mod]['dates'], numclus, out_dates = True)
+        var, dates_yr = ctl.calc_seasonal_clus_freq(models[mod]['labels'], models[mod]['dates'], numclus, out_dates=True)
 
         long_names = []
         for i, fre in enumerate(var):
             long_names.append('clus {} frequency'.format(i))
 
-        ctl.save_iris_N_timeseries(outfil, var, dates = dates_yr, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, var, dates=dates_yr,
+                                   time_units=models[mod]['time_units'], time_cal=models[mod]['time_cal'], long_names=long_names)
 
     # pcs
     std_name = None
@@ -1605,10 +1653,11 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
         long_names = []
         for i, fre in enumerate(var):
             long_names.append('pcs {}'.format(i))
-            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all=dates_all)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=obs['time_units'], time_cal=obs['time_cal'], long_names=long_names)
 
     for mod in models:
         outfil = cart_out + 'pcs_timeseries_{}.nc'.format(mod)
@@ -1621,15 +1670,16 @@ def out_WRtool_netcdf(cart_out, models, obs, inputs, var_long_name = 'geopotenti
         long_names = []
         for i, fre in enumerate(var):
             long_names.append('pcs {}'.format(i))
-            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all=dates_all)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=models[mod]['time_units'], time_cal=models[mod]['time_cal'], long_names=long_names)
 
     return
 
 
-def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'geopotential height anomaly at 500 hPa', var_std_name = 'geopotential_height_anomaly', var_units = 'm'):
+def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name='geopotential height anomaly at 500 hPa', var_std_name='geopotential_height_anomaly', var_units='m'):
     """
     Output in netcdf format.
     """
@@ -1662,7 +1712,8 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
 
             ctl.save_iris_3Dfield(outfil, var, lat, lon)
 
-        if inputs['use_reference_eofs'] and nam == 'model_eofs': continue
+        if inputs['use_reference_eofs'] and nam == 'model_eofs':
+            continue
 
         # for each model
         for mod in models:
@@ -1688,9 +1739,10 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
         dates_all = obs['dates_allyear']
         dates_season = obs['dates']
 
-        var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+        var_all, da = ctl.complete_time_range(var, dates_season, dates_all=dates_all)
 
-        ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = obs['time_units'], time_cal = obs['time_cal'], std_name = std_name, units = units, long_name = long_name)
+        ctl.save_iris_timeseries(
+            outfil, var_all, dates=da, time_units=obs['time_units'], time_cal=obs['time_cal'], std_name=std_name, units=units, long_name=long_name)
 
     for mod in models:
         ens_names = models[mod]['ens_names']
@@ -1702,16 +1754,16 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
             dates_all = models[mod]['dates_allyear'][ens]
             dates_season = models[mod]['dates'][ens]
 
-            var_all, da = ctl.complete_time_range(var, dates_season, dates_all = dates_all)
+            var_all, da = ctl.complete_time_range(var, dates_season, dates_all=dates_all)
 
-            ctl.save_iris_timeseries(outfil, var_all, dates = da, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], std_name = std_name, units = units, long_name = long_name)
+            ctl.save_iris_timeseries(outfil, var_all, dates=da, time_units=models[mod]['time_units'],
+                                     time_cal=models[mod]['time_cal'], std_name=std_name, units=units, long_name=long_name)
 
             outfil2 = cart_out + 'regime_index_{}_{}_compressed.npy'.format(mod, ens)
             if type(var_all) is np.ma.core.MaskedArray:
                 np.save(outfil2, var_all.compressed())
             else:
                 np.save(outfil2, var_all)
-
 
     # monthly clus frequency
     std_name = None
@@ -1728,7 +1780,8 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
             var_all, datesall = ctl.complete_time_range(fre, datesmon)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=obs['time_units'], time_cal=obs['time_cal'], long_names=long_names)
 
     for mod in models:
         ens_names = models[mod]['ens_names']
@@ -1744,7 +1797,8 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
                 var_all, datesall = ctl.complete_time_range(fre, datesmon)
                 vars_all.append(var_all)
 
-            ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+            ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                       time_units=models[mod]['time_units'], time_cal=models[mod]['time_cal'], long_names=long_names)
 
     # pcs
     std_name = None
@@ -1760,10 +1814,11 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
         long_names = []
         for i, fre in enumerate(var):
             long_names.append('pcs {}'.format(i))
-            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+            var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all=dates_all)
             vars_all.append(var_all)
 
-        ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = obs['time_units'], time_cal = obs['time_cal'], long_names = long_names)
+        ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                   time_units=obs['time_units'], time_cal=obs['time_cal'], long_names=long_names)
 
     for mod in models:
         ens_names = models[mod]['ens_names']
@@ -1779,10 +1834,11 @@ def out_WRtool_netcdf_ensemble(cart_out, models, obs, inputs, var_long_name = 'g
             long_names = []
             for i, fre in enumerate(var):
                 long_names.append('pcs {}'.format(i))
-                var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all = dates_all)
+                var_all, datesall = ctl.complete_time_range(fre, dates_season, dates_all=dates_all)
                 vars_all.append(var_all)
 
-            ctl.save_iris_N_timeseries(outfil, vars_all, dates = datesall, time_units = models[mod]['time_units'], time_cal = models[mod]['time_cal'], long_names = long_names)
+            ctl.save_iris_N_timeseries(outfil, vars_all, dates=datesall,
+                                       time_units=models[mod]['time_units'], time_cal=models[mod]['time_cal'], long_names=long_names)
 
     return
 
@@ -1814,7 +1870,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
         ctl.newline(filos)
         filos.write('---- Optimal ratio of regime structure ----\n')
-        #varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
+        # varopt = ctl.calc_varopt_molt(obs['pcs'], obs['centroids'], obs['labels'])
         filos.write('{:10.4f}'.format(obs['var_ratio']))
 
         ctl.newline(filos)
@@ -1880,8 +1936,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
         ctl.newline(filos)
         filos.write('---- Optimal ratio of regime structure ----\n')
-        #varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
-        #filos.write('{:10.4f}'.format(varopt))
+        # varopt = ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels'])
+        # filos.write('{:10.4f}'.format(varopt))
         filos.write('{:10.4f}'.format(models[mod]['var_ratio']))
 
         ctl.newline(filos)
@@ -1935,14 +1991,14 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                 ctl.newline(filos)
                 filos.write('---- RMS and pattern correlation wrt observed patterns ----\n')
                 stringa = 'RMS:     '+inputs['numclus']*'{:8.2f}'+'\n'
-                coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis = 0))/nsqr
-                cosoerr = np.std([models[mod]['RMS'] for mod in inputs['groups'][gru]], axis = 0)/nsqr
+                coso = np.sqrt(np.mean(np.array([models[mod]['RMS'] for mod in inputs['groups'][gru]])**2, axis=0))/nsqr
+                cosoerr = np.std([models[mod]['RMS'] for mod in inputs['groups'][gru]], axis=0)/nsqr
                 filos.write(stringa.format(*coso))
                 stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
                 filos.write(stringa.format(*cosoerr))
                 stringa = 'patcor:  '+inputs['numclus']*'{:8.2f}'+'\n'
-                coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
-                cosoerr = np.std([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis = 0)
+                coso = np.mean([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis=0)
+                cosoerr = np.std([models[mod]['patcor'] for mod in inputs['groups'][gru]], axis=0)
                 filos.write(stringa.format(*coso))
                 stringa = '+/-      '+inputs['numclus']*'{:8.2f}'+'\n'
                 filos.write(stringa.format(*cosoerr))
@@ -1959,7 +2015,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 
             varopts = [models[mod]['var_ratio'] for mod in inputs['groups'][gru]]
             # for mod in inputs['groups'][gru]:
-                #varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
+            # varopts.append(ctl.calc_varopt_molt(models[mod]['pcs'], models[mod]['centroids'], models[mod]['labels']))
             sig = np.mean(varopts)
             std = np.std(varopts)
             filos.write('{:10.4f} +/- {:10.4f}'.format(sig, std))
@@ -1967,8 +2023,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
             ctl.newline(filos)
             filos.write('---- Regimes frequencies ----\n')
             stringa = '    '+inputs['numclus']*'{:8.2f}'+'\n'
-            coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
-            std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis = 0)
+            coso = np.mean([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis=0)
+            std = np.std([models[mod]['freq_clus'] for mod in inputs['groups'][gru]], axis=0)
             filos.write(stringa.format(*coso))
             stringa = '+/- '+inputs['numclus']*'{:8.2f}'+'\n'
             filos.write(stringa.format(*std))
@@ -1979,8 +2035,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                 stringa = (inputs['numclus']+1)*'{:11s}' + '\n'
                 filos.write(stringa.format(*(['']+inputs['patnames_short'])))
 
-                coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
-                std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis = 0)
+                coso = np.mean([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis=0)
+                std = np.std([models[mod]['trans_matrix'] for mod in inputs['groups'][gru]], axis=0)
                 for i, cen in enumerate(coso):
                     stringa = len(cen)*'{:11.2e}' + '\n'
                     filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
@@ -1991,8 +2047,8 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
                     filos.write('{:11s}'.format(inputs['patnames_short'][i])+stringa.format(*cen))
 
             ctl.newline(filos)
-            coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
-            std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis = 0)
+            coso = np.mean([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis=0)
+            std = np.std([models[mod]['centroids'] for mod in inputs['groups'][gru]], axis=0)
             filos.write('---- Centroids coordinates (in pc space) ----\n')
             for i, cen in enumerate(coso):
                 stringa = len(cen)*'{:10.2f}' + '\n'
@@ -2019,7 +2075,7 @@ def out_WRtool_mainres(outfile, models, obs, inputs):
 #############################################################################
 #############################################################################
 
-def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names = None, obs_name = None, patnames = None, patnames_short = None, custom_model_colors = None, compare_models = None, central_lat_lon = (70, 0), visualization = 'Nstereo', groups = None, group_symbols = None, reference_group = None, bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, out_only_main_figs = True, use_seaborn = True, color_palette = 'hls', show_transitions = True, draw_grid = False, plot_type = 'pcolormesh', cb_label = 'Geopotential height anomaly (m)'):
+def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_names=None, obs_name=None, patnames=None, patnames_short=None, custom_model_colors=None, compare_models=None, central_lat_lon=(70, 0), visualization='Nstereo', groups=None, group_symbols=None, reference_group=None, bounding_lat=30, plot_margins=None, draw_rectangle_area=None, taylor_mark_dim=100, out_only_main_figs=True, use_seaborn=True, color_palette='hls', show_transitions=True, draw_grid=False, plot_type='pcolormesh', cb_label='Geopotential height anomaly (m)'):
     """
     Plot the results of WRtool.
 
@@ -2036,7 +2092,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     """
     symbols = ['o', 'd', 'v', '*', 'P', 'h', 'X', 'p', '1']
     cart_out = cart_out + tag + '/'
-    if not os.path.exists(cart_out): os.mkdir(cart_out)
+    if not os.path.exists(cart_out):
+        os.mkdir(cart_out)
 
     n_clus = len(result_obs['cluspattern'])
 
@@ -2062,8 +2119,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         # labels = []
         for ll in range(len(list(groups.values())[0])):
             for k in groups:
-                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
-                #labels.append(groups[k][ll])
+                if len(groups[k]) < len(list(groups.values())[0]):
+                    continue  # groups have unequal lengths
+                # labels.append(groups[k][ll])
                 if k != reference_group:
                     compare_models.append((groups[k][ll], groups[reference_group][ll]))
 
@@ -2073,7 +2131,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             if k != reference_group:
                 compare_models.append((k, reference_group))
     else:
-        #labels = result_models.keys()
+        # labels = result_models.keys()
         labels = model_names
         groups = dict()
         groups['all'] = labels
@@ -2083,7 +2141,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     print('COMPARE:', compare_models)
 
     if custom_model_colors is None:
-        colors = ctl.color_set(len(labels)+1, only_darker_colors = False, use_seaborn = use_seaborn, sns_palette = color_palette)
+        colors = ctl.color_set(len(labels)+1, only_darker_colors=False, use_seaborn=use_seaborn, sns_palette=color_palette)
         color_dict = dict(zip(labels, colors))
     else:
         if len(custom_model_colors) != len(labels)+1:
@@ -2091,7 +2149,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         colors = custom_model_colors
         color_dict = dict(zip(labels, colors))
 
-    nuko = ctl.color_set(len(groups.keys()), only_darker_colors = False, use_seaborn = use_seaborn, sns_palette = 'Set2')
+    nuko = ctl.color_set(len(groups.keys()), only_darker_colors=False, use_seaborn=use_seaborn, sns_palette='Set2')
     for k, col in zip(groups.keys(), nuko):
         color_dict[k] = col
 
@@ -2103,24 +2161,24 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         for k in groups:
             for mod in groups[k]:
                 col = color_dict[mod]
-                ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, result_models[mod]['significance'], width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
 
         if 'significance' in result_obs.keys():
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+            ax.bar(i, result_obs['significance'], width=wi,  color='black', label=obs_name)
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Significance of regime structure')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Significance')
         fig.savefig(cart_out+'Significance_all_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2133,23 +2191,23 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             sig = np.mean([result_models[mod]['significance'] for mod in groups[k]])
             stddev = np.std([result_models[mod]['significance'] for mod in groups[k]])
             col = color_dict[k]
-            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-            i+=1.2
+            ax.bar(i, sig, yerr=stddev, width=wi, color=col, ecolor='black', label=k, capsize=5)
+            i += 1.2
 
         if 'significance' in result_obs.keys():
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+            ax.bar(i, result_obs['significance'], width=wi,  color='black', label=obs_name)
         if len(groups.keys()) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Significance of regime structure')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Significance')
         fig.savefig(cart_out+'Significance_groups_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2160,27 +2218,28 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(list(groups.values())[0])):
             for k in groups:
-                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
+                if len(groups[k]) < len(list(groups.values())[0]):
+                    continue  # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
-                ax.bar(i, result_models[mod]['significance'], width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, result_models[mod]['significance'], width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
 
         if 'significance' in result_obs.keys():
-            ax.bar(i, result_obs['significance'], width = wi,  color = 'black', label = obs_name)
+            ax.bar(i, result_obs['significance'], width=wi,  color='black', label=obs_name)
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Significance of regime structure')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Significance')
         fig.savefig(cart_out+'Significance_1vs1_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2195,22 +2254,22 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             for mod in groups[k]:
                 col = color_dict[mod]
                 rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
-                ax.bar(i, rms, width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, rms, width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
 
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Total RMS vs observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('RMS (m)')
         fig.savefig(cart_out+'RMS_all_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2226,21 +2285,21 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
             # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
             col = color_dict[k]
-            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-            i+=1.2
+            ax.bar(i, sig, yerr=stddev, width=wi, color=col, ecolor='black', label=k, capsize=5)
+            i += 1.2
 
         if len(groups.keys()) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Total RMS vs observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('RMS (m)')
         fig.savefig(cart_out+'RMS_groups_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2251,25 +2310,26 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(list(groups.values())[0])):
             for k in groups:
-                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
+                if len(groups[k]) < len(list(groups.values())[0]):
+                    continue  # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
-                ax.bar(i, rms, width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, rms, width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Total RMS vs observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('RMS (m)')
         fig.savefig(cart_out+'RMS_1vs1_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2282,24 +2342,24 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         for k in groups:
             for mod in groups[k]:
                 col = color_dict[mod]
-                #rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
+                # rms = np.sqrt(np.mean(np.array(result_models[mod]['RMS'])**2))/nsqr
                 rms = np.mean(result_models[mod]['patcor'])
-                ax.bar(i, rms, width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, rms, width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
 
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Pattern correlation with observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Correlation')
         fig.savefig(cart_out+'patcor_all_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2315,21 +2375,21 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             # sig = np.mean([result_models[mod]['RMS'] for mod in groups[k]])
             # stddev = np.std([result_models[mod]['RMS'] for mod in groups[k]])
             col = color_dict[k]
-            ax.bar(i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = k, capsize = 5)
-            i+=1.2
+            ax.bar(i, sig, yerr=stddev, width=wi, color=col, ecolor='black', label=k, capsize=5)
+            i += 1.2
 
         if len(groups.keys()) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Pattern correlation with observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Correlation')
         fig.savefig(cart_out+'patcor_groups_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2340,25 +2400,26 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         i = 0
         for ll in range(len(list(groups.values())[0])):
             for k in groups:
-                if len(groups[k]) < len(list(groups.values())[0]): continue # groups have unequal lengths
+                if len(groups[k]) < len(list(groups.values())[0]):
+                    continue  # groups have unequal lengths
                 mod = groups[k][ll]
                 col = color_dict[mod]
                 rms = np.mean(np.array(result_models[mod]['patcor']))
-                ax.bar(i, rms, width = wi, color = col, label = mod)
-                i+=0.7
-            i+=0.5
+                ax.bar(i, rms, width=wi, color=col, label=mod)
+                i += 0.7
+            i += 0.5
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Pattern correlation with observations')
         ax.set_xticks([])
-        #ax.set_xticks(range(len(labels+[obs_name])), minor = False)
-        #ax.set_xticklabels(labels+[obs_name], size='small')
+        # ax.set_xticks(range(len(labels+[obs_name])), minor = False)
+        # ax.set_xticklabels(labels+[obs_name], size='small')
         ax.set_ylabel('Correlation')
         fig.savefig(cart_out+'patcor_1vs1_{}.pdf'.format(tag))
         all_figures.append(fig)
@@ -2369,8 +2430,10 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
     if patt_ref[0].shape != list(result_models.values())[0]['cluspattern'][0].shape:
         nupatt_ref = []
-        _, oklats, _ = np.intersect1d(result_obs['lat'], list(result_models.values())[0]['lat'], assume_unique = True, return_indices = True)
-        _, oklons, _ = np.intersect1d(result_obs['lon'], list(result_models.values())[0]['lon'], assume_unique = True, return_indices = True)
+        _, oklats, _ = np.intersect1d(result_obs['lat'], list(result_models.values())[
+                                      0]['lat'], assume_unique=True, return_indices=True)
+        _, oklons, _ = np.intersect1d(result_obs['lon'], list(result_models.values())[
+                                      0]['lon'], assume_unique=True, return_indices=True)
         for nu in range(n_clus):
             coso = patt_ref[nu][oklats, :]
             coso2 = coso[:, oklons]
@@ -2389,32 +2452,37 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     if 'freq_clus' in list(result_models.values())[0].keys():
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.grid(axis = 'y', zorder = 0)
+        ax.grid(axis='y', zorder=0)
         wi = 0.8
         n_tot = len(labels)+1
         for j in range(n_clus):
             central = j*(n_tot*1.5)
             for i, (mod, col) in enumerate(zip(labels, colors)):
                 labelmod = None
-                if j == 0: labelmod = mod
+                if j == 0:
+                    labelmod = mod
                 if plot_diffs:
-                    ax.bar(central-(n_tot-1)/2.+i, result_models[mod]['freq_clus'][j]-result_obs['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
+                    ax.bar(central-(n_tot-1)/2.+i, result_models[mod]['freq_clus'][j] -
+                           result_obs['freq_clus'][j], width=wi, color=col, label=labelmod, zorder=5)
                 else:
-                    ax.bar(central-(n_tot-1)/2.+i, result_models[mod]['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
+                    ax.bar(central-(n_tot-1)/2.+i, result_models[mod]['freq_clus']
+                           [j], width=wi, color=col, label=labelmod, zorder=5)
             labelmod = None
-            if j == 0: labelmod = obs_name
+            if j == 0:
+                labelmod = obs_name
             if not plot_diffs:
-                ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j], width = wi,  color = 'black', label = labelmod, zorder = 5)
+                ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j],
+                       width=wi,  color='black', label=labelmod, zorder=5)
         if len(labels) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 1)
+            ax.legend(fontsize='small', loc=1)
         ax.set_title('Regimes frequencies')
-        ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor = False)
+        ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor=False)
         ax.set_xticklabels(patnames_short, size='small')
         ax.set_ylabel('Frequency')
         fig.savefig(cart_out+'Regime_frequency_{}.pdf'.format(tag))
@@ -2422,7 +2490,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.grid(axis = 'y', zorder = 0)
+        ax.grid(axis='y', zorder=0)
         ax.set_axisbelow(True)
         wi = 0.8
 
@@ -2435,27 +2503,33 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 stddev = np.std([result_models[mod]['freq_clus'][j] for mod in groups[k]])
                 col = color_dict[k]
                 labelmod = None
-                if j == 0: labelmod = k
+                if j == 0:
+                    labelmod = k
                 if plot_diffs:
-                    ax.bar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], width = wi, color = col, label = labelmod, zorder = 5)
-                    ax.errorbar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus'][j], yerr = stddev, color = 'black', capsize = 3, zorder = 6)
+                    ax.bar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus']
+                           [j], width=wi, color=col, label=labelmod, zorder=5)
+                    ax.errorbar(central-(n_tot-1)/2.+i, sig-result_obs['freq_clus']
+                                [j], yerr=stddev, color='black', capsize=3, zorder=6)
                 else:
-                    ax.bar(central-(n_tot-1)/2.+i, sig, yerr = stddev, width = wi, color = col, ecolor = 'black', label = labelmod, capsize = 3, zorder = 5)
-                    ax.errorbar(central-(n_tot-1)/2.+i, sig, yerr = stddev, color = 'black', capsize = 3, zorder = 6)
+                    ax.bar(central-(n_tot-1)/2.+i, sig, yerr=stddev, width=wi, color=col,
+                           ecolor='black', label=labelmod, capsize=3, zorder=5)
+                    ax.errorbar(central-(n_tot-1)/2.+i, sig, yerr=stddev, color='black', capsize=3, zorder=6)
             labelmod = None
-            if j == 0: labelmod = obs_name
+            if j == 0:
+                labelmod = obs_name
             if not plot_diffs:
-                ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j], width = wi,  color = 'black', label = labelmod, zorder = 5)
+                ax.bar(central-(n_tot-1)/2.+i+1, result_obs['freq_clus'][j],
+                       width=wi,  color='black', label=labelmod, zorder=5)
         if len(groups.keys()) > 4:
             # Shrink current axis by 20%
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
             # Put a legend to the right of the current axis
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize = 'small')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='small')
         else:
-            ax.legend(fontsize = 'small', loc = 4)
+            ax.legend(fontsize='small', loc=4)
         ax.set_title('Regimes frequencies')
-        ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor = False)
+        ax.set_xticks([j*(n_tot*1.5) for j in range(n_clus)], minor=False)
         ax.set_xticklabels(patnames_short, size='small')
         ax.set_ylabel('Frequency')
         fig.savefig(cart_out+'Regime_frequency_groups_{}.pdf'.format(tag))
@@ -2473,29 +2547,28 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             fig = plt.figure()
             # binzzz = np.arange(0,36,5)
             for j in range(n_clus):
-                ax = fig.add_subplot(i1,i2,j+1)
+                ax = fig.add_subplot(i1, i2, j+1)
                 ax.set_title(patnames[j])
 
                 max_days = 29
-                numarr, frek_obs = ctl.count_occurrences(result_obs['resid_times'][j], num_range = (0, max_days))
-                ax.bar(numarr, frek_obs, alpha = 0.5, label = obs_name, color = 'indianred')
+                numarr, frek_obs = ctl.count_occurrences(result_obs['resid_times'][j], num_range=(0, max_days))
+                ax.bar(numarr, frek_obs, alpha=0.5, label=obs_name, color='indianred')
                 coso_obs = ctl.running_mean(frek_obs[:-1], 3)
-                numarr, frek_mod = ctl.count_occurrences(result_models[lab]['resid_times'][j], num_range = (0, max_days))
-                ax.bar(numarr, frek_mod, alpha = 0.5, label = lab, color = 'steelblue')
+                numarr, frek_mod = ctl.count_occurrences(result_models[lab]['resid_times'][j], num_range=(0, max_days))
+                ax.bar(numarr, frek_mod, alpha=0.5, label=lab, color='steelblue')
                 coso_mod = ctl.running_mean(frek_mod[:-1], 3)
-                ax.plot(numarr[:-1], coso_obs, color = 'indianred')
-                ax.plot(numarr[:-1], coso_mod, color = 'steelblue')
+                ax.plot(numarr[:-1], coso_obs, color='indianred')
+                ax.plot(numarr[:-1], coso_mod, color='steelblue')
                 ax.legend()
                 ax.set_xlim(0, max_days+2)
-                tics = np.arange(0,max_days+2,5)
+                tics = np.arange(0, max_days+2, 5)
                 labs = ['{}'.format(ti) for ti in tics[:-1]]
                 labs.append('>{}'.format(max_days))
-                ax.set_xticks(tics, minor = False)
+                ax.set_xticks(tics, minor=False)
                 ax.set_xticklabels(labs, size='small')
                 ax.set_xlabel('Days')
                 ax.set_ylabel('Frequency')
                 axes.append(ax)
-
 
             plt.suptitle('Residence times - {}'.format(lab))
             fig.tight_layout()
@@ -2511,7 +2584,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 print(coup)
                 fig = plt.figure()
                 for j in range(n_clus):
-                    ax = fig.add_subplot(i1,i2,j+1)
+                    ax = fig.add_subplot(i1, i2, j+1)
                     ax.set_title(patnames[j])
 
                     if coup[1] in model_names:
@@ -2531,27 +2604,27 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                         continue
 
                     max_days = 29
-                    numarr, frek_obs_ERA = ctl.count_occurrences(result_obs['resid_times'][j], num_range = (0, max_days))
-                    numarr, frek_obs = ctl.count_occurrences(model_1, num_range = (0, max_days))
+                    numarr, frek_obs_ERA = ctl.count_occurrences(result_obs['resid_times'][j], num_range=(0, max_days))
+                    numarr, frek_obs = ctl.count_occurrences(model_1, num_range=(0, max_days))
                     frek_obs -= frek_obs_ERA
-                    ax.bar(numarr, frek_obs, alpha = 0.5, label = coup[1], color = 'indianred')
+                    ax.bar(numarr, frek_obs, alpha=0.5, label=coup[1], color='indianred')
                     coso_obs = ctl.running_mean(frek_obs[:-1], 3)
-                    numarr, frek_mod = ctl.count_occurrences(model_0, num_range = (0, max_days))
+                    numarr, frek_mod = ctl.count_occurrences(model_0, num_range=(0, max_days))
                     frek_mod -= frek_obs_ERA
-                    ax.bar(numarr, frek_mod, alpha = 0.5, label = coup[0], color = 'steelblue')
+                    ax.bar(numarr, frek_mod, alpha=0.5, label=coup[0], color='steelblue')
                     coso_mod = ctl.running_mean(frek_mod[:-1], 3)
-                    ax.plot(numarr[:-1], coso_obs, color = 'indianred')
-                    ax.plot(numarr[:-1], coso_mod, color = 'steelblue')
+                    ax.plot(numarr[:-1], coso_obs, color='indianred')
+                    ax.plot(numarr[:-1], coso_mod, color='steelblue')
                     ax.legend()
                     ax.set_xlim(0, max_days+2)
-                    ax.set_ylim(-0.06,0.06)
-                    tics = np.arange(0,max_days+2,5)
+                    ax.set_ylim(-0.06, 0.06)
+                    tics = np.arange(0, max_days+2, 5)
                     labs = ['{}'.format(ti) for ti in tics[:-1]]
                     labs.append('>{}'.format(max_days))
-                    ax.set_xticks(tics, minor = False)
+                    ax.set_xticks(tics, minor=False)
                     ax.set_xticklabels(labs, size='small')
                     ax.set_xlabel('Days')
-                    ax.set_ylabel('Frequency diff', fontsize = 'small')
+                    ax.set_ylabel('Frequency diff', fontsize='small')
                     axes.append(ax)
 
                 plt.suptitle('Resid. times diffs - {} vs {}'.format(coup[0], coup[1]))
@@ -2568,16 +2641,16 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         mappe = []
 
         for lab in labels:
-            fig = plt.figure(figsize=(16,6))
+            fig = plt.figure(figsize=(16, 6))
             ax = fig.add_subplot(121)
-            gigi = ax.imshow(result_models[lab]['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
+            gigi = ax.imshow(result_models[lab]['trans_matrix'], norm=LogNorm(vmin=0.01, vmax=1.0))
             ax.xaxis.tick_top()
-            #ax.invert_yaxis()
+            # ax.invert_yaxis()
             # ax.set_xticks(np.arange(n_clus)+0.5, minor=False)
             # ax.set_yticks(np.arange(n_clus)+0.5, minor=False)
-            ax.set_xticks(np.arange(n_clus), minor = False)
+            ax.set_xticks(np.arange(n_clus), minor=False)
             ax.set_xticklabels(patnames_short, size='small')
-            ax.set_yticks(np.arange(n_clus), minor = False)
+            ax.set_yticks(np.arange(n_clus), minor=False)
             ax.set_yticklabels(patnames_short, size='small')
             cb = plt.colorbar(gigi)
             cb.set_label('Transition probability')
@@ -2585,12 +2658,12 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             ax = fig.add_subplot(122)
             vmin = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 5)
             vmax = np.percentile(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], 95)
-            cos = np.max(abs(np.array([vmin,vmax])))
-            gigi = ax.imshow(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
+            cos = np.max(abs(np.array([vmin, vmax])))
+            gigi = ax.imshow(result_models[lab]['trans_matrix']-result_obs['trans_matrix'], vmin=-cos, vmax=cos, cmap=cmapparu)
             ax.xaxis.tick_top()
-            ax.set_xticks(np.arange(n_clus), minor = False)
+            ax.set_xticks(np.arange(n_clus), minor=False)
             ax.set_xticklabels(patnames_short, size='small')
-            ax.set_yticks(np.arange(n_clus), minor = False)
+            ax.set_yticks(np.arange(n_clus), minor=False)
             ax.set_yticklabels(patnames_short, size='small')
             cb = plt.colorbar(gigi)
             cb.set_label('Differences btw {} and {}'.format(lab, obs_name))
@@ -2607,7 +2680,7 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 if coup[1] in model_names:
                     model_1 = result_models[coup[1]]['trans_matrix']
                 elif coup[1] in groups.keys():
-                    model_1 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[1]]], axis = 0)
+                    model_1 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[1]]], axis=0)
                 else:
                     print('# WARNING: compare_models: {} not found. continue..\n'.format(coup[1]))
                     continue
@@ -2615,35 +2688,35 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 if coup[0] in model_names:
                     model_0 = result_models[coup[0]]['trans_matrix']
                 elif coup[0] in groups.keys():
-                    model_0 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[0]]], axis = 0)
+                    model_0 = np.mean([result_models[k]['trans_matrix'] for k in groups[coup[0]]], axis=0)
                 else:
                     print('# WARNING: compare_models: {} not found. continue..\n'.format(coup[0]))
                     continue
 
-                fig = plt.figure(figsize=(24,6))
+                fig = plt.figure(figsize=(24, 6))
                 ax = fig.add_subplot(131)
                 vmin = np.percentile(model_0-result_obs['trans_matrix'], 5)
                 vmax = np.percentile(model_0-result_obs['trans_matrix'], 95)
-                cos = np.max(abs(np.array([vmin,vmax])))
-                gigi = ax.imshow(model_0-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
+                cos = np.max(abs(np.array([vmin, vmax])))
+                gigi = ax.imshow(model_0-result_obs['trans_matrix'], vmin=-cos, vmax=cos, cmap=cmapparu)
                 ax.set_title('{} vs obs'.format(coup[0]))
                 ax.xaxis.tick_top()
-                ax.set_xticks(np.arange(n_clus), minor = False)
+                ax.set_xticks(np.arange(n_clus), minor=False)
                 ax.set_xticklabels(patnames_short, size='small')
-                ax.set_yticks(np.arange(n_clus), minor = False)
+                ax.set_yticks(np.arange(n_clus), minor=False)
                 ax.set_yticklabels(patnames_short, size='small')
                 mappe.append(gigi)
 
                 ax = fig.add_subplot(132)
                 vmin = np.percentile(model_1-result_obs['trans_matrix'], 5)
                 vmax = np.percentile(model_1-result_obs['trans_matrix'], 95)
-                cos = np.max(abs(np.array([vmin,vmax])))
-                gigi = ax.imshow(model_1-result_obs['trans_matrix'], vmin = -cos, vmax = cos, cmap = cmapparu)
+                cos = np.max(abs(np.array([vmin, vmax])))
+                gigi = ax.imshow(model_1-result_obs['trans_matrix'], vmin=-cos, vmax=cos, cmap=cmapparu)
                 ax.set_title('{} vs obs'.format(coup[1]))
                 ax.xaxis.tick_top()
-                ax.set_xticks(np.arange(n_clus), minor = False)
+                ax.set_xticks(np.arange(n_clus), minor=False)
                 ax.set_xticklabels(patnames_short, size='small')
-                ax.set_yticks(np.arange(n_clus), minor = False)
+                ax.set_yticks(np.arange(n_clus), minor=False)
                 ax.set_yticklabels(patnames_short, size='small')
                 mappe.append(gigi)
                 cb = plt.colorbar(gigi)
@@ -2652,13 +2725,13 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
                 ax = fig.add_subplot(133)
                 vmin = np.percentile(model_0-model_1, 5)
                 vmax = np.percentile(model_0-model_1, 95)
-                cos = np.max(abs(np.array([vmin,vmax])))
-                gigi = ax.imshow(model_0-model_1, vmin = -cos, vmax = cos, cmap = cmapparu)
+                cos = np.max(abs(np.array([vmin, vmax])))
+                gigi = ax.imshow(model_0-model_1, vmin=-cos, vmax=cos, cmap=cmapparu)
                 ax.set_title('{} vs {}'.format(coup[0], coup[1]))
                 ax.xaxis.tick_top()
-                ax.set_xticks(np.arange(n_clus), minor = False)
+                ax.set_xticks(np.arange(n_clus), minor=False)
                 ax.set_xticklabels(patnames_short, size='small')
-                ax.set_yticks(np.arange(n_clus), minor = False)
+                ax.set_yticks(np.arange(n_clus), minor=False)
                 ax.set_yticklabels(patnames_short, size='small')
                 cb = plt.colorbar(gigi)
                 cb.set_label('Diffs btw models')
@@ -2672,7 +2745,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     lat_ref = result_obs['lat']
     lon_ref = result_obs['lon']
     filename = cart_out+'Allclus_OBSERVED_{}.pdf'.format(tag)
-    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Observed weather regimes', subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patt, lat_ref, lon_ref, filename, visualization=visualization, central_lat_lon=central_lat_lon, cmap='RdBu_r', title='Observed weather regimes', subtitles=patnames, cb_label=cb_label, color_percentiles=(
+        0.5, 99.5), number_subplots=False, bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=draw_rectangle_area, draw_grid=draw_grid, plot_type=plot_type, plot_anomalies=True)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -2687,18 +2761,21 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             patt[np.isnan(patt)] = 0.0
         if not out_only_main_figs:
             cartout_mod = cart_out + 'mod_{}/'.format(lab)
-            if not os.path.exists(cartout_mod): os.mkdir(cartout_mod)
+            if not os.path.exists(cartout_mod):
+                os.mkdir(cartout_mod)
             filename = cartout_mod+'Allclus_'+lab+'_'+tag+'.pdf'
         else:
             filename = None
 
-        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Simulated weather regimes - {}'.format(lab), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
+        figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization=visualization, central_lat_lon=central_lat_lon, cmap='RdBu_r', title='Simulated weather regimes - {}'.format(lab), subtitles=patnames, cb_label=cb_label,
+                                         color_percentiles=(0.5, 99.5), number_subplots=False, bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=draw_rectangle_area, draw_grid=draw_grid, plot_type=plot_type, plot_anomalies=True)
         all_figures += figs
         if not out_only_main_figs:
             for patuno, patuno_ref, pp, pps in zip(patt, patt_ref, patnames, patnames_short):
                 nunam = cartout_mod+'clus_'+pps+'_'+lab+'.pdf'
                 print(nunam)
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, [lat, lat_ref], [lon, lon_ref], filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp+' ({})'.format(lab), cb_label = cb_label, stitle_1 = lab, stitle_2 = 'ERA', color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, use_different_grids = True, plot_type = plot_type)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, [lat, lat_ref], [lon, lon_ref], filename=nunam, visualization=visualization, central_lat_lon=central_lat_lon, title=pp+' ({})'.format(lab), cb_label=cb_label, stitle_1=lab, stitle_2='ERA', color_percentiles=(
+                    0.5, 99.5), draw_contour_lines=True, bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=draw_rectangle_area, draw_grid=draw_grid, use_different_grids=True, plot_type=plot_type)
                 all_figures.append(fig)
 
     if compare_models is not None and not out_only_main_figs:
@@ -2714,9 +2791,9 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
 
             for patuno, patuno_ref, pp, pps in zip(patt, patt2, patnames, patnames_short):
                 nunam = cart_out+'compare_clus_'+pps+'_'+coup[0]+'_vs_'+coup[1]+'.pdf'
-                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename = nunam, visualization = visualization, central_lat_lon = central_lat_lon, title = pp, cb_label = cb_label, stitle_1 = coup[0], stitle_2 = coup[1], color_percentiles = (0.5,99.5), draw_contour_lines = True, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type)
+                fig = ctl.plot_triple_sidebyside(patuno, patuno_ref, lat, lon, filename=nunam, visualization=visualization, central_lat_lon=central_lat_lon, title=pp, cb_label=cb_label, stitle_1=coup[0], stitle_2=coup[1], color_percentiles=(
+                    0.5, 99.5), draw_contour_lines=True, bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=draw_rectangle_area, draw_grid=draw_grid, plot_type=plot_type)
                 all_figures.append(fig)
-
 
     markers = None
     if group_symbols is not None:
@@ -2743,7 +2820,8 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             label_ERMS_axis = 'Total RMS error (m)'
             label_bias_axis = 'Pattern mean (m)'
 
-            figs = ctl.Taylor_plot(modpats, obs, latitude = result_obs['lat_area'], filename = filename, title = patt, label_bias_axis = label_bias_axis, label_ERMS_axis = label_ERMS_axis, colors = colors, markers = markers, only_first_quarter = False, legend = True, marker_edge = None, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
+            figs = ctl.Taylor_plot(modpats, obs, latitude=result_obs['lat_area'], filename=filename, title=patt, label_bias_axis=label_bias_axis, label_ERMS_axis=label_ERMS_axis, colors=colors, markers=markers,
+                                   only_first_quarter=False, legend=True, marker_edge=None, labels=labels, obs_label=obs_name, mod_points_size=taylor_mark_dim, obs_points_size=int(1.1*taylor_mark_dim), max_val_sd=max_val_sd)
             all_figures += figs
 
     numens_ok = int(np.ceil(n_clus))
@@ -2754,18 +2832,18 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         side1 = side2
         side2 = cos
 
-    fig = plt.figure(figsize=(16,12))
+    fig = plt.figure(figsize=(16, 12))
     for num, patt in enumerate(patnames):
-        ax = plt.subplot(side1, side2, num+1, polar = True)
+        ax = plt.subplot(side1, side2, num+1, polar=True)
 
         obs = result_obs['cluspattern_area'][num, ...]
         modpats = [result_models[lab]['cluspattern_area'][num, ...] for lab in labels]
 
         legok = False
-        ctl.Taylor_plot(modpats, obs, latitude = result_obs['lat_area'], ax = ax, title = None, colors = colors, markers = markers, only_first_quarter = True, legend = legok, labels = labels, obs_label = obs_name, mod_points_size = taylor_mark_dim, obs_points_size = int(1.1*taylor_mark_dim), max_val_sd = max_val_sd)
+        ctl.Taylor_plot(modpats, obs, latitude=result_obs['lat_area'], ax=ax, title=None, colors=colors, markers=markers, only_first_quarter=True,
+                        legend=legok, labels=labels, obs_label=obs_name, mod_points_size=taylor_mark_dim, obs_points_size=int(1.1*taylor_mark_dim), max_val_sd=max_val_sd)
 
-
-    #Custom legend
+    # Custom legend
     from matplotlib.patches import Patch
     from matplotlib.lines import Line2D
 
@@ -2777,18 +2855,18 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
     for col, lab, mark in zip(colors, labels, mark_all):
         if lab is None:
             break
-        legend_elements.append(Line2D([0], [0], marker=mark, color=col, label=lab, linestyle = ''))
+        legend_elements.append(Line2D([0], [0], marker=mark, color=col, label=lab, linestyle=''))
 
-    legend_elements.append(Line2D([0], [0], marker='D', color='black', label='ERA', linestyle = ''))
-    fig.legend(handles=legend_elements, loc=1, fontsize = 'large')
+    legend_elements.append(Line2D([0], [0], marker='D', color='black', label='ERA', linestyle=''))
+    fig.legend(handles=legend_elements, loc=1, fontsize='large')
 
     fig.tight_layout()
     if len(patnames) == 4:
-        n1 = plt.text(0.15,0.6,patnames[0],transform=fig.transFigure, fontsize = 20)
-        n3 = plt.text(0.6,0.6,patnames[1],transform=fig.transFigure, fontsize = 20)
-        n2 = plt.text(0.15,0.1,patnames[2],transform=fig.transFigure, fontsize = 20)
-        n4 = plt.text(0.6,0.1,patnames[3],transform=fig.transFigure, fontsize = 20)
-        bbox=dict(facecolor = 'lightsteelblue', alpha = 0.7, edgecolor='black', boxstyle='round,pad=0.2')
+        n1 = plt.text(0.15, 0.6, patnames[0], transform=fig.transFigure, fontsize=20)
+        n3 = plt.text(0.6, 0.6, patnames[1], transform=fig.transFigure, fontsize=20)
+        n2 = plt.text(0.15, 0.1, patnames[2], transform=fig.transFigure, fontsize=20)
+        n4 = plt.text(0.6, 0.1, patnames[3], transform=fig.transFigure, fontsize=20)
+        bbox = dict(facecolor='lightsteelblue', alpha=0.7, edgecolor='black', boxstyle='round,pad=0.2')
         n1.set_bbox(bbox)
         n2.set_bbox(bbox)
         n3.set_bbox(bbox)
@@ -2802,38 +2880,41 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
         data = dict()
         for cos in ['RMS', 'patcor']:
             fac = 1.
-            if cos == 'RMS': fac = nsqr
+            if cos == 'RMS':
+                fac = nsqr
             data[cos] = []
             data[cos+'_err'] = []
             data[cos+'_errlarge'] = []
             for grp in groups:
-                data[cos].append(np.mean([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
-                data[cos+'_err'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/(fac * np.sqrt(len(groups[grp])-1)))
-                data[cos+'_errlarge'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis = 0)/fac)
+                data[cos].append(np.mean([result_models[mod][cos] for mod in groups[grp]], axis=0)/fac)
+                data[cos+'_err'].append(np.std([result_models[mod][cos]
+                                        for mod in groups[grp]], axis=0)/(fac * np.sqrt(len(groups[grp])-1)))
+                data[cos+'_errlarge'].append(np.std([result_models[mod][cos] for mod in groups[grp]], axis=0)/fac)
             data[cos] = np.stack(data[cos])
             data[cos+'_err'] = np.stack(data[cos+'_err'])
             data[cos+'_errlarge'] = np.stack(data[cos+'_errlarge'])
 
         if not np.any([len(groups[k]) == 1 for k in groups.keys()]):
-            fig = plt.figure(figsize = (16,12))
+            fig = plt.figure(figsize=(16, 12))
 
             for j in range(n_clus):
-                ax = fig.add_subplot(i1,i2,j+1)
-                ax.set_title(patnames[j], fontsize = 18, fontweight = 'bold')
+                ax = fig.add_subplot(i1, i2, j+1)
+                ax.set_title(patnames[j], fontsize=18, fontweight='bold')
 
-                ctl.ellipse_plot(data['patcor'][:,j], data['RMS'][:,j], data['patcor_err'][:,j], data['RMS_err'][:,j], labels = list(groups.keys()), ax = ax, colors = group_colors, alpha = 0.7)
+                ctl.ellipse_plot(data['patcor'][:, j], data['RMS'][:, j], data['patcor_err'][:, j],
+                                 data['RMS_err'][:, j], labels=list(groups.keys()), ax=ax, colors=group_colors, alpha=0.7)
 
                 for grp in groups:
                     pats = [result_models[mod]['patcor'][j] for mod in groups[grp]]
                     rmss = [result_models[mod]['RMS'][j]/nsqr for mod in groups[grp]]
-                    ax.scatter(pats, rmss, color = color_dict[grp], s = 25, marker = group_symbols[grp])
+                    ax.scatter(pats, rmss, color=color_dict[grp], s=25, marker=group_symbols[grp])
 
                 ax.set_xlim(0.35, 1.0)
                 ax.set_ylim(0., 27.0)
                 ax.tick_params(labelsize=14)
                 plt.gca().invert_xaxis()
-                ax.set_xlabel('Pattern correlation', fontsize = 18)
-                ax.set_ylabel('RMS (m)', fontsize = 18)
+                ax.set_xlabel('Pattern correlation', fontsize=18)
+                ax.set_ylabel('RMS (m)', fontsize=18)
                 ax.grid()
 
             plt.tight_layout()
@@ -2842,28 +2923,27 @@ def plot_WRtool_results(cart_out, tag, n_ens, result_models, result_obs, model_n
             fig.savefig(cart_out + 'ellipse_plot_{}.pdf'.format(tag))
             all_figures.append(fig)
 
-
     filename = cart_out + 'WRtool_{}_allfig.pdf'.format(tag)
     ctl.plot_pdfpages(filename, all_figures)
 
     return
 
 
-def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_range = None, cb_label = None, plot_type = 'filled_contour', reg_freq = None, draw_contour_lines = True, cmappa = None, n_color_levels = 11):
+def plot_regimes(lat, lon, patts, filename, clatlo=None, names=None, cbar_range=None, cb_label=None, plot_type='filled_contour', reg_freq=None, draw_contour_lines=True, cmappa=None, n_color_levels=11):
     """
     Nice regime plot.
     """
     from matplotlib import colors
 
-    #colo = '#d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4'
+    # colo = '#d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4'
     if cmappa is None:
         colo = '#a50026 #d73027 #f46d43 #fdae61 #fee090 #ffffff #e0f3f8 #abd9e9 #74add1 #4575b4 #313695'
         colo = colo.split()
         colo = colo[::-1]
         # sns.palplot(colo)
         cmappa = colors.ListedColormap(colo)
-        cmappa.set_over('#800026') #662506
-        cmappa.set_under('#023858') #542788
+        cmappa.set_over('#800026')  # 662506
+        cmappa.set_under('#023858')  # 542788
 
     if names is None:
         names = ['Clus {}'.format(i) for i in range(len(patts))]
@@ -2874,7 +2954,7 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
         clatlo = (70, -20)
 
     if cbar_range is None:
-        cbar_range = (-110., 110.)#(-135., 135.)
+        cbar_range = (-110., 110.)  # (-135., 135.)
 
     if n_color_levels == 11:
         clevels = np.arange(cbar_range[0], cbar_range[1]+1, (cbar_range[1]-cbar_range[0])/9.)
@@ -2886,12 +2966,13 @@ def plot_regimes(lat, lon, patts, filename, clatlo = None, names = None, cbar_ra
     proj = 'nearside'
     blat = 0
 
-    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization = proj, central_lat_lon = clatlo, cmap = cmappa, cbar_range = cbar_range, title = '', subtitles = names, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = blat, draw_grid = True, n_color_levels = n_color_levels, draw_contour_lines = draw_contour_lines, clevels = clevels, lw_contour = 0.7, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patts, lat, lon, filename, visualization=proj, central_lat_lon=clatlo, cmap=cmappa, cbar_range=cbar_range, title='', subtitles=names, cb_label=cb_label, color_percentiles=(
+        0.5, 99.5), number_subplots=False, bounding_lat=blat, draw_grid=True, n_color_levels=n_color_levels, draw_contour_lines=draw_contour_lines, clevels=clevels, lw_contour=0.7, plot_type=plot_type, plot_anomalies=True)
 
     return figs
 
 
-def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames = None, patnames_short = None, central_lat_lon = (70, 0), visualization = 'Nstereo', bounding_lat = 30, plot_margins = None, draw_rectangle_area = None, taylor_mark_dim = 100, use_seaborn = True, color_palette = 'hls', show_transitions = False, draw_grid = False, plot_type = 'pcolormesh', cb_label = 'Geopotential height anomaly (m)'):
+def plot_WRtool_singlemodel(cart_out, tag, results, model_name=None, patnames=None, patnames_short=None, central_lat_lon=(70, 0), visualization='Nstereo', bounding_lat=30, plot_margins=None, draw_rectangle_area=None, taylor_mark_dim=100, use_seaborn=True, color_palette='hls', show_transitions=False, draw_grid=False, plot_type='pcolormesh', cb_label='Geopotential height anomaly (m)'):
     """
     Plot the results of WRtool.
 
@@ -2900,7 +2981,8 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     < central_lat_lon > : tuple. Latitude and longitude of the central point in the maps. Usually (70,0) for EAT, (70,-90) per PNA.
     """
     cart_out = cart_out + tag + '/'
-    if not os.path.exists(cart_out): os.mkdir(cart_out)
+    if not os.path.exists(cart_out):
+        os.mkdir(cart_out)
 
     n_clus = len(results['cluspattern'])
 
@@ -2923,14 +3005,14 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     if 'freq_clus' in results.keys():
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.grid(axis = 'y', zorder = 0)
+        ax.grid(axis='y', zorder=0)
         wi = 0.8
         for j in range(n_clus):
-            ax.bar(j, results['freq_clus'][j], width = wi,  color = color, zorder = 5)
+            ax.bar(j, results['freq_clus'][j], width=wi,  color=color, zorder=5)
 
-        ax.legend(fontsize = 'small', loc = 1)
+        ax.legend(fontsize='small', loc=1)
         ax.set_title('Regimes frequencies')
-        ax.set_xticks([j for j in range(n_clus)], minor = False)
+        ax.set_xticks([j for j in range(n_clus)], minor=False)
         ax.set_xticklabels(patnames_short, size='small')
         ax.set_ylabel('Frequency')
         fig.savefig(cart_out+'Regime_frequency_{}.pdf'.format(tag))
@@ -2947,20 +3029,20 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
         fig = plt.figure()
         # binzzz = np.arange(0,36,5)
         for j in range(n_clus):
-            ax = fig.add_subplot(i1,i2,j+1)
+            ax = fig.add_subplot(i1, i2, j+1)
             ax.set_title(patnames[j])
 
             max_days = 29
-            numarr, frek_obs = ctl.count_occurrences(results['resid_times'][j], num_range = (0, max_days))
-            ax.bar(numarr, frek_obs, alpha = 0.5, label = model_name, color = 'indianred')
+            numarr, frek_obs = ctl.count_occurrences(results['resid_times'][j], num_range=(0, max_days))
+            ax.bar(numarr, frek_obs, alpha=0.5, label=model_name, color='indianred')
             coso_obs = ctl.running_mean(frek_obs[:-1], 3)
-            ax.plot(numarr[:-1], coso_obs, color = 'indianred')
+            ax.plot(numarr[:-1], coso_obs, color='indianred')
             ax.legend()
             ax.set_xlim(0, max_days+2)
-            tics = np.arange(0,max_days+2,5)
+            tics = np.arange(0, max_days+2, 5)
             labs = ['{}'.format(ti) for ti in tics[:-1]]
             labs.append('>{}'.format(max_days))
-            ax.set_xticks(tics, minor = False)
+            ax.set_xticks(tics, minor=False)
             ax.set_xticklabels(labs, size='small')
             ax.set_xlabel('Days')
             ax.set_ylabel('Frequency')
@@ -2973,21 +3055,20 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
         ctl.adjust_ax_scale(axes)
         all_figures.append(fig)
 
-
     if 'trans_matrix' in results.keys() and show_transitions:
         cmapparu = cm.get_cmap('RdBu_r')
         mappe = []
 
-        fig = plt.figure(figsize=(16,6))
+        fig = plt.figure(figsize=(16, 6))
         ax = fig.add_subplot(121)
-        gigi = ax.imshow(results['trans_matrix'], norm = LogNorm(vmin = 0.01, vmax = 1.0))
+        gigi = ax.imshow(results['trans_matrix'], norm=LogNorm(vmin=0.01, vmax=1.0))
         ax.xaxis.tick_top()
-        #ax.invert_yaxis()
+        # ax.invert_yaxis()
         # ax.set_xticks(np.arange(n_clus)+0.5, minor=False)
         # ax.set_yticks(np.arange(n_clus)+0.5, minor=False)
-        ax.set_xticks(np.arange(n_clus), minor = False)
+        ax.set_xticks(np.arange(n_clus), minor=False)
         ax.set_xticklabels(patnames_short, size='small')
-        ax.set_yticks(np.arange(n_clus), minor = False)
+        ax.set_yticks(np.arange(n_clus), minor=False)
         ax.set_yticklabels(patnames_short, size='small')
         cb = plt.colorbar(gigi)
         cb.set_label('Transition probability')
@@ -2995,12 +3076,12 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
         ax = fig.add_subplot(122)
         numat = results['trans_matrix'][:]
         for i in range(numat.shape[0]):
-            numat[i,i] = np.nan
-        gigi = ax.imshow(numat, vmin = 0.01, vmax = 0.1, cmap = cmapparu)
+            numat[i, i] = np.nan
+        gigi = ax.imshow(numat, vmin=0.01, vmax=0.1, cmap=cmapparu)
         ax.xaxis.tick_top()
-        ax.set_xticks(np.arange(n_clus), minor = False)
+        ax.set_xticks(np.arange(n_clus), minor=False)
         ax.set_xticklabels(patnames_short, size='small')
-        ax.set_yticks(np.arange(n_clus), minor = False)
+        ax.set_yticks(np.arange(n_clus), minor=False)
         ax.set_yticklabels(patnames_short, size='small')
         cb = plt.colorbar(gigi)
         cb.set_label('Transitions only')
@@ -3015,7 +3096,8 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     lat = results['lat']
     lon = results['lon']
     filename = cart_out+'Allclus_{}.pdf'.format(model_name)
-    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization = visualization, central_lat_lon = central_lat_lon, cmap = 'RdBu_r', title = 'Weather regimes in {}'.format(model_name), subtitles = patnames, cb_label = cb_label, color_percentiles = (0.5,99.5), number_subplots = False, bounding_lat = bounding_lat, plot_margins = plot_margins, add_rectangles = draw_rectangle_area, draw_grid = draw_grid, plot_type = plot_type, plot_anomalies = True)
+    figs = ctl.plot_multimap_contour(patt, lat, lon, filename, visualization=visualization, central_lat_lon=central_lat_lon, cmap='RdBu_r', title='Weather regimes in {}'.format(model_name), subtitles=patnames, cb_label=cb_label, color_percentiles=(
+        0.5, 99.5), number_subplots=False, bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=draw_rectangle_area, draw_grid=draw_grid, plot_type=plot_type, plot_anomalies=True)
     all_figures += figs
     figs[0].savefig(filename)
 
@@ -3025,8 +3107,8 @@ def plot_WRtool_singlemodel(cart_out, tag, results, model_name = None, patnames 
     return
 
 
-#################### EnsClus
-def EnsClus_light(var_anom, lat = None, flag_perc = False, numpcs = 4, perc = 80, numclus = 4):
+# EnsClus
+def EnsClus_light(var_anom, lat=None, flag_perc=False, numpcs=4, perc=80, numclus=4):
     '''
     var_anom is a list of lat-lon objects.
 
@@ -3056,59 +3138,58 @@ def EnsClus_light(var_anom, lat = None, flag_perc = False, numpcs = 4, perc = 80
         print('Considering fixed number of principal components: {0}'.format(numpcs))
 
     print('------------ EOF analysis -------------- \n')
-    #----------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------
     solver = ctl.eof_computation(var_anom, lat)
 
     varfrac = solver.varianceFraction()
     acc = np.cumsum(varfrac*100)
     if flag_perc:
-        numpcs = min(enumerate(acc), key=lambda x: x[1]<=perc)[0]+1
-        print('\nThe number of PCs that explain at least {}% of variance is {}'.format(perc,numpcs))
-        exctperc=min(enumerate(acc), key=lambda x: x[1]<=perc)[1]
+        numpcs = min(enumerate(acc), key=lambda x: x[1] <= perc)[0]+1
+        print('\nThe number of PCs that explain at least {}% of variance is {}'.format(perc, numpcs))
+        exctperc = min(enumerate(acc), key=lambda x: x[1] <= perc)[1]
     if numpcs is not None:
-        exctperc=acc[numpcs-1]
+        exctperc = acc[numpcs-1]
     if np.isnan(exctperc):
         print(acc)
         raise ValueError('NaN in evaluation of variance explained by first pcs')
-    print('(the first {} PCs explain the {:5.2f}% of variance)'.format(numpcs,exctperc))
+    print('(the first {} PCs explain the {:5.2f}% of variance)'.format(numpcs, exctperc))
 
-
-    #____________Compute k-means analysis using a subset of PCs
+    # ____________Compute k-means analysis using a subset of PCs
     print('__________________________________________________\n')
     print('k-means analysis')
     print('_____________________________________________\n')
-    #----------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------
 
     centroids, labels = ctl.Kmeans_clustering_from_solver(solver, numclus, numpcs)
 
-    #____________Save labels
+    # ____________Save labels
     stringo = '{:10s} {:10s}\n'.format('ens #', 'cluster')
     print(stringo)
     for ii, lab in zip(range(numens), labels):
         stringo = 'ens: {:6d} -> {:8d}\n'.format(ii, lab)
         print(stringo)
 
-    #____________Compute cluster frequencies
-    L=[]
+    # ____________Compute cluster frequencies
+    L = []
     for nclus in range(numclus):
-        cl=list(np.where(labels==nclus)[0])
-        fr=len(cl)*100/len(labels)
-        L.append([nclus,fr,cl])
+        cl = list(np.where(labels == nclus)[0])
+        fr = len(cl)*100/len(labels)
+        L.append([nclus, fr, cl])
 
     print('Cluster labels:')
     print([L[ncl][0] for ncl in range(numclus)])
     print('Cluster frequencies (%):')
-    print([round(L[ncl][1],3) for ncl in range(numclus)])
+    print([round(L[ncl][1], 3) for ncl in range(numclus)])
     print('Cluster members:')
     print([L[ncl][2] for ncl in range(numclus)])
 
-    #____________Find the most representative ensemble member for each cluster
+    # ____________Find the most representative ensemble member for each cluster
     print('___________________________________________________________________________________')
     print('             Closest member to cluster centroid                              ')
     print('_______________________________________________________________________________')
     # 1)
 
-    PCs = solver.pcs()[:,:numpcs]
+    PCs = solver.pcs()[:, :numpcs]
 
     distances = ctl.compute_centroid_distance(PCs, centroids, labels)
     cluspatterns = ctl.compute_clusterpatterns(var_anom, labels)
@@ -3119,9 +3200,9 @@ def EnsClus_light(var_anom, lat = None, flag_perc = False, numpcs = 4, perc = 80
         repr_clus = np.arange(numens)[labok][np.argmin(distances[labok])]
         repres.append(repr_clus)
 
-    #____________Save the most representative ensemble members
+    # ____________Save the most representative ensemble members
     print('List of cluster representatives\n')
-    #stringo = '{:10s} {:8s} -> {:20s}\n'.format('', '#', 'filename')
+    # stringo = '{:10s} {:8s} -> {:20s}\n'.format('', '#', 'filename')
     stringo = '{:12s} {:10s}\n'.format('', '#')
     print(stringo)
     for ii in range(numclus):

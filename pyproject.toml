@@ -21,6 +21,7 @@ dependencies = [
     "xarray",
     "netcdf4",
     "eofs",
+    "cartopy",
     "numpy",
     "esmpy",
     "cfgrib",
