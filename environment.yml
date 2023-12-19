@@ -1,4 +1,4 @@
-name: ctl5
+name: climtools
 channels:
 - scitools
 - conda-forge
@@ -17,3 +17,5 @@ dependencies:
 - cdo
 - cdsapi
 - python-cdo
+- pip:
+  - -e .

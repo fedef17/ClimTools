@@ -1,8 +1,13 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+"""
+Diagnostics for standard climate outputs. Contains higher level tools that make use of climtools_lib.
+Tools contained:
+- WRtool
+- heat_flux_calc
+"""
 
 import numpy as np
-import sys
 import os
 
 from matplotlib import pyplot as plt
@@ -10,26 +15,18 @@ import matplotlib.cm as cm
 import matplotlib.patheffects as PathEffects
 from matplotlib.colors import LogNorm
 
-import iris
-
-import netCDF4 as nc
 import pandas as pd
 from datetime import datetime
 import cftime
 import pickle
 from copy import deepcopy as copy
 
-import climtools_lib as ctl
+import climtools.climtools_lib as ctl
 import glob
 
 ###############################################################################
 
-"""
-Diagnostics for standard climate outputs. Contains higher level tools that make use of climtools_lib.
-Tools contained:
-- WRtool
-- heat_flux_calc
-"""
+
 ###############################################################################
 ### constants
 cp = 1005.0 # specific enthalpy dry air - J kg-1 K-1
