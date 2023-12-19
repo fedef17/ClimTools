@@ -3350,14 +3350,21 @@ def global_mean(field, latitude = None, mask = None, skip_nan = True):
         # coso = field.mean('lon')
         # weights = abs(np.cos(np.deg2rad(coso.lat.values)))
         # glomean = np.average(coso, weights = weights, axis = -1)
+        latn = 'lat'
+        lonn = 'lon'
+
+        if latn not in field.dims and 'latitude' in field.dims:
+            latn = 'latitude'
+        if lonn not in field.dims and 'longitude' in field.dims:
+            lonn = 'longitude'
 
         if mask is None:
-            weights = np.cos(np.deg2rad(field.lat))
-            glomean = field.weighted(weights).mean(['lat', 'lon'])
+            weights = np.cos(np.deg2rad(field[latn]))
+            glomean = field.weighted(weights).mean([latn, lonn])
         else:
-            weights_mask = np.cos(np.deg2rad(np.array(field.lat)))[:, np.newaxis]*mask
-            we_da = xr.DataArray(weights_mask, coords = {'lat': field.lat, 'lon': field.lon})
-            glomean = field.weighted(we_da).mean(['lat', 'lon'])
+            weights_mask = np.cos(np.deg2rad(np.array(field[latn])))[:, np.newaxis]*mask
+            we_da = xr.DataArray(weights_mask, coords = {latn: field[latn], lonm: field[lonn]})
+            glomean = field.weighted(we_da).mean([latn, lonn])
 
         return glomean
         # else:
