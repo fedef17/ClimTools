@@ -1,7 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-Diagnostics for standard climate outputs. Contains higher level tools that make use of climtools_lib.
+Diagnostics for standard climate outputs. 
+Contains higher level tools that make use of climtools_lib.
 Tools contained:
 - WRtool
 - heat_flux_calc
@@ -24,7 +25,6 @@ from copy import deepcopy as copy
 import climtools.climtools_lib as ctl
 import glob
 
-###############################################################################
 
 
 ###############################################################################

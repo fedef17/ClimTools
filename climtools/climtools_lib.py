@@ -15,7 +15,7 @@ if 'DISPLAY' not in os.environ.keys():
 
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
-import matplotlib.patheffects as PathEffects
+#import matplotlib.patheffects as PathEffects
 import matplotlib.animation as animation
 from matplotlib.animation import ImageMagickFileWriter, PillowWriter
 #import seaborn as sns
