@@ -4,6 +4,7 @@ channels:
 - conda-forge
 - defaults
 dependencies:
+- python<3.12
 - netcdf4
 - cartopy
 - eofs
