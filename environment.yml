@@ -1,9 +1,10 @@
-name: ctl5
+name: climtools
 channels:
 - scitools
 - conda-forge
 - defaults
 dependencies:
+- python<3.12
 - netcdf4
 - cartopy
 - eofs
@@ -17,3 +18,5 @@ dependencies:
 - cdo
 - cdsapi
 - python-cdo
+- pip:
+  - -e .
