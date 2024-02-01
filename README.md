@@ -34,14 +34,14 @@ git pull origin master
 #### 0. Install Anaconda
 ClimTools needs a Conda environment, which is defined by the file **env_ctl4.yml**. If you don't have Conda installed, follow the instructions at https://conda.io/projects/conda/en/latest/user-guide/install/index.html?highlight=conda.
 
-#### 1. Create the *ctl4* environment
+#### 1. Create the *climtools* environment
 To create the environment, open a terminal from your ClimTools folder and do:
 ```
-conda env create -f env_ctl4.yml
+conda env create -f environment.yml
 ```
 Each time you want to use ClimTools, remember to activate the environment first:
 ```
-conda activate ctl4
+conda activate climtools
 ```
 
 #### 2. Add permanently the path to ClimTools to your PYTHONPATH

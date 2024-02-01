@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ClimTools"
+dynamic = ["version"]
+authors = [
+  { name="Federico Fabiano", email="f.fabiano@isac.cnr.it" },
+]
+description = "ClimTools is a library of tools for the analysis and visualization of climate datasets"
+readme = "README.md"
+requires-python = ">3.9,<3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "xarray",
+    "netcdf4",
+    "eofs",
+    "cartopy",
+    "numpy",
+    "esmpy",
+    "cfgrib",
+    "cdsapi",
+    "cdo",
+    "scipy",
+    "matplotlib"
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/fedef17/ClimTools"
+"Repository" = "https://github.com/fedef17/ClimTools"
+"Bug Tracker" = "https://github.com/fedef17/ClimTools/issues"
+
+
+[tool.setuptools.dynamic]
+version = {attr = "climtools.__version__"}
