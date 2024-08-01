@@ -1863,6 +1863,12 @@ def sel_area_translate(area):
         latS = 25.0
         lonW = -10.0
         lonE = 40.0
+    elif area == 'Drom':
+        printarea = 'Dromedar domain'
+        latN = 69.0
+        latS = 16.0
+        lonW = -85.0
+        lonE = 60.0
     elif (type(area) in [list, tuple, np.ndarray]) and len(area) == 4:
         lonW, lonE, latS, latN = area
     else:
