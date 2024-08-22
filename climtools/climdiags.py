@@ -193,7 +193,7 @@ def preprocess_cdo(cart_in, cart_out, sel_levels=None, regrid=True, interp_style
 #############################################################################
 
 
-def WRtool_from_file(ifile, season, area, regrid_to_reference_cube=None, sel_yr_range=None, extract_level_hPa=None, netcdf4_read=False, iris_read=False, remove_29feb=False, thres_inf=1.e9, pressure_levels=False, select_area_first=False, rebase_to_historical=False, climate_mean=None, dates_climate_mean=None, read_from_p=None, write_to_p=None, **kwargs):
+def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, wnd_days = 20, regrid_to_reference_cube=None, sel_yr_range=None, extract_level_hPa=None, netcdf4_read=False, iris_read=False, remove_29feb=False, thres_inf=1.e9, pressure_levels=False, select_area_first=False, rebase_to_historical=False, climate_mean=None, dates_climate_mean=None, read_from_p=None, write_to_p=None, **kwargs):
     """
     Wrapper for inputing a filename.
 
@@ -208,9 +208,12 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube=None, sel_yr_
 
     < area > : string. Restricts the input field to this region. (EAT, PNA, NH, Med, Eu)
     """
-    # print(kwargs.keys())
-    # print(numpcs)
-    # print(netcdf4_read)
+
+    # to expose fundamental kwargs in the call
+    kwargs['numclus'] = numclus
+    kwargs['numpcs'] = numpcs
+    kwargs['perc'] = perc
+    kwargs['wnd_days'] = wnd_days
 
     if ifile[-2:] == '.p' and read_from_p is None:
         read_from_p = open(ifile, 'rb')
@@ -391,7 +394,7 @@ def WRtool_from_file(ifile, season, area, regrid_to_reference_cube=None, sel_yr_
     if not rebase_to_historical:
         print('Calculating mean climatology\n')
         if ctl.check_daily(dates):
-            climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window=kwargs['wnd_days'])
+            climate_mean, dates_climate_mean, _ = ctl.daily_climatology(var, dates, window = kwargs['wnd_days'])
 
             # climate_mean_dtr, dates_climate_mean_dtr = None, None
             # if kwargs['detrended_eof_calculation']:

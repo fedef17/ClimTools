@@ -26,7 +26,7 @@ from shapely import geometry
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy.util as cutil
-# import pandas as pd
+import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
