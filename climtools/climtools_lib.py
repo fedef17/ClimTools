@@ -5,9 +5,12 @@ import numpy as np
 import sys
 import os
 import glob
+import pandas as pd
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+plt.rcParams['pcolor.shading'] = 'auto'
+
 
 if 'DISPLAY' not in os.environ.keys():
     print('No DISPLAY variable set. Switching to agg backend')
@@ -26,7 +29,7 @@ from shapely import geometry
 import netCDF4 as nc
 import cartopy.crs as ccrs
 import cartopy.util as cutil
-# import pandas as pd
+import pandas as pd
 
 from numpy import linalg as LA
 from eofs.standard import Eof
@@ -4796,7 +4799,10 @@ def calc_regime_residtimes(indices, dates=None, count_incomplete=True, skip_sing
     if dates is None:
         return np.array(resid_times)
     else:
-        return np.array(resid_times), np.array(regime_dates), np.array(regime_nums)
+        # print(np.shape(np.array(resid_times, dtype=object)))
+        # print(np.shape(np.array(regime_dates, dtype=object))) 
+        # print(np.shape(np.array(regime_nums, dtype=object)))
+        return np.array(resid_times, dtype=object), np.array(regime_dates, dtype=object), np.array(regime_nums, dtype=object)
 
 
 def calc_days_event(labels, resid_times, regime_nums):
@@ -5540,8 +5546,15 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
     elif len(grid_step) > 1:
         # either the longitude is split or it has a discontinuity at zero which cartopy can't handle..
         lon_o = lon.copy()
-        pi = np.where(np.diff(lon) < 0)[0][0]
-        lon_o[pi + 1:] += 360.
+        # print('longitudes: ')
+        # print(lon)
+        # print(np.where(np.diff(lon)<0))
+        pi = np.array(np.where(np.diff(lon) < 0))
+        # print(pi)
+        # print(pi.size)
+        if pi.size > 0:
+            pi = pi[0,0]
+            lon_o[pi + 1:] += 360.
         lon = lon_o
     else:
         # regional domain
@@ -5552,6 +5565,7 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     # print(cbar_range, clevels, cmappa)
     if plot_type == 'filled_contour':
+        data = np.squeeze(data)
         map_plot = ax.contourf(xi, yi, data, clevels, cmap=cmappa, transform=ccrs.PlateCarree(),
                                extend=extend_opt, corner_mask=False, colors=colors, alpha=alphamap, norm=color_norm)
         nskip = (len(clevels)-1)//n_lines
@@ -5561,8 +5575,12 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
             map_plot_lines = ax.contour(xi, yi, data, clevels[::nskip], colors=line_color,
                                         transform=ccrs.PlateCarree(), linewidths=lw_contour)
     elif plot_type == 'pcolormesh':
+        # print(cmappa)
+        # print(data.shape)
+        data = np.squeeze(data)
         map_plot = ax.pcolormesh(xi, yi, data, cmap=cmappa, transform=ccrs.PlateCarree(),
-                                 norm=color_norm, vmin=clevels[0], vmax=clevels[-1])
+                                 norm=color_norm, vmin=clevels[0], vmax=clevels[-1],
+                                 shading='auto')
     elif plot_type == 'contour':
         nskip = (len(clevels)-1)//n_lines
         if nskip == 0:
@@ -6642,7 +6660,7 @@ def plot_multimap_contour(dataset, lat=None, lon=None, filename=None, max_ax_in_
 
     if lat is None or lon is None:
         # print(type(dataset[0]))
-        if isinstance(dataset[0], xr.DataArray):
+        if isinstance(dataset, xr.DataArray):
             if 'lat' in dataset[0].coords:
                 lat = dataset[0].lat.values
                 lon = dataset[0].lon.values
@@ -6650,7 +6668,7 @@ def plot_multimap_contour(dataset, lat=None, lon=None, filename=None, max_ax_in_
                 lat = dataset[0].latitude.values
                 lon = dataset[0].longitude.values
             dataset = [da.values for da in dataset]
-        elif isinstance(dataset, xr.Dataset) or isinstance(dataset[0], xr.Dataset):
+        elif isinstance(dataset, xr.Dataset) or isinstance(dataset, xr.Dataset):
             raise ValueError(
                 'Not implemented! Function works on DataArrays not on Datasets. Extract the right variable first and concatenate them')
         else:
