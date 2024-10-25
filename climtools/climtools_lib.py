@@ -1997,6 +1997,21 @@ def convert_lon_std(lon, lon_type='0-360'):
     return lon
 
 
+def transform_to_dataarray(arr1, new_data, new_name):
+    # Create a new DataArray with the data from nparr, but with the same structure as xrarr
+    arr2_da = xr.DataArray(
+        data=new_data,                      # The new data (arr2)
+        coords=arr1.coords,             # Copy coordinates from arr1
+        dims=arr1.dims,                 # Copy dimensions from arr1
+        attrs=arr1.attrs                # Copy attributes from arr1 (optional)
+    )
+    
+    # Rename the variable (if arr1 is part of a dataset, we need to change the name explicitly)
+    arr2_da.name = new_name
+
+    return arr2_da
+
+
 def sel_area_xr(var, area):
     """
     Works on a DataArray.
@@ -2939,7 +2954,34 @@ def extract_common_dates(dates1, dates2, arr1, arr2, ignore_HHMM=True):
     return arr1_ok, arr2_ok, dates_common
 
 
-def running_mean(var, wnd, remove_nans=False, cyclic=False):
+def running_mean(var, wnd, remove_nans = False,  fill_edges = True, cyclic = False):
+    if isinstance(var, xr.Dataset) or isinstance(var, xr.DataArray):
+        if cyclic: print('WARNING: cyclic not implemented!')
+        return running_mean_xr(var, wnd, remove_nans = remove_nans, fill_edges = fill_edges)
+    else:
+        if fill_edges: print('WARNING: fill_edges not implemented!')
+        return running_mean_old(var, wnd, remove_nans = remove_nans, cyclic = cyclic)
+    
+    return
+
+
+def running_mean_xr(ds, wnd, remove_nans=False, fill_edges = True):
+    """
+    Performs a running mean along the time/year axis.
+
+    < wnd > : is the window length
+    """
+    if 'time' in ds.coords or 'time' in ds.dims:
+        ds_running_mean = ds.rolling(time = wnd, center = True, min_periods = wnd/2).mean(skipna = remove_nans)
+    elif 'year' in ds.coords or 'year' in ds.dims:
+        ds_running_mean = ds.rolling(year = wnd, center = True, min_periods = wnd/2).mean(skipna = remove_nans)
+    else:
+        raise ValueError("Neither 'time' nor 'year' is found in the dataset.")
+    
+    return ds_running_mean
+
+
+def running_mean_old(var, wnd, remove_nans=False, cyclic=False):
     """
     Performs a running mean (if multidim, the mean is done on the first axis).
 
@@ -3415,7 +3457,7 @@ def global_mean(field, latitude=None, mask=None, skip_nan=True):
             glomean = field.weighted(weights).mean([latn, lonn])
         else:
             weights_mask = np.cos(np.deg2rad(np.array(field[latn])))[:, np.newaxis]*mask
-            we_da = xr.DataArray(weights_mask, coords={latn: field[latn], lonm: field[lonn]})
+            we_da = xr.DataArray(weights_mask, coords={latn: field[latn], lonn: field[lonn]})
             glomean = field.weighted(we_da).mean([latn, lonn])
 
         return glomean
