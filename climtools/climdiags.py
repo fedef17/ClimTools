@@ -241,8 +241,8 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
         dates_sel = []
 
         var, dates, lat, lon = pickle.load(read_from_p)
-        if sel_yr_range is not None:
-            var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+        # if sel_yr_range is not None:
+        #     var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
         if select_area_first:
             print('Selecting area first for saving memory')
             var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
@@ -258,8 +258,8 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
             except EOFError:
                 break
 
-            if sel_yr_range is not None:
-                var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+            # if sel_yr_range is not None:
+            #     var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
             if select_area_first:
                 print('Selecting area first for saving memory')
                 var, lat_area, lon_area = ctl.sel_area(lat, lon, var, area)
@@ -322,9 +322,9 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
         if write_to_p is not None:
             pickle.dump([var, dates, lat, lon], write_to_p)
 
-        if sel_yr_range is not None:
-            print('Selecting year range: {}'.format(sel_yr_range))
-            var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+        # if sel_yr_range is not None:
+        #     print('Selecting year range: {}'.format(sel_yr_range))
+        #     var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
 
         all_ye = np.arange(dates[0].year, dates[-1].year + 1)
         all_ye_data = np.unique([da.year for da in dates])
@@ -372,8 +372,8 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
                 else:
                     pickle.dump([var, dates], write_to_p)
 
-            if sel_yr_range is not None:
-                var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+            # if sel_yr_range is not None:
+            #     var, dates = ctl.sel_time_range(var, dates, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
 
             if select_area_first:
                 print('Selecting area first for saving memory')
@@ -418,21 +418,11 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
     else:
         print('Using historical climate mean!\n')
 
-    # if sel_yr_range is not None:
-    #     print('Selecting date range {}\n'.format(sel_yr_range))
-    #     dates_season_pdh = pd.to_datetime(dates_season)
-    #     okdat = (dates_season_pdh.year >= sel_yr_range[0]) & (dates_season_pdh.year <= sel_yr_range[1])
-    #     var_season = var_season[okdat, ...]
-    #     dates_season = dates_season[okdat]
-    #
-    #     dates_pdh = pd.to_datetime(dates)
-    #     okdat = (dates_pdh.year >= sel_yr_range[0]) & (dates_pdh.year <= sel_yr_range[1])
-    #     dates = dates[okdat]
     del var
 
     # results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean = climate_mean, dates_climate_mean = dates_climate_mean, climate_mean_dtr = climate_mean_dtr, dates_climate_mean_dtr = dates_climate_mean_dtr, select_area_first = select_area_first, **kwargs)
     results = WRtool_core(var_season, lat, lon, dates_season, area, climate_mean=climate_mean, dates_climate_mean=dates_climate_mean,
-                          select_area_first=select_area_first, rebase_to_historical=rebase_to_historical, **kwargs)
+                          select_area_first=select_area_first, rebase_to_historical=rebase_to_historical, sel_yr_range=sel_yr_range, **kwargs)
 
     results['dates_allyear'] = dates
     if read_from_p is not None:
@@ -441,6 +431,10 @@ def WRtool_from_file(ifile, season, area, numclus = 4, numpcs = 4, perc = None, 
         results['time_cal'] = aux_info['time_calendar']
         results['time_units'] = aux_info['time_units']
 
+    if sel_yr_range is not None:
+        var, dates_season = ctl.sel_time_range(var_season, dates_season, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+        del var
+   
     var, datesmon = ctl.calc_monthly_clus_freq(results['labels'], dates_season, kwargs['numclus'])
     results['freq_clus_monthly'] = var
     # results['freq_clus_monthly_dates'] = pd.to_datetime(datesmon)
@@ -625,7 +619,7 @@ def WRtool_from_ensset(ensset, dates_set, lat, lon, season, area, **kwargs):
     return results
 
 
-def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days=20, wnd_years=30, numpcs=4, perc=None, numclus=4, ref_solver=None, ref_patterns_area=None, clus_algorhitm='molteni', nrsamp_sig=5000, heavy_output=False, run_significance_calc=False, significance_calc_routine='BootStrap25', use_reference_eofs=False, use_reference_clusters=False, ref_clusters_centers=None, climate_mean=None, dates_climate_mean=None, bad_matching_rule='rms_mean', matching_hierarchy=None, area_dtr='global', detrend_only_global=False, calc_gradient=False, supervised_clustering=False, frac_super=0.02, select_area_first=False, deg_dtr=1, detrend_local_linear=False, rebase_to_historical=False, remove_climate_mean=True):
+def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days=20, wnd_years=30, numpcs=4, sel_yr_range=None, perc=None, numclus=4, ref_solver=None, ref_patterns_area=None, clus_algorhitm='molteni', nrsamp_sig=5000, heavy_output=False, run_significance_calc=False, significance_calc_routine='BootStrap25', use_reference_eofs=False, use_reference_clusters=False, ref_clusters_centers=None, climate_mean=None, dates_climate_mean=None, bad_matching_rule='rms_mean', matching_hierarchy=None, area_dtr='global', detrend_only_global=False, calc_gradient=False, supervised_clustering=False, frac_super=0.02, select_area_first=False, deg_dtr=1, detrend_local_linear=False, rebase_to_historical=False, remove_climate_mean=True):
     """
     Tools for calculating Weather Regimes clusters. The clusters are found through Kmeans_clustering.
     This is the core: works on a set of variables already filtered for the season.
@@ -676,7 +670,10 @@ def WRtool_core(var_season, lat, lon, dates_season, area, wnd_days=20, wnd_years
         var_season, local_trend, dates_season = ctl.remove_local_lineartrend(lat, lon, var_season, dates_season, None)
         if not rebase_to_historical:
             climate_mean = None  # need to recalculate climate_mean
-
+    
+    if sel_yr_range is not None:    
+        var_season, dates_season = ctl.sel_time_range(var_season, dates_season, ctl.range_years(sel_yr_range[0], sel_yr_range[1]))
+    
     if remove_climate_mean:
         if is_daily:
             if climate_mean is None:

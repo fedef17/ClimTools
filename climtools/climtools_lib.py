@@ -2353,6 +2353,7 @@ def remove_global_polytrend(lat, lon, var, dates, season, deg=3, area='global', 
 
     # m, c, err_m, err_c = linear_regre_witherr(years, var_regional)
     coeffs, covmat = np.polyfit(years, var_regional, deg=deg, cov=True)
+    # coeffs = np.polyfit(years, var_regional, deg=deg, cov=False)
     # if print_trend:
     #     print('Trend: {:7.2e} +/- {:7.1e}\n'.format(m, err_m))
     #     print('Intercept: {:7.2e} +/- {:7.1e}\n'.format(c, err_c))
@@ -6385,10 +6386,10 @@ def plot_map_contour(data, lat=None, lon=None, filename=None, visualization='sta
                                vec_every=vec_every, add_hatching=add_hatching, hatch_styles=hatch_styles, add_contour_same_levels=add_contour_same_levels, add_contour_plot_anomalies=add_contour_plot_anomalies, add_contour_lines_step=add_contour_lines_step, add_contour_range=add_contour_range, extend_opt=extend_opt, line_color=line_color, color_norm=color_norm, clevels=clevels, add_contour_regrid_shape=add_contour_regrid_shape, vector_plot=vector_plot)
 
     title_obj = plt.title(title, fontsize=20, fontweight='bold')
-    title_obj.set_position([.5, 1.05])
+    title_obj.set_position([.7, 1.75])   # change here for the position
 
     if plot_type not in ['contour', 'binary_contour']:
-        cax = plt.axes([0.1, 0.11, 0.8, 0.05])  # horizontal
+        cax = plt.axes([0.1, 0.09, 0.8, 0.05])  # horizontal
         cb = plt.colorbar(map_plot, cax=cax, orientation='horizontal')  # , labelsize=18)
         cb.ax.tick_params(labelsize=14)
         cb.set_label(cb_label, fontsize=16)
@@ -6403,8 +6404,10 @@ def plot_map_contour(data, lat=None, lon=None, filename=None, visualization='sta
 
     # save the figure or show it
     if filename is not None:
-        fig4.savefig(filename)
-        # plt.close(fig4)
+        #fig4.savefig(filename) # UN/COMMENT THIS
+        #plt.close(fig4)   # UN/COMMENT THIS
+        plt.savefig(filename) # UN/COMMENT THIS
+        plt.close()   # UN/COMMENT THIS
 
     if 'vscod' in os.environ['PATH']:
         # matplotlib inline in jupyter
@@ -7088,8 +7091,8 @@ def plot_animation_map(maps, lat, lon, labels=None, fps_anim=5, title=None, file
     map_plot = plot_mapc_on_ax(ax, mapa, lat, lon, proj, cmappa, cbar_range, n_color_levels=n_color_levels, draw_contour_lines=draw_contour_lines, n_lines=n_lines,
                                bounding_lat=bounding_lat, plot_margins=plot_margins, add_rectangles=add_rectangles, draw_grid=draw_grid, plot_type=plot_type, lw_contour=lw_contour)
 
-    showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight='bold', color='black', bbox=dict(
-        facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
+    showdate = ax.text(0.5, 0.9, labels[0], transform=fig.transFigure, fontweight='bold', color='black', 
+                       bbox=dict(facecolor='lightsteelblue', edgecolor='black', boxstyle='round,pad=1'))
 
     # cax = plt.axes([0.1, 0.11, 0.8, 0.05]) #horizontal
     cb = plt.colorbar(map_plot, orientation='horizontal')  # cax=cax, labelsize=18)
