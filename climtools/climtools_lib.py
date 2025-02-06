@@ -836,6 +836,15 @@ def create_xr_grid(lats, lons, gridname='grid'):
     return grids
 
 
+def build_xr_ds(allvars, time, lat, lon):
+    data_vars = {vnam : (['time', 'lat', 'lon'], allvars[vnam]) for vnam in allvars.keys() if isinstance(allvars[vnam], np.ndarray)}
+    scalars = {vnam : allvars[vnam] for vnam in allvars.keys() if vnam not in data_vars}
+
+    ds = xr.Dataset(data_vars = data_vars, coords={'time': time, 'lat': lat, 'lon': lon}, attrs = scalars)
+
+    return ds
+
+
 def regrid_dataset(dataset, lats=None, lons=None, regrid_to_reference=None, regrid_to_deg=2.5, regrid_scheme='bilinear', ignore_degenerate=True):
     """
     Regrids xarray dataset as a reference dataset (regrid_to_reference) or with custom degrees spacing.

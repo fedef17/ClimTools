@@ -1,9 +1,8 @@
 name: climtools
 channels:
-- scitools
 - conda-forge
 dependencies:
-- python<3.12
+- python
 - netcdf4
 - cartopy
 - eofs
@@ -12,10 +11,14 @@ dependencies:
 - scikit-learn
 - scipy
 - xarray
+- dask
+- dask-jobqueue
 - cfgrib
 - xesmf
 - cdo
 - cdsapi
 - python-cdo
+- ipykernel
+- pip
 - pip:
   - -e .
