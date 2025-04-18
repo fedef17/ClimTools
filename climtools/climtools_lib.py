@@ -2681,7 +2681,7 @@ def seasonal_set(var, dates=None, season=None, dates_range=None, cut=True, seaso
     # dates_diff = dates_season[1:] - dates_season[:-1]
     dates_diff = np.array([da1-da0 for da1, da0 in zip(dates_season[1:], dates_season[:-1])])
     if check_daily(dates) and season != 'year':
-        jump = dates_diff > pd.Timedelta('15 days')
+        jump = dates_diff > np.timedelta64(15, 'D')
         okju = np.where(jump)[0] + 1
         okju = np.append([0], okju)
         okju = np.append(okju, [len(dates_season)])
@@ -2700,7 +2700,7 @@ def seasonal_set(var, dates=None, season=None, dates_range=None, cut=True, seaso
         all_dates_seas = [dates_season[okju[i]:okju[i+1]] for i in range(n_seas)]
         all_var_seas = [var_season[okju[i]:okju[i+1], ...] for i in range(n_seas)]
     else:
-        jump = dates_diff > pd.Timedelta('40 days')
+        jump = dates_diff > np.timedelta64(40, 'D')
         maxjump = int(np.round(np.max([ju.days for ju in dates_diff])/30.))
         len_seas = 12 - maxjump + 1
         # if season is not None:
@@ -2912,18 +2912,32 @@ def date_series(init_dat, end_dat, freq='d', calendar='proleptic_gregorian'):
     return dates
 
 
-def check_daily(dates, allow_diff_HH=True):
-    """
-    Checks if the dataset is a daily dataset.
+# def check_daily(dates, allow_diff_HH=True):
+#     """
+#     Checks if the dataset is a daily dataset.
 
-    < allow_diff_HH > : if set to True (default), allows for a difference up to 12 hours.
-    """
-    daydelta = pd.Timedelta('1 days')
-    delta = dates[1]-dates[0]
+#     < allow_diff_HH > : if set to True (default), allows for a difference up to 12 hours.
+#     """
+#     daydelta = pd.Timedelta('1 days')
+#     delta = dates[1]-dates[0]
 
-    if delta == daydelta:
-        return True
-    elif allow_diff_HH and (delta >= pd.Timedelta('12 hours') and delta <= pd.Timedelta('36 hours')):
+#     if delta == daydelta:
+#         return True
+#     elif allow_diff_HH and (delta >= pd.Timedelta('12 hours') and delta <= pd.Timedelta('36 hours')):
+#         return True
+#     else:
+#         return False
+
+
+def check_daily(time_axis):
+    """Check if the time axis has daily frequency."""
+    if len(time_axis) < 2:
+        return False  # Need at least 2 timestamps to compute deltas
+    
+    # Compute time differences between consecutive steps
+    time_deltas = np.diff(np.array(time_axis))
+    
+    if time_deltas[0] == np.timedelta64(1, 'D'):
         return True
     else:
         return False
@@ -4135,7 +4149,7 @@ def calc_autocorr_wlag(pcs, dates=None, maxlag=40, out_lag1=False):
 
     if dates is not None:
         dates_diff = dates[1:] - dates[:-1]
-        jump = dates_diff > pd.Timedelta('2 days')
+        jump = dates_diff > np.timedelta64(2, 'D')
 
         okju = np.where(jump)[0] + 1
         okju = np.append([0], okju)
@@ -4775,7 +4789,7 @@ def calc_regime_residtimes(indices, dates=None, count_incomplete=True, skip_sing
             regime_nums.append(np.array(clu_num_reg))
     else:
         # dates = pd.to_datetime(dates)
-        duday = pd.Timedelta('2 days 00:00:00')
+        duday = np.timedelta64(2, 'D')
         regime_dates = []
         for clu in range(numclus):
             clu_resids = []
@@ -4839,9 +4853,9 @@ def calc_regime_residtimes(indices, dates=None, count_incomplete=True, skip_sing
             regime_nums.append(np.array(clu_num_reg))
 
     if dates is None:
-        return np.array(resid_times)
+        return resid_times
     else:
-        return np.array(resid_times), np.array(regime_dates), np.array(regime_nums)
+        return resid_times, regime_dates, regime_nums
 
 
 def calc_days_event(labels, resid_times, regime_nums):
