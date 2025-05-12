@@ -10,11 +10,17 @@ Tools contained:
 
 import numpy as np
 import os
+import xarray as xr
+
+from eofs.standard import Eof
 
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 #import matplotlib.patheffects as PathEffects
 from matplotlib.colors import LogNorm
+
+from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances
 
 import pandas as pd
 from datetime import datetime
@@ -3214,3 +3220,276 @@ def EnsClus_light(var_anom, lat=None, flag_perc=False, numpcs=4, perc=80, numclu
         print(stringo)
 
     return centroids, labels, cluspatterns, repres, distances
+
+
+###############################################################################
+
+
+def WRtool_yearround(ds, start_date = None, end_date = None, area = 'EAT', numclus = 7, numpcs = 7):
+    # open dataset netcdf (use_cftime=True if datetime64 doesn't work)
+
+    # dates and coordinate selection
+    ds = ds.sel(time=slice(start_date, end_date))
+    if area is not None:
+        lonW, lonE, latS, latN = ctl.sel_area_translate(area)        
+        ds_EAT = ds.where((ds.lat > latS) & (ds.lat < latN) & (ds.lon > lonW) & (ds.lon < lonE),drop=True)
+
+    # First, ensure the time is in datetime64 (optional depending on your data)
+    # If already in datetime64, skip this step
+    if isinstance(ds_EAT['time'].values[0], cftime.DatetimeNoLeap):
+        ds_EAT['time'] = ds_EAT.indexes['time'].to_datetimeindex()
+    # eliminate leap days
+    ds_EAT = ds_EAT.sel(time=~((ds_EAT['time.month'] == 2) & (ds_EAT['time.day'] == 29)))
+    print(ds_EAT)
+    Z_EAT = ds_EAT['z'][:,:,:]
+
+    ##############################
+
+    # climatology
+    ds_clim = Z_EAT.rolling(time=90, center=True).mean().groupby('time.dayofyear').mean('time').compute()   # Calcola le anomalie sottraendo la climatologia
+    z500_clim = Z_EAT.groupby('time.dayofyear') - ds_clim
+    z500_clim = z500_clim.compute()
+
+    ###############################
+
+    # low pass filter
+    #transform xarray in numpy array
+    z500_clim_np = z500_clim.values
+    #def butter_filter(data, n_days, filtype = 'lowpass', axis = 0, order = 5):
+    z500_np = ctl.butter_filter(z500_clim_np, 10, filtype= 'lowpass', axis = 0, order = 5)
+
+    # recnstruction of xarray.DataArray
+    time_data = Z_EAT['time']
+    # Crea l'array xarray con le coordinate
+    z500 = xr.DataArray(z500_np, coords={'time': time_data, 'lat': Z_EAT['lat'], 'lon': Z_EAT['lon']},
+                            dims=['time', 'lat', 'lon'])
+    # Stampa l'array xarray
+    print(z500)
+
+    ####################################
+    # normalization process
+
+    # we compute the std grouping the datapoint for each day to create a seasonal variation
+    rolling_std = z500.groupby('time.dayofyear').std('time').compute()
+    #rolling_std = rolling_std.sel(dayofyear=rolling_std['dayofyear'] != 60).compute()
+    print(rolling_std.shape)
+
+    # select the december period to create a dataset with december bfore january to compute the
+    # following running mean simulating periodic axis (so we donot lose january information)
+    roll_std_last = rolling_std.sel(dayofyear=slice(338, 366)).compute()
+    print(roll_std_last.shape)
+
+    # we combine the original array with december in front
+    combined_array = xr.concat([roll_std_last, rolling_std], dim='dayofyear').compute()
+    print(combined_array.shape)
+
+    # we compute the rolling mean on a moving 30 days window (expect nan for the first 29 datapoints)
+    rolling_std_mean = combined_array.rolling(dayofyear=30).mean('dayofyear').compute()
+    print(rolling_std_mean.shape)
+
+    # remove nan values from the dataset
+    rolling_std_mean = rolling_std_mean.dropna(dim = 'dayofyear').compute()
+
+    # to calculate the normalization with the variance for the spatial variation (sqrt(mean(std**2)))
+    # so we weight more the areas with much variation
+    rolling_std_mean2 = ((rolling_std_mean)**2).compute()
+    print(rolling_std_mean2.shape)
+
+    # we compute the mean on the spatial dimension 
+    #spatial_mean_std = rolling_std_mean2.mean(dim=['lat', 'lon'])
+    spatial_mean_std = ctl.global_mean(rolling_std_mean2)
+
+    # then we compute the square root
+    spatial_mean_std2 = np.sqrt(spatial_mean_std)
+    print(spatial_mean_std2.shape)
+
+    # check if there are nan in the normalization factor
+    has_missing_values = np.isnan(spatial_mean_std2).any().compute()
+    print(has_missing_values)
+
+    # we compute the normalized anomalies
+    z500_normalized = (z500.groupby('time.dayofyear') / spatial_mean_std2).compute()
+    print(z500_normalized.shape)
+    # we also save them as numpy array for the eof analysis
+    z500_normalized_np = z500_normalized.values
+    print(z500_normalized_np.shape)
+
+    # check if the dataset has nan values
+    has_missing_values = np.isnan(z500_normalized_np).any()
+    print(has_missing_values)
+
+    ########################################
+
+    # eliminate the trend
+    # we try to eliminate a 5 years running mean to smooth out the long period fluctuations
+    z500_trend = z500_normalized.rolling(min_periods = 50, time=1825, center=True).mean().compute()   # min_periods = 5, 
+    z500_detrended = (z500_normalized - z500_trend).compute()
+    z500_detrended_np = z500_detrended.values
+
+    ##########################################################
+
+    #eof calculation using the detrended anomalies
+
+    # convert xarray to numpy array, necessary to use this EOF calculator
+    # one may use the one implemented directly for xarray, but sometimes an internal
+    # conflict of the funtion arises with the version of xarray v2023.07.0
+
+    # calculation of the weights: we weight the area with the square root of the cosine
+    # of the latitude
+    coslat = np.cos(np.deg2rad(z500_detrended.coords['lat'].values)).clip(0., 1.)
+    wgts = np.sqrt(coslat)[..., np.newaxis]
+
+    # compute the EOF and the PC weighted with the square root of the cosine of latitude
+    solver = Eof(z500_detrended_np, weights = wgts)
+    eof = solver.eofs(neofs=numpcs)
+    pc  = solver.pcs(npcs=numpcs, pcscaling=0)
+
+    #compute also the variance, the eigenvalues and the cumulative variance
+    varfrac = solver.varianceFraction()
+    lambdas = solver.eigenvalues()
+    cumulative = varfrac.cumsum()
+
+
+    ##########################################################ààà
+
+    # OPTION N.1 
+    # # K-means clustering done using detrended anomalies to obtain
+    # centroids not containing the trend info
+
+    # random initialization of the centroids
+    kms = KMeans(init='random', n_clusters = numclus, n_init=600, max_iter=300, random_state=None).fit(pc)
+
+    print(kms.cluster_centers_)
+    print(kms.labels_)
+
+    # Step 2: Create the xarray DataArray for the pcs
+    pcdim = pc.shape[1]  # Automatically set the number of principal components
+    pc_xr = xr.DataArray(pc, coords={'time': time_data, 'num': np.arange(pcdim)}, dims=['time', 'num'])
+    print(pc_xr.shape)
+
+
+    # OPTION N.2
+    # project non-detrended anomalies on the detrended eofs
+
+    projected_anom = solver.projectField(z500_normalized_np, neofs=7)
+    print(projected_anom.shape)
+
+    # in order to compute the patterns with the right units we need to transform the numpy arrays of labels and
+    # pcs in xarray to multiply for the normalization factor which is a seasonal cycle
+    time_data = z500_normalized['time']
+    # Step 2: Create the xarray DataArray for the pcs
+    pcdim = projected_anom.shape[1]  # Automatically set the number of principal components
+    projected_anom_xr = xr.DataArray(projected_anom, coords={'time': time_data, 'num': np.arange(pcdim)}, dims=['time', 'num'])
+    print(projected_anom_xr.shape)
+
+
+    ########################################################
+
+    # insert the noRegime condition using the 8th centroid (see Lee et. al. 2023)
+
+    # Step 1: Get the centroids from your existing KMeans clustering = kms.cluster_centers_
+
+    # Step 2: Add the 8th centroid with coordinates (0,0,0,0,0,0,0)
+    new_centroid = np.zeros((1, kms.cluster_centers_.shape[1]))  # Create a (1, 7) array of zeros
+    print(new_centroid)
+    all_centroids = np.vstack([kms.cluster_centers_, new_centroid])  # Stack the new centroid below the existing centroids
+    print(all_centroids.shape)
+
+    # Step 3: Compute the distance of each point to all 8 centroids
+    # Assuming 'pc' is your dataset used for clustering
+    distances = pairwise_distances(pc, all_centroids)  # Compute pairwise Euclidean distances (n_samples, 8)
+    print(distances.shape)
+
+    # Step 4: Assign each point to the closest centroid
+    new_labels = np.argmin(distances, axis=1)  # Find the index of the closest centroid for each point
+    print(new_labels)
+    # Now, new_labels will contain the cluster assignments for 8 clusters.
+    # You can then analyze or plot this new clustering.
+
+
+    # in order to compute the patterns with the right units we need to transform the numpy arrays of labels and
+    # pcs in xarray to multiply for the normalization factor which is a seasonal cycle
+
+
+    time_data = z500_normalized['time']
+
+    # Crea l'array xarray con le coordinate
+    labels_orig_xr = xr.DataArray(kms.labels_, coords={'time': time_data}, dims=['time'])
+    labels_new_xr = xr.DataArray(new_labels, coords={'time': time_data}, dims=['time'])
+
+    # Step 2: Create the xarray DataArray for the pcs
+    #pcdim = pc.shape[1]  # Automatically set the number of principal components
+    #pc_xr = xr.DataArray(pc, coords={'time': time_data, 'num': np.arange(pcdim)}, dims=['time', 'num'])
+
+    # Step 3: Print the xarray DataArrays
+    print(labels_orig_xr.shape)
+    print(labels_new_xr.shape)
+
+    ###############################################
+
+    # # compute the pcs going back from the normalization to plot the wrs patterns with the
+    # correct units
+
+    spatial_mean_std3 = np.mean(spatial_mean_std2)
+    #print(spatial_mean_std3)
+    #pc_denormalized = (pc_xr.groupby('time.dayofyear')) * spatial_mean_std2
+    pc_denormalized = pc_xr * spatial_mean_std3
+    print(pc_denormalized)
+
+
+    # Initialize a dictionary for the denormalized PCs in each cluster (now 8 clusters)
+    clusters_denorm = {}
+
+    # Step 3: Use `new_labels` (which includes 8 clusters) instead of `kms.labels_`
+    for i in range(8):  # Change from 7 to 8
+        clusters_denorm[f"clust{i+1}_denorm"] = np.array(pc_denormalized[new_labels == i])
+
+
+
+    num_clusters = 8
+
+    centroids_denorm = []
+    for i in range(num_clusters):
+        cluster_name = f"clust{i+1}_denorm"  # Assuming your cluster variable names follow this pattern
+        if i == 7:  # 8th cluster (index 7) is manually set to (0,0,0,0,0,0,0)
+            centroid = np.zeros(7)  # Keep it as (0,0,0,0,0,0,0)
+        else:
+            centroid = np.mean(locals()[cluster_name], axis=0)
+        centroids_denorm.append(centroid)
+
+    # Convert the list of centroids to a NumPy array
+    centroids_denorm = np.array(centroids_denorm)
+    print(centroids_denorm)
+
+
+    #################################################
+
+    # function to compute the 
+
+
+    # compute the wrs with the pcs "denormalized" to have the correct units
+    # for the whol eyear period
+
+    wr_year_denorm = calculate_wr_period(centroids_denorm, eof)
+
+    print(np.min(wr_year_denorm))
+    print(np.max(wr_year_denorm))
+    
+    return
+
+
+
+def calculate_wr_period(centroids, eofs):
+    num_centroids = len(centroids)
+    num_eofs = eofs.shape[0]  # Assume eofs is a 3D array (num_eofs, 24, 49)
+    lat_eofs = eofs.shape[1]
+    lon_eofs = eofs.shape[2]
+    wr = np.zeros((num_centroids, lat_eofs, lon_eofs), dtype=float)
+    
+    selected_eofs = eofs[:num_eofs, :, :]  # Select the relevant EOFs for the period
+    
+    for c in range(num_centroids):
+        for w in range(num_eofs):
+            wr[c] += centroids[c][w] * selected_eofs[w, :, :]
+    
+    return wr
