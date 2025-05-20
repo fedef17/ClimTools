@@ -3514,4 +3514,4 @@ def calculate_wr_period(centroids, eofs):
     # # Step 2: Create the xarray DataArray for the pcs
     # pc_np_dim = proj_anom_np.shape[1]  # Automatically set the number of principal components
     # proj_anom = xr.DataArray(proj_anom_np, coords={'time': time_data, 'num': np.arange(pc_np_dim)}, dims=['time', 'num'])
-    # print(proj_anom.shape)
+    #print(proj_anom.shape)
