@@ -5575,11 +5575,11 @@ def plot_mapc_on_ax(ax, data, lat, lon, proj, cmappa, cbar_range, n_color_levels
 
     cyclic = False
 
-    grid_step = np.unique(np.round(np.diff(lon), 4))
+    grid_step = np.unique(np.round(np.diff(lon), 2))
 
     # print(grid_step)
     # lon grid equally spaced and global longitudes
-    if len(grid_step) == 1 and np.round((lon[0]-lon[-1]) % 360, 4) == grid_step[0]:
+    if len(grid_step) == 1 and np.round((lon[0]-lon[-1]) % 360, 2) == grid_step[0]:
         print('Adding cyclic point\n')
         cyclic = True
         # lon = np.append(lon, 360)
